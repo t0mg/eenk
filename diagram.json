@@ -1,0 +1,23 @@
+{
+    "version": 1,
+    "author": "t0mg",
+    "editor": "wokwi",
+    "parts": [
+        {
+            "id": "esp",
+            "type": "board-esp32-c3-devkitm-1"
+        }
+    ],
+    "connections": [
+        [
+            "esp:TX",
+            "$serialMonitor:RX",
+            ""
+        ],
+        [
+            "esp:RX",
+            "$serialMonitor:TX",
+            ""
+        ]
+    ]
+}
