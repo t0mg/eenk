@@ -10,24 +10,20 @@ This project supports two primary build configurations managed via PlatformIO:
 
 ## 1. How to Compile Ink Stories
 
-Before running either configuration, you must compile your `.ink` source files into the optimized binary format required by InkCPP.
+We provide a dedicated **EENK Story Compiler** desktop application to automatically convert your `.ink` source files into the optimized binary format required by InkCPP.
 
-The compilation is a two-step process:
-1. **Compile `.ink` to `.json`** using `inklecate` (located in `tools/inklecate`).
-2. **Compile `.json` to `.bin`** using the custom compiler tool `inkcpp_cl` (built in `lib/inkcpp/build/inkcpp_cl`).
+### Using the GUI
+1. Navigate to `tools/eenk-compiler` and run `npm start` (or install the generated `.exe` from `tools/eenk-compiler/dist-electron`).
+2. Drag and drop your `.ink` file into the compiler window.
+3. The `.bin` file will be generated instantly in the same directory as your source file.
 
-### Step 1: `.ink` ➡️ `.json`
-Run the following command from the project root:
+### Using the CLI
+If you prefer a terminal workflow, you can run the compiler headless by passing the ink file path:
 ```powershell
-.\tools\inklecate\inklecate.exe -j -o stories/hello_world.ink.json stories/hello_world.ink
-```
-
-### Step 2: `.json` ➡️ `.bin`
-Run the `inkcpp_cl` tool. *Note: As this tool is built using MinGW-w64, make sure the MinGW binary folder is in your PATH.*
-```powershell
-# In PowerShell:
-$env:PATH="C:\msys64\mingw64\bin;$env:PATH"
-.\lib\inkcpp\build\inkcpp_cl\inkcpp_cl.exe -o stories/hello_world.bin stories/hello_world.ink.json
+cd tools/eenk-compiler
+npm start ../../stories/hello_world.ink
+# Or using the packaged executable:
+.\dist-electron\win-unpacked\"EENK Story Compiler.exe" ../../stories/hello_world.ink
 ```
 
 ---

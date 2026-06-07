@@ -1,0 +1,9 @@
+{
+  "name": "ExternalFont",
+  "version": "1.0.0",
+  "description": "External font loading from SD card (.epdfont)",
+  "build": {
+    "srcDir": "src",
+    "includeDir": "src"
+  }
+}

@@ -194,11 +194,54 @@ Key behaviors:
 
 ---
 
-### Milestone 3: Physical Device Bring-Up & E-Ink Rendering
-**Goal:** Game running on actual Xteink X4 hardware with e-ink display and physical buttons.
+### Milestone 3: Physical Device Bring-Up
+**Goal:** Migrate the Papyrix Reader display and input drivers into the EENK architecture to run the InkEngine on the real Xteink X4 hardware.
 
-> [!NOTE]
-> This milestone is **blocked** until the device arrives. All prior milestones are designed to minimize work needed here.
+> [!IMPORTANT]
+> **User Review Required:** We have successfully cloned the Papyrix Reader source code into the workspace to extract its battle-tested drivers (`EInkDisplay` and `InputManager`). Since you have ordered the developer edition of the X4, this milestone focuses strictly on compiling the physical hardware abstraction layer. Verification will require you to flash the firmware to the real device when it arrives. Please approve this plan so we can begin the integration.
+
+## Proposed Changes
+
+We will extract the required driver libraries from Papyrix, place them in our `lib/` directory, and wrap them in our abstract C++17 interfaces.
+
+### 1. Papyrix Driver Migration
+#### [NEW] `lib/EInkDisplay/`
+- We will copy the `EInkDisplay` library from the Papyrix clone. This library provides the low-level SPI communication for the SSD1677 display panel used in the X4.
+- Hardware SPI Pins: SCLK (8), MOSI (10), CS (21), DC (4), RST (5), BUSY (6).
+
+#### [NEW] `lib/InputManager/`
+- We will copy the `InputManager` library from Papyrix. This reads the resistor ladder on the X4 directional pad.
+- Hardware ADC Pins: ADC_PIN_1 (1) and ADC_PIN_2 (2).
+
+### 2. Hardware Abstraction Layer (HAL) Integration
+
+#### [NEW] [EspEinkDisplay.cpp](file:///c:/Users/tomgr/dev/eenk/src/hal/esp32/EspEinkDisplay.cpp)
+- Implements `IDisplay`. Wraps `EInkDisplay`.
+- Translates `present()` to `EInkDisplay::displayBuffer(FAST_REFRESH)`.
+- Handles full screen refreshes to clear ghosting.
+
+#### [NEW] [EspAdcInput.cpp](file:///c:/Users/tomgr/dev/eenk/src/hal/esp32/EspAdcInput.cpp)
+- Implements `IInput`. Wraps `InputManager`.
+- Translates Papyrix `InputManager::Button` enums (Up, Down, Enter, Power) into EENK `ButtonEvent` enums (UP, DOWN, CONFIRM, QUIT).
+
+### 3. Build System & Main Flow
+
+#### [MODIFY] [main.cpp](file:///c:/Users/tomgr/dev/eenk/src/main.cpp)
+- Swap out the `EspSerialDisplay` and `EspSerialInput` stubs for the new `EspEinkDisplay` and `EspAdcInput`.
+- Keep using `EspEmbeddedStorage` for now to avoid dealing with the SD Card logic until the display works.
+
+#### [MODIFY] [platformio.ini](file:///c:/Users/tomgr/dev/eenk/platformio.ini)
+- Ensure the `EInkDisplay` and `InputManager` libraries are correctly linked into the `esp32c3` environment.
+
+## Verification Plan
+
+### Automated Build Verification
+- Run `pio run -e esp32c3` to ensure the Papyrix C++ drivers compile successfully within the `INKCPP_NO_STD` highly optimized toolchain environment.
+
+### Manual Verification
+- Once the hardware arrives, flash the `.bin` to the Xteink X4.
+- Verify the InkEngine renders text correctly to the physical e-ink screen.
+- Verify the physical D-Pad allows cycling through choices and confirming them.
 
 #### Tasks
 
@@ -423,3 +466,12 @@ gantt
 
 > [!NOTE]
 > Milestones 0–2 can proceed **immediately** without hardware. M3–5 require the physical device but benefit enormously from all the validation done in M0–2.
+
+---
+
+## Side Projects & Enhancements
+
+### Unified Story Compiler Tool (✅ COMPLETED)
+We have successfully built a dedicated Electron/Vite desktop application that combines `inklecate` and `inkcpp_cl` into a single, seamless pipeline. 
+
+Authors using editors like Inky can now conveniently export ready-to-use `.bin` files for the Xteink X4 with a single drag-and-drop action, vastly improving the developer and author experience. The tool is available in `tools/eenk-compiler` as both a beautiful GUI and a headless CLI.

@@ -15,6 +15,22 @@
 #include <SDL.h>  // for SDL_Delay
 #endif
 
+#include <GfxRenderer.h>
+#include <EpdFont.h>
+#include <EpdFontFamily.h>
+
+// Builtin fonts
+#include <builtinFonts/reader_medium_2b.h>
+#include <builtinFonts/ui_12.h>
+
+static constexpr int FONT_NARRATIVE = 1;
+static constexpr int FONT_CHOICE = 2;
+
+static EpdFont fontNarrativeData(&reader_medium_2b);
+static EpdFont fontChoiceData(&ui_12);
+static EpdFontFamily fontNarrativeFamily(&fontNarrativeData);
+static EpdFontFamily fontChoiceFamily(&fontChoiceData);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Construction / destruction
 // ─────────────────────────────────────────────────────────────────────────────
@@ -25,8 +41,6 @@ InkEngine::InkEngine(IDisplay& display, IInput& input, IStorage& storage)
 
 InkEngine::~InkEngine()
 {
-    // InkCPP smart handles manage runner/globals lifetime
-    // We only manually free the story binary buffer
     if (_story) {
         delete _story;
         _story = nullptr;
@@ -47,8 +61,7 @@ bool InkEngine::loadStory(const char* path)
         return false;
     }
 
-    _story = ink::runtime::story::from_binary(_storyBuf, size,
-                                               /*freeOnDestroy=*/false);
+    _story = ink::runtime::story::from_binary(_storyBuf, size, false);
     if (!_story) {
         fprintf(stderr, "[InkEngine] story::from_binary() failed\n");
         _storage.freeBuffer(_storyBuf);
@@ -61,15 +74,18 @@ bool InkEngine::loadStory(const char* path)
 
     printf("[InkEngine] Story loaded — %zu bytes\n", size);
 
-    _formatter.clear();
+    GfxRenderer* renderer = _display.getRenderer();
+    if (renderer) {
+        renderer->insertFont(FONT_NARRATIVE, fontNarrativeFamily);
+        renderer->insertFont(FONT_CHOICE, fontChoiceFamily);
+    }
+
+    _narrativeLines.clear();
     _state = State::RUNNING_TEXT;
     return true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Main update tick
-// ─────────────────────────────────────────────────────────────────────────────
-
 void InkEngine::update()
 {
     switch (_state) {
@@ -77,8 +93,6 @@ void InkEngine::update()
         tickRunningText();
         break;
     case State::SHOWING_CHOICES:
-        // Immediately transition — SHOWING_CHOICES only exists for one tick
-        // to give the redraw a clean entry point before waiting.
         _state = State::WAITING_INPUT;
         redraw();
         break;
@@ -89,8 +103,6 @@ void InkEngine::update()
         tickStoryEnded();
         break;
     case State::SAVE_STUB:
-        // Stub: just show a message and go back
-        // (real save system in Milestone 5)
         _state = State::WAITING_INPUT;
         redraw();
         break;
@@ -100,23 +112,21 @@ void InkEngine::update()
     }
 
 #ifdef PLATFORM_NATIVE
-    SDL_Delay(16); // cap at ~60 fps to avoid spinning the CPU
+    SDL_Delay(16); // cap at ~60 fps
 #endif
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Drain all available text from the runner into the formatter
-// ─────────────────────────────────────────────────────────────────────────────
-
 void InkEngine::tickRunningText()
 {
-    // Drain as many lines as the runner will give us this tick
-    bool gotAny = false;
     while (_runner->can_continue()) {
         const char* line = _runner->getline_alloc();
         if (line) {
-            _formatter.append(line);
-            gotAny = true;
+            std::string s(line);
+            while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) {
+                s.pop_back();
+            }
+            _narrativeLines.push_back(s);
         }
     }
 
@@ -125,16 +135,14 @@ void InkEngine::tickRunningText()
         _state = State::SHOWING_CHOICES;
         redraw();
     } else {
-        // Story ended
-        _formatter.append("--- THE END ---");
-        _formatter.append("[Press ENTER to restart, ESC to quit]");
+        _narrativeLines.push_back("--- THE END ---");
+        _narrativeLines.push_back("[Press ENTER to restart, ESC to quit]");
         _state = State::STORY_ENDED;
         redraw();
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-
 void InkEngine::collectChoices()
 {
     _numChoices     = 0;
@@ -143,8 +151,7 @@ void InkEngine::collectChoices()
         if (_numChoices >= MAX_CHOICES) break;
         const char* txt = c->text();
         if (txt) {
-            strncpy(_choiceText[_numChoices], txt,
-                    sizeof(_choiceText[0]) - 1);
+            strncpy(_choiceText[_numChoices], txt, sizeof(_choiceText[0]) - 1);
             _choiceText[_numChoices][sizeof(_choiceText[0]) - 1] = '\0';
         } else {
             _choiceText[_numChoices][0] = '\0';
@@ -154,9 +161,6 @@ void InkEngine::collectChoices()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Handle user input
-// ─────────────────────────────────────────────────────────────────────────────
-
 void InkEngine::tickWaitingInput()
 {
     ButtonEvent ev = _input.pollInput();
@@ -176,8 +180,7 @@ void InkEngine::tickWaitingInput()
         }
         break;
     case ButtonEvent::BACK:
-        // Stub: acknowledge with a message on screen
-        _formatter.append("[Save system coming in Milestone 5]");
+        _narrativeLines.push_back("[Save system coming in Milestone 5]");
         _state = State::SAVE_STUB;
         break;
     case ButtonEvent::QUIT:
@@ -189,14 +192,13 @@ void InkEngine::tickWaitingInput()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-
 void InkEngine::tickStoryEnded()
 {
     ButtonEvent ev = _input.pollInput();
     if (ev == ButtonEvent::CONFIRM) {
         _globals = _story->new_globals();
         _runner  = _story->new_runner(_globals);
-        _formatter.clear();
+        _narrativeLines.clear();
         _state = State::RUNNING_TEXT;
     } else if (ev == ButtonEvent::QUIT) {
         _state = State::DONE;
@@ -204,62 +206,78 @@ void InkEngine::tickStoryEnded()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Rendering
-// ─────────────────────────────────────────────────────────────────────────────
-
-int InkEngine::narrativeRows() const
-{
-    // Reserve rows for choices + 1 divider line + 1 blank gap
-    int reserved = (_numChoices > 0) ? _numChoices + 2 : 0;
-    return _display.getRows() - reserved;
-}
-
 void InkEngine::redraw()
 {
     _display.clear();
-    drawNarrativeArea();
-    if (_numChoices > 0) {
-        drawChoiceArea();
+    
+    GfxRenderer* renderer = _display.getRenderer();
+    if (!renderer) {
+        _display.present();
+        return;
     }
-    _display.present();
-}
 
-void InkEngine::drawNarrativeArea()
-{
-    int narRows = narrativeRows();
-    int start, count;
-    _formatter.getVisibleWindow(narRows, &start, &count);
+    int width = _display.getWidth();
+    int height = _display.getHeight();
 
-    for (int i = 0; i < count; ++i) {
-        const char* line = _formatter.getLine(start + i);
-        if (line) {
-            _display.drawText(0, i, line, /*inverted=*/false);
+    int marginX = 24;
+    int marginY = 24;
+    int narrativeWidth = width - (2 * marginX);
+
+    std::vector<std::string> wrappedLines;
+    for (const auto& line : _narrativeLines) {
+        if (line.empty()) {
+            wrappedLines.push_back("");
+            continue;
+        }
+        auto wraps = renderer->wrapTextWithHyphenation(FONT_NARRATIVE, line.c_str(), narrativeWidth, 100);
+        for (const auto& w : wraps) {
+            wrappedLines.push_back(w);
         }
     }
-}
 
-void InkEngine::drawChoiceArea()
-{
-    int totalRows  = _display.getRows();
-    int dividerRow = totalRows - _numChoices - 1;
+    int lineHeight = renderer->getLineHeight(FONT_NARRATIVE);
+    int choiceLineHeight = renderer->getLineHeight(FONT_CHOICE);
+    int choiceHeight = 0;
 
-    // Draw divider line
-    int dividerY = _display.getLineHeight() * dividerRow
-                 + _display.getLineHeight() / 2;
-    _display.drawHLine(dividerY);
-
-    // Draw each choice
-    for (int i = 0; i < _numChoices; ++i) {
-        int row = dividerRow + 1 + i;
-        bool selected = (i == _selectedChoice);
-
-        // Build choice label: "> text" or "  text"
-        char buf[FMT_MAX_LINE_LEN];
-        snprintf(buf, sizeof(buf), "%s %d. %s",
-                 selected ? ">" : " ",
-                 i + 1,
-                 _choiceText[i]);
-
-        _display.drawText(0, row, buf, selected);
+    if (_numChoices > 0) {
+        choiceHeight = (_numChoices * choiceLineHeight) + marginY;
     }
+    
+    int availableHeightForNarrative = height - (2 * marginY) - choiceHeight;
+    int maxVisibleRows = availableHeightForNarrative / lineHeight;
+
+    int startIdx = 0;
+    if ((int)wrappedLines.size() > maxVisibleRows) {
+        startIdx = wrappedLines.size() - maxVisibleRows;
+    }
+
+    int y = marginY;
+    for (size_t i = startIdx; i < wrappedLines.size(); ++i) {
+        if (!wrappedLines[i].empty()) {
+            renderer->drawText(FONT_NARRATIVE, marginX, y, wrappedLines[i].c_str());
+        }
+        y += lineHeight;
+    }
+
+    if (_numChoices > 0) {
+        y += (marginY / 2);
+        renderer->fillRect(marginX, y, narrativeWidth, 2, true);
+        y += (marginY / 2);
+        
+        for (int i = 0; i < _numChoices; ++i) {
+            bool selected = (i == _selectedChoice);
+            char buf[256];
+            snprintf(buf, sizeof(buf), "%s %d. %s", selected ? ">" : " ", i + 1, _choiceText[i]);
+            
+            if (selected) {
+                renderer->fillRect(marginX - 4, y, narrativeWidth + 8, choiceLineHeight, true);
+                renderer->drawText(FONT_CHOICE, marginX, y, buf, false);
+            } else {
+                renderer->drawText(FONT_CHOICE, marginX, y, buf, true);
+            }
+            y += choiceLineHeight;
+        }
+    }
+
+    _display.present();
 }

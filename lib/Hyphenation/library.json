@@ -1,0 +1,9 @@
+{
+  "name": "Hyphenation",
+  "version": "1.0.0",
+  "description": "Liang hyphenation algorithm with language-specific patterns",
+  "build": {
+    "srcDir": "src",
+    "includeDir": "src"
+  }
+}

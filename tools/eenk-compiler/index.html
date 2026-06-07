@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EENK Story Compiler</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="app">
+      <div class="glass-panel">
+        <header>
+          <h1>EENK Compiler</h1>
+          <p>Drag & drop your <code>.ink</code> file to instantly compile it for the Xteink X4 hardware.</p>
+        </header>
+
+        <div id="drop-zone" class="drop-zone">
+          <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+          <span class="drop-text">Drop your .ink file here</span>
+        </div>
+
+        <div id="log-container" class="log-container hidden">
+          <div class="log-header">
+            <h3>Compilation Log</h3>
+            <div id="status-indicator" class="status-indicator processing">Processing...</div>
+          </div>
+          <pre id="log-output"></pre>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/ui.js"></script>
+  </body>
+</html>

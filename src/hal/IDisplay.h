@@ -7,6 +7,8 @@
  *   EInkDisplay  (PLATFORM_ESP32)    — SSD1677 driver via Papyrix GfxRenderer (M2)
  */
 
+class GfxRenderer;
+
 class IDisplay
 {
 public:
@@ -15,20 +17,6 @@ public:
     /** Clear the entire framebuffer to the background colour. */
     virtual void clear() = 0;
 
-    /**
-     * Draw a null-terminated string at character-grid position (col, row).
-     * @param col  Column index (0-based, in character widths)
-     * @param row  Row index (0-based, in line heights)
-     * @param text Null-terminated UTF-8 string (ASCII subset only for now)
-     * @param inverted If true, swap fg/bg colours (for choice highlighting)
-     */
-    virtual void drawText(int col, int row, const char* text, bool inverted = false) = 0;
-
-    /**
-     * Draw a horizontal divider line at the given pixel y-coordinate.
-     * Used to visually separate narrative text from the choice list.
-     */
-    virtual void drawHLine(int y) = 0;
 
     /**
      * Present changes to the display.
@@ -44,12 +32,9 @@ public:
     virtual int getWidth()  const = 0;
     /** Display height in pixels. */
     virtual int getHeight() const = 0;
-    /** Height of one text row in pixels (font height + leading). */
-    virtual int getLineHeight() const = 0;
-    /** Width of one character in pixels. */
-    virtual int getCharWidth()  const = 0;
-    /** Number of usable character columns. */
-    virtual int getCols() const = 0;
-    /** Number of usable character rows. */
-    virtual int getRows() const = 0;
+    /**
+     * Get the underlying pixel-based GfxRenderer for drawing proportional
+     * fonts and graphics.
+     */
+    virtual GfxRenderer* getRenderer() = 0;
 };

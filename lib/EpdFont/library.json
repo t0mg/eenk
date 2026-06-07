@@ -1,0 +1,9 @@
+{
+  "name": "EpdFont",
+  "version": "1.0.0",
+  "description": "Font loading, glyph cache, and built-in font data",
+  "build": {
+    "srcDir": "src",
+    "includeDir": "src"
+  }
+}

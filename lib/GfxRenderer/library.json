@@ -1,0 +1,9 @@
+{
+  "name": "GfxRenderer",
+  "version": "1.0.0",
+  "description": "Graphics rendering engine for e-paper displays",
+  "build": {
+    "srcDir": "src",
+    "includeDir": "src"
+  }
+}

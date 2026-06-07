@@ -1,0 +1,9 @@
+{
+  "name": "Utf8",
+  "version": "1.0.0",
+  "description": "UTF-8 string handling utilities",
+  "build": {
+    "srcDir": "src",
+    "includeDir": "src"
+  }
+}

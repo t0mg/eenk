@@ -67,13 +67,13 @@ int main(int argc, char* argv[])
 // ════════════════════════════════════════════════════════════════════════════
 
 #include <Arduino.h>
-#include "hal/esp32/EspSerialDisplay.h"
-#include "hal/esp32/EspSerialInput.h"
+#include "hal/esp32/EspEinkDisplay.h"
+#include "hal/esp32/EspAdcInput.h"
 #include "hal/esp32/EspLittleFSStorage.h"
 #include "engine/InkEngine.h"
 
-EspSerialDisplay* display = nullptr;
-EspSerialInput* input = nullptr;
+EspEinkDisplay* display = nullptr;
+EspAdcInput* input = nullptr;
 EspLittleFSStorage* storage = nullptr;
 InkEngine* engine = nullptr;
 
@@ -87,8 +87,8 @@ void setup()
     Serial.println("=== EENK Interactive Fiction Runtime (ESP32-C3) ===");
     Serial.printf("Free heap before init: %u bytes\n", ESP.getFreeHeap());
 
-    display = new EspSerialDisplay();
-    input = new EspSerialInput();
+    display = new EspEinkDisplay();
+    input = new EspAdcInput();
     storage = new EspLittleFSStorage();
 
     engine = new InkEngine(*display, *input, *storage);
