@@ -1,0 +1,7 @@
+[submodule "lib/inkcpp"]
+	path = lib/inkcpp
+	url = https://github.com/inkle/inkcpp.git
+
+[submodule "papyrix"]
+	path = papyrix
+	url = https://github.com/bigbag/papyrix-reader

@@ -67,32 +67,52 @@ int main(int argc, char* argv[])
 // ════════════════════════════════════════════════════════════════════════════
 
 #include <Arduino.h>
-#include "hal/esp32/EspEinkDisplay.h"
-#include "hal/esp32/EspAdcInput.h"
 #include "hal/esp32/EspLittleFSStorage.h"
 #include "engine/InkEngine.h"
 
-EspEinkDisplay* display = nullptr;
-EspAdcInput* input = nullptr;
-EspLittleFSStorage* storage = nullptr;
-InkEngine* engine = nullptr;
+#ifdef SERIAL_DEBUG
+// ── Debug mode: render to serial terminal, no e-ink hardware required ───────
+#include "hal/esp32/EspSerialDisplay.h"
+#include "hal/esp32/EspSerialInput.h"
+using DisplayType = EspSerialDisplay;
+using InputType   = EspSerialInput;
+#else
+// ── Hardware mode: e-ink display + ADC D-Pad (Xteink X4) ─────────────────
+#include "hal/esp32/EspEinkDisplay.h"
+#include "hal/esp32/EspAdcInput.h"
+using DisplayType = EspEinkDisplay;
+using InputType   = EspAdcInput;
+#endif
+
+DisplayType*         display = nullptr;
+InputType*           input   = nullptr;
+EspLittleFSStorage*  storage = nullptr;
+InkEngine*           engine  = nullptr;
 
 void setup()
 {
     Serial.begin(115200);
-    delay(1000);
     
-    // Clear terminal screen so Wokwi is clean
+#ifdef SERIAL_DEBUG
+    // Wait for the serial monitor to connect before booting the game
+    while (!Serial) {
+        delay(10);
+    }
+    // VT100 clear is handled by EspSerialDisplay constructor
+    Serial.println("=== EENK Interactive Fiction Runtime (ESP32-C3 / Serial Debug) ===");
+#else
+    delay(1000);
     Serial.print("\x1B[2J\x1B[H");
     Serial.println("=== EENK Interactive Fiction Runtime (ESP32-C3) ===");
+#endif
     Serial.printf("Free heap before init: %u bytes\n", ESP.getFreeHeap());
 
-    display = new EspEinkDisplay();
-    input = new EspAdcInput();
+    display = new DisplayType();
+    input   = new InputType();
     storage = new EspLittleFSStorage();
 
     engine = new InkEngine(*display, *input, *storage);
-    
+
     const char* storyPath = "/the_intercept.bin";
     if (!storage->fileExists(storyPath)) {
         Serial.printf("ERROR: Story not found in Embedded Flash: %s\n", storyPath);
@@ -105,7 +125,12 @@ void setup()
     }
 
     Serial.printf("Free heap after load: %u bytes\n", ESP.getFreeHeap());
-    delay(2000); // Give user time to see the RAM stats before clearing screen
+    delay(2000); // Give user time to see RAM stats
+
+#ifdef SERIAL_DEBUG
+    Serial.println("Controls: W/S = Up/Down, Enter = Confirm, B = Back, Q = Quit");
+    Serial.println("────────────────────────────────────────");
+#endif
 }
 
 void loop()

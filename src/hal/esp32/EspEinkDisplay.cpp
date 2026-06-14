@@ -1,4 +1,4 @@
-#ifdef PLATFORM_ESP32
+#if defined(PLATFORM_ESP32) && !defined(SERIAL_DEBUG)
 
 #include "EspEinkDisplay.h"
 #include <SPI.h>

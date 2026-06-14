@@ -15,6 +15,7 @@
 #include <SDL.h>  // for SDL_Delay
 #endif
 
+#ifndef SERIAL_DEBUG
 #include <GfxRenderer.h>
 #include <EpdFont.h>
 #include <EpdFontFamily.h>
@@ -30,6 +31,7 @@ static EpdFont fontNarrativeData(&reader_medium_2b);
 static EpdFont fontChoiceData(&ui_12);
 static EpdFontFamily fontNarrativeFamily(&fontNarrativeData);
 static EpdFontFamily fontChoiceFamily(&fontChoiceData);
+#endif // !SERIAL_DEBUG
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Construction / destruction
@@ -74,11 +76,13 @@ bool InkEngine::loadStory(const char* path)
 
     printf("[InkEngine] Story loaded — %zu bytes\n", size);
 
+#ifndef SERIAL_DEBUG
     GfxRenderer* renderer = _display.getRenderer();
     if (renderer) {
         renderer->insertFont(FONT_NARRATIVE, fontNarrativeFamily);
         renderer->insertFont(FONT_CHOICE, fontChoiceFamily);
     }
+#endif
 
     _narrativeLines.clear();
     _state = State::RUNNING_TEXT;
@@ -209,13 +213,24 @@ void InkEngine::tickStoryEnded()
 void InkEngine::redraw()
 {
     _display.clear();
-    
+
     GfxRenderer* renderer = _display.getRenderer();
     if (!renderer) {
+        // ── Text-mode (e.g. EspSerialDisplay) ───────────────────────────────
+        for (const auto& line : _narrativeLines) {
+            _display.drawNarrativeLine(line.c_str());
+        }
+        if (_numChoices > 0) {
+            _display.drawSeparator();
+            for (int i = 0; i < _numChoices; ++i) {
+                _display.drawChoiceLine(i, _choiceText[i], i == _selectedChoice);
+            }
+        }
         _display.present();
         return;
     }
 
+#ifndef SERIAL_DEBUG
     int width = _display.getWidth();
     int height = _display.getHeight();
 
@@ -242,7 +257,7 @@ void InkEngine::redraw()
     if (_numChoices > 0) {
         choiceHeight = (_numChoices * choiceLineHeight) + marginY;
     }
-    
+
     int availableHeightForNarrative = height - (2 * marginY) - choiceHeight;
     int maxVisibleRows = availableHeightForNarrative / lineHeight;
 
@@ -263,12 +278,12 @@ void InkEngine::redraw()
         y += (marginY / 2);
         renderer->fillRect(marginX, y, narrativeWidth, 2, true);
         y += (marginY / 2);
-        
+
         for (int i = 0; i < _numChoices; ++i) {
             bool selected = (i == _selectedChoice);
             char buf[256];
             snprintf(buf, sizeof(buf), "%s %d. %s", selected ? ">" : " ", i + 1, _choiceText[i]);
-            
+
             if (selected) {
                 renderer->fillRect(marginX - 4, y, narrativeWidth + 8, choiceLineHeight, true);
                 renderer->drawText(FONT_CHOICE, marginX, y, buf, false);
@@ -280,4 +295,5 @@ void InkEngine::redraw()
     }
 
     _display.present();
+#endif // !SERIAL_DEBUG
 }
