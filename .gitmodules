@@ -1,6 +1,6 @@
 [submodule "lib/inkcpp"]
 	path = lib/inkcpp
-	url = https://github.com/inkle/inkcpp.git
+	url = https://github.com/t0mg/inkcpp.git
 
 [submodule "papyrix"]
 	path = papyrix
