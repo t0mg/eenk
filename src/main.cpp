@@ -139,7 +139,13 @@ void loop() {
   if (engine && !engine->isDone()) {
     engine->update();
   } else {
+#ifdef PLATFORM_ESP32
+    Serial.println("Engine done. Restarting...");
+    delay(1000);
+    ESP.restart();
+#else
     delay(100);
+#endif
   }
 }
 

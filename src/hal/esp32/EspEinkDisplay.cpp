@@ -21,7 +21,7 @@ EspEinkDisplay::EspEinkDisplay()
     _gfxRenderer.begin();
     // Hardware has LandscapeCounterClockwise natively or we can just use Portrait to map it!
     // Papyrix's Portrait handles mapping to the 800x480 frame buffer.
-    _gfxRenderer.setOrientation(GfxRenderer::PortraitInverted);
+    _gfxRenderer.setOrientation(GfxRenderer::Portrait);
 
     clear();
 }
