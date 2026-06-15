@@ -66,3 +66,17 @@ pio run -e esp32c3 -t upload
 ```
 
 Alternatively, you can flash using the **Flash** tab within the EENKY IDE, which uses ESP Web Tools to push `firmware-factory.bin` over USB.
+
+---
+
+## 4. ESP32-C3 Serial Debug (`esp32c3_serial` configuration)
+
+If you have a generic ESP32-C3 development board and no e-ink screen attached, you can use the `esp32c3_serial` environment. This target renders the game directly to the USB serial terminal using VT100 escape codes instead of trying to drive an e-ink display.
+
+```powershell
+# Build and upload the serial debug target
+pio run -e esp32c3_serial -t upload
+
+# Open the serial monitor to play the story
+pio device monitor -e esp32c3_serial
+```
