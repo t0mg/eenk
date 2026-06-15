@@ -2,6 +2,7 @@
 	path = lib/inkcpp
 	url = https://github.com/t0mg/inkcpp.git
 	branch = eenk-patches
+	ignore = all
 
 [submodule "tools/eenky"]
 	path = tools/eenky
