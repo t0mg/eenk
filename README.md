@@ -1,36 +1,28 @@
-# EENK — Interactive Fiction Runtime for Xteink X4
+# EENK — Interactive Fiction Firmware for Xteink X4
 
-Welcome to **EENK**, a custom firmware fork of the **Papyrix Reader** designed to run **InkCPP** interactive fiction stories on the Xteink X4 e-reader.
+Welcome to **EENK**, a custom firmware designed to run **Ink** interactive fiction stories on the Xteink X4 e-ink device, utilizing the [inkcpp](https://github.com/t0mg/inkcpp) C++ runtime.
 
 This project supports two primary build configurations managed via PlatformIO:
-- **`native`**: A desktop simulation of the runtime, using an 800x480 SDL2 graphical window to simulate the e-ink display.
-- **`esp32c3`**: The firmware build for the actual ESP32-C3 microcontroller hardware (simulated in Wokwi, outputting via VT100 Serial).
+- **`native`**: A desktop simulation of the runtime, using an 800x480 SDL2 graphical window to simulate the e-ink display for testing.
+- **`esp32c3`**: The firmware build for the actual ESP32-C3 microcontroller hardware.
 
 ---
 
-## 1. How to Compile Ink Stories
+## 1. Project Architecture
 
-We provide a dedicated **EENK Story Compiler** desktop application to automatically convert your `.ink` source files into the optimized binary format required by InkCPP.
+The EENK ecosystem relies on two repositories working together through git submodules:
 
-### Using the GUI
-1. Navigate to `tools/eenk-compiler` and run `npm start` (or install the generated `.exe` from `tools/eenk-compiler/dist-electron`).
-2. Drag and drop your `.ink` file into the compiler window.
-3. The `.bin` file will be generated instantly in the same directory as your source file.
+- **`eenk` (This repository)**: The core C++ firmware and SDL simulation runtime. It handles rendering to the e-ink display (or SDL window) and executing the compiled Ink binary using the `inkcpp` runtime.
+- **`eenky` (IDE)**: The Electron-based editor and toolchain. It provides the UI to write Ink stories, compile them to JSON and then to `.bin`, run the SDL simulator from `eenk`, and finally flash the compiled firmware to the device via Web Serial.
 
-### Using the CLI
-If you prefer a terminal workflow, you can run the compiler headless by passing the ink file path:
-```powershell
-cd tools/eenk-compiler
-npm start ../../stories/hello_world.ink
-# Or using the packaged executable:
-.\dist-electron\win-unpacked\"EENK Story Compiler.exe" ../../stories/hello_world.ink
-```
+> [!NOTE]
+> `eenky` is included as a submodule in `tools/eenky`. Conversely, `eenky` includes `eenk` as a submodule to build the simulator backend. They operate in tandem.
 
 ---
 
 ## 2. Desktop Simulation (`native` configuration)
 
-The native configuration compiles a host executable that runs the compiled story interactively in an 800x480 SDL2 graphical window, rendering text with a bundled CP437 font to perfectly simulate the e-ink experience.
+The native configuration compiles a host executable that runs the compiled story interactively in an 800x480 SDL2 graphical window, rendering text with a bundled CP437 font to perfectly simulate the e-ink experience. This executable is used as the simulation backend for the EENKY IDE.
 
 ### Building the Native Target
 Ensure that the MinGW compiler suite (`g++`) is in your PATH. If you use MSYS2, the compiler path is typically `C:\msys64\mingw64\bin`.
@@ -42,38 +34,35 @@ pio run -e native
 ```
 
 ### Running the Native Target
-Once built, the executable is created at `.pio/build/native/program.exe`. The runtime standard libraries and SDL2 are statically linked, so you can execute the program directly with the compiled story file:
+Once built, the executable is created at `.pio/build/native/program.exe`. The runtime standard libraries and SDL2 are statically linked, so you can execute the program directly with a compiled story file:
 
 ```powershell
-# Run with the compiled story
-.pio\build\native\program.exe stories/the_intercept.bin
+# Run with a compiled story
+.pio\build\native\program.exe path/to/story.bin
 ```
 
 Use `W/S` or the **Arrow Keys** to navigate choices, and **Enter** to confirm.
-
 
 ---
 
 ## 3. ESP32-C3 Target (`esp32c3` configuration)
 
-The `esp32c3` environment builds the firmware partition for the actual physical device or Wokwi simulator. In this milestone, the display driver is stubbed out and replaced with a VT100 Serial renderer, allowing you to play the game inside the Wokwi Serial Monitor!
+The `esp32c3` environment builds the firmware partition for the actual physical device.
 
-### Building the ESP32 Target
-The firmware embeds the story binary directly into the flash `.rodata` section (configured via `board_build.embed_txtfiles = data/the_intercept.bin`). To compile the firmware, run:
+### Building the Firmware
+To compile the firmware for the Xteink X4, run:
 ```powershell
 pio run -e esp32c3
 ```
-This produces the firmware binaries under `.pio/build/esp32c3/firmware.bin`.
 
-### Wokwi Simulation Behavior
-Start the Wokwi simulation via the VS Code extension or web interface. The terminal output will boot the ESP32, mount the embedded data, print memory usage statistics, and drop you straight into the interactive story loop:
+This compiles the firmware and runs the `merge_firmware.py` post-build script to produce the merged binary ready for web flashing:
+- `.pio/build/esp32c3/firmware.bin` (The app partition)
+- **`.pio/build/esp32c3/firmware-factory.bin`** (The merged bootloader + partition table + app, used by ESP Web Tools in the EENKY IDE)
 
-```text
-=== EENK Interactive Fiction Runtime (ESP32-C3) ===
-Free heap before init: 306388 bytes
-[InkEngine] Story loaded — 150897 bytes
-Free heap after load: 112008 bytes
-...
+### Flashing the Firmware (CLI)
+You can flash the device directly from PlatformIO:
+```powershell
+pio run -e esp32c3 -t upload
 ```
 
-Click on the Serial Terminal and use the keyboard to navigate through the story!
+Alternatively, you can flash using the **Flash** tab within the EENKY IDE, which uses ESP Web Tools to push `firmware-factory.bin` over USB.
