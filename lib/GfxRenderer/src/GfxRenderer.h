@@ -38,6 +38,7 @@ class GfxRenderer {
   EInkDisplay& einkDisplay;
   RenderMode renderMode;
   Orientation orientation;
+  bool drawHalftone = false;
   uint8_t* frameBuffer = nullptr;
   uint8_t* bwBufferChunks[BW_BUFFER_NUM_CHUNKS] = {nullptr};
   std::map<int, EpdFontFamily> fontMap;
@@ -176,6 +177,9 @@ class GfxRenderer {
     }
     return sf ? sf : it->second[EpdFontFamily::REGULAR];
   }
+
+  void setHalftone(bool enabled) { drawHalftone = enabled; }
+  bool getHalftone() const { return drawHalftone; }
 
   // Orientation control (affects logical width/height and coordinate transforms)
   void setOrientation(const Orientation o) { orientation = o; }

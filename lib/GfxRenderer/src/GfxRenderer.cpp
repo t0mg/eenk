@@ -62,7 +62,11 @@ __attribute__((always_inline)) static inline void writeFB(uint8_t* fb, int strid
 
 __attribute__((always_inline)) static inline void orientedWriteFB(uint8_t* fb, int stride, int sX, int sY,
                                                                   GfxRenderer::Orientation o, int panelW, int panelH,
-                                                                  bool state) {
+                                                                  bool state, bool halftone = false) {
+  if (halftone && state) {
+    // 2x2 checkerboard drastically reduces e-ink source driver crosstalk (VCOM bounce)
+    if (((sX >> 1) + (sY >> 1)) & 1) return;
+  }
   int pX, pY;
   switch (o) {
     case GfxRenderer::LandscapeCounterClockwise:
@@ -169,6 +173,9 @@ void GfxRenderer::begin() {
 }
 
 void GfxRenderer::drawPixel(const int x, const int y, const bool state) const {
+  if (drawHalftone && state) {
+    if (((x >> 1) + (y >> 1)) & 1) return;
+  }
   int rotatedX = 0;
   int rotatedY = 0;
   rotateCoordinates(x, y, &rotatedX, &rotatedY);
@@ -523,11 +530,11 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
       const uint8_t val = (srcRow[bmpX >> 2] >> (6 - ((bmpX & 3) << 1))) & 0x3;
       const int sX = x + dx;
       if (renderMode == BW && val < 3) {
-        orientedWriteFB(frameBuffer, stride, sX, screenY, orientation, panelW, panelH, true);
+        orientedWriteFB(frameBuffer, stride, sX, screenY, orientation, panelW, panelH, true, drawHalftone);
       } else if (renderMode == GRAYSCALE_MSB && (val == 1 || val == 2)) {
-        orientedWriteFB(frameBuffer, stride, sX, screenY, orientation, panelW, panelH, false);
+        orientedWriteFB(frameBuffer, stride, sX, screenY, orientation, panelW, panelH, false, drawHalftone);
       } else if (renderMode == GRAYSCALE_LSB && val == 1) {
-        orientedWriteFB(frameBuffer, stride, sX, screenY, orientation, panelW, panelH, false);
+        orientedWriteFB(frameBuffer, stride, sX, screenY, orientation, panelW, panelH, false, drawHalftone);
       }
     }
   }
@@ -1176,7 +1183,7 @@ void GfxRenderer::renderChar(const EpdFontFamily& fontFamily, const uint32_t cp,
           bool st;
           if (!extractFontPixel(bitmap, gy * width + gx, is2Bit, renderMode, pixelState, st)) continue;
           const int sX = logLeft + gx;
-          orientedWriteFB(frameBuffer, stride, sX, sY, orientation, panelW, panelH, st);
+          orientedWriteFB(frameBuffer, stride, sX, sY, orientation, panelW, panelH, st, drawHalftone);
         }
       }
     }

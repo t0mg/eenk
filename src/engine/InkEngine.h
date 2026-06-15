@@ -38,6 +38,7 @@ private:
     const unsigned char*  _storyBuf = nullptr;
 
     std::vector<std::string> _narrativeLines;
+    size_t _oldTextLineCount = 0;
 
     static constexpr int MAX_CHOICES = 8;
     char  _choiceText[MAX_CHOICES][128] = {};

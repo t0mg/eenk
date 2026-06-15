@@ -85,6 +85,7 @@ bool InkEngine::loadStory(const char* path)
 #endif
 
     _narrativeLines.clear();
+    _oldTextLineCount = 0;
     _state = State::RUNNING_TEXT;
     return true;
 }
@@ -179,6 +180,7 @@ void InkEngine::tickWaitingInput()
         break;
     case ButtonEvent::CONFIRM:
         if (_numChoices > 0) {
+            _oldTextLineCount = _narrativeLines.size();
             _runner->choose(static_cast<std::size_t>(_selectedChoice));
             _state = State::RUNNING_TEXT;
         }
@@ -203,6 +205,7 @@ void InkEngine::tickStoryEnded()
         _globals = _story->new_globals();
         _runner  = _story->new_runner(_globals);
         _narrativeLines.clear();
+        _oldTextLineCount = 0;
         _state = State::RUNNING_TEXT;
     } else if (ev == ButtonEvent::QUIT) {
         _state = State::DONE;
@@ -238,15 +241,21 @@ void InkEngine::redraw()
     int marginY = 24;
     int narrativeWidth = width - (2 * marginX);
 
-    std::vector<std::string> wrappedLines;
-    for (const auto& line : _narrativeLines) {
+    struct WrappedLine {
+        std::string text;
+        bool isOld;
+    };
+    std::vector<WrappedLine> wrappedLines;
+    for (size_t j = 0; j < _narrativeLines.size(); ++j) {
+        const auto& line = _narrativeLines[j];
+        bool isOld = (j < _oldTextLineCount);
         if (line.empty()) {
-            wrappedLines.push_back("");
+            wrappedLines.push_back({"", isOld});
             continue;
         }
         auto wraps = renderer->wrapTextWithHyphenation(FONT_NARRATIVE, line.c_str(), narrativeWidth, 100);
         for (const auto& w : wraps) {
-            wrappedLines.push_back(w);
+            wrappedLines.push_back({w, isOld});
         }
     }
 
@@ -268,8 +277,10 @@ void InkEngine::redraw()
 
     int y = marginY;
     for (size_t i = startIdx; i < wrappedLines.size(); ++i) {
-        if (!wrappedLines[i].empty()) {
-            renderer->drawText(FONT_NARRATIVE, marginX, y, wrappedLines[i].c_str());
+        if (!wrappedLines[i].text.empty()) {
+            renderer->setHalftone(wrappedLines[i].isOld);
+            renderer->drawText(FONT_NARRATIVE, marginX, y, wrappedLines[i].text.c_str());
+            renderer->setHalftone(false);
         }
         y += lineHeight;
     }
