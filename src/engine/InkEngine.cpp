@@ -84,8 +84,9 @@ bool InkEngine::loadStory(const char* path)
     }
 #endif
 
-    _narrativeLines.clear();
-    _oldTextLineCount = 0;
+    _wrappedLines.clear();
+    _scrollY = 0;
+    _maxScrollY = 0;
     _state = State::RUNNING_TEXT;
     return true;
 }
@@ -124,6 +125,26 @@ void InkEngine::update()
 // ─────────────────────────────────────────────────────────────────────────────
 void InkEngine::tickRunningText()
 {
+    GfxRenderer* renderer = _display.getRenderer();
+    int narrativeWidth = _display.getWidth() - 48; // 2 * marginX
+    int newLinesCount = 0;
+
+    auto pushLine = [&](const std::string& str) {
+        if (str.empty()) {
+            _wrappedLines.push_back({"", false});
+            newLinesCount++;
+        } else if (renderer) {
+            auto wraps = renderer->wrapTextWithHyphenation(FONT_NARRATIVE, str.c_str(), narrativeWidth, 100);
+            for (auto& w : wraps) {
+                _wrappedLines.push_back({w, false});
+                newLinesCount++;
+            }
+        } else {
+            _wrappedLines.push_back({str, false});
+            newLinesCount++;
+        }
+    };
+
     while (_runner->can_continue()) {
         const char* line = _runner->getline_alloc();
         if (line) {
@@ -131,17 +152,48 @@ void InkEngine::tickRunningText()
             while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) {
                 s.pop_back();
             }
-            _narrativeLines.push_back(s);
+            pushLine(s);
         }
     }
 
+    while (_wrappedLines.size() > 300) {
+        _wrappedLines.pop_front();
+    }
+
+    auto doAutoScroll = [&]() {
+        if (!renderer) return;
+        int height = _display.getHeight();
+        int marginY = 24;
+        int choiceHeight = (_numChoices > 0) ? ((_numChoices * renderer->getLineHeight(FONT_CHOICE)) + marginY) : 0;
+        int documentHeight = _wrappedLines.size() * renderer->getLineHeight(FONT_NARRATIVE) + choiceHeight;
+        int availableHeight = height - (2 * marginY);
+        
+        _maxScrollY = std::max(0, documentHeight - availableHeight);
+        
+        int newContentHeight = newLinesCount * renderer->getLineHeight(FONT_NARRATIVE) + choiceHeight;
+        if (newContentHeight > availableHeight) {
+            // Scroll so the first new line is at the top of the visible narrative area
+            int oldLinesCount = _wrappedLines.size() - newLinesCount;
+            _scrollY = std::min(_maxScrollY, oldLinesCount * renderer->getLineHeight(FONT_NARRATIVE));
+        } else {
+            // Snap to bottom
+            _scrollY = _maxScrollY;
+        }
+
+        if (_numChoices > 0 && _scrollY > _maxScrollY - choiceHeight - marginY) {
+            _scrollY = _maxScrollY;
+        }
+    };
+
     if (_runner->has_choices()) {
         collectChoices();
+        doAutoScroll();
         _state = State::SHOWING_CHOICES;
         redraw();
     } else {
-        _narrativeLines.push_back("--- THE END ---");
-        _narrativeLines.push_back("[Press ENTER to restart, ESC to quit]");
+        pushLine("--- THE END ---");
+        pushLine("[Press ENTER to restart, ESC to quit]");
+        doAutoScroll();
         _state = State::STORY_ENDED;
         redraw();
     }
@@ -169,24 +221,68 @@ void InkEngine::collectChoices()
 void InkEngine::tickWaitingInput()
 {
     ButtonEvent ev = _input.pollInput();
+
+    bool choicesVisible = false;
+    GfxRenderer* renderer = _display.getRenderer();
+    if (renderer && _numChoices > 0) {
+        int marginY = 24;
+        int choiceHeight = (_numChoices * renderer->getLineHeight(FONT_CHOICE)) + marginY;
+        if (_scrollY > _maxScrollY - choiceHeight - marginY) {
+            choicesVisible = true;
+        }
+    } else if (!renderer) {
+        choicesVisible = true;
+    }
+
+    if (!choicesVisible) {
+        if (ev == ButtonEvent::UP) ev = ButtonEvent::LEFT;
+        if (ev == ButtonEvent::DOWN) ev = ButtonEvent::RIGHT;
+    }
+
     switch (ev) {
     case ButtonEvent::UP:
         if (_selectedChoice > 0) --_selectedChoice;
+        else if (_numChoices > 0) _selectedChoice = _numChoices - 1;
         redraw();
         break;
     case ButtonEvent::DOWN:
         if (_selectedChoice < _numChoices - 1) ++_selectedChoice;
+        else if (_numChoices > 0) _selectedChoice = 0;
         redraw();
         break;
+    case ButtonEvent::LEFT: {
+        int scrollAmount = _display.getHeight() / 4;
+        _scrollY -= scrollAmount;
+        if (_scrollY < 0) _scrollY = 0;
+        redraw();
+        break;
+    }
+    case ButtonEvent::RIGHT: {
+        int scrollAmount = _display.getHeight() / 4;
+        _scrollY += scrollAmount;
+        
+        GfxRenderer* renderer = _display.getRenderer();
+        if (renderer && _numChoices > 0) {
+            int marginY = 24;
+            int choiceHeight = (_numChoices * renderer->getLineHeight(FONT_CHOICE)) + marginY;
+            if (_scrollY > _maxScrollY - choiceHeight - marginY) {
+                _scrollY = _maxScrollY;
+            }
+        }
+        
+        if (_scrollY > _maxScrollY) _scrollY = _maxScrollY;
+        redraw();
+        break;
+    }
     case ButtonEvent::CONFIRM:
         if (_numChoices > 0) {
-            _oldTextLineCount = _narrativeLines.size();
+            for (auto& l : _wrappedLines) l.isOld = true;
             _runner->choose(static_cast<std::size_t>(_selectedChoice));
             _state = State::RUNNING_TEXT;
         }
         break;
     case ButtonEvent::BACK:
-        _narrativeLines.push_back("[Save system coming in Milestone 5]");
+        _wrappedLines.push_back({"[Save system coming in Milestone 5]", false});
         _state = State::SAVE_STUB;
         break;
     case ButtonEvent::QUIT:
@@ -204,9 +300,30 @@ void InkEngine::tickStoryEnded()
     if (ev == ButtonEvent::CONFIRM) {
         _globals = _story->new_globals();
         _runner  = _story->new_runner(_globals);
-        _narrativeLines.clear();
-        _oldTextLineCount = 0;
+        _wrappedLines.clear();
+        _scrollY = 0;
+        _maxScrollY = 0;
         _state = State::RUNNING_TEXT;
+    } else if (ev == ButtonEvent::LEFT) {
+        int scrollAmount = _display.getHeight() / 4;
+        _scrollY -= scrollAmount;
+        if (_scrollY < 0) _scrollY = 0;
+        redraw();
+    } else if (ev == ButtonEvent::RIGHT) {
+        int scrollAmount = _display.getHeight() / 4;
+        _scrollY += scrollAmount;
+        
+        GfxRenderer* renderer = _display.getRenderer();
+        if (renderer && _numChoices > 0) {
+            int marginY = 24;
+            int choiceHeight = (_numChoices * renderer->getLineHeight(FONT_CHOICE)) + marginY;
+            if (_scrollY > _maxScrollY - choiceHeight - marginY) {
+                _scrollY = _maxScrollY;
+            }
+        }
+        
+        if (_scrollY > _maxScrollY) _scrollY = _maxScrollY;
+        redraw();
     } else if (ev == ButtonEvent::QUIT) {
         _state = State::DONE;
     }
@@ -220,8 +337,8 @@ void InkEngine::redraw()
     GfxRenderer* renderer = _display.getRenderer();
     if (!renderer) {
         // ── Text-mode (e.g. EspSerialDisplay) ───────────────────────────────
-        for (const auto& line : _narrativeLines) {
-            _display.drawNarrativeLine(line.c_str());
+        for (const auto& line : _wrappedLines) {
+            _display.drawNarrativeLine(line.text.c_str());
         }
         if (_numChoices > 0) {
             _display.drawSeparator();
@@ -241,45 +358,15 @@ void InkEngine::redraw()
     int marginY = 24;
     int narrativeWidth = width - (2 * marginX);
 
-    struct WrappedLine {
-        std::string text;
-        bool isOld;
-    };
-    std::vector<WrappedLine> wrappedLines;
-    for (size_t j = 0; j < _narrativeLines.size(); ++j) {
-        const auto& line = _narrativeLines[j];
-        bool isOld = (j < _oldTextLineCount);
-        if (line.empty()) {
-            wrappedLines.push_back({"", isOld});
-            continue;
-        }
-        auto wraps = renderer->wrapTextWithHyphenation(FONT_NARRATIVE, line.c_str(), narrativeWidth, 100);
-        for (const auto& w : wraps) {
-            wrappedLines.push_back({w, isOld});
-        }
-    }
-
     int lineHeight = renderer->getLineHeight(FONT_NARRATIVE);
     int choiceLineHeight = renderer->getLineHeight(FONT_CHOICE);
-    int choiceHeight = 0;
+    
+    int y = marginY - _scrollY;
 
-    if (_numChoices > 0) {
-        choiceHeight = (_numChoices * choiceLineHeight) + marginY;
-    }
-
-    int availableHeightForNarrative = height - (2 * marginY) - choiceHeight;
-    int maxVisibleRows = availableHeightForNarrative / lineHeight;
-
-    int startIdx = 0;
-    if ((int)wrappedLines.size() > maxVisibleRows) {
-        startIdx = wrappedLines.size() - maxVisibleRows;
-    }
-
-    int y = marginY;
-    for (size_t i = startIdx; i < wrappedLines.size(); ++i) {
-        if (!wrappedLines[i].text.empty()) {
-            renderer->setHalftone(wrappedLines[i].isOld);
-            renderer->drawText(FONT_NARRATIVE, marginX, y, wrappedLines[i].text.c_str());
+    for (const auto& w : _wrappedLines) {
+        if (!w.text.empty() && (y + lineHeight > 0) && (y < height)) {
+            renderer->setHalftone(w.isOld);
+            renderer->drawText(FONT_NARRATIVE, marginX, y, w.text.c_str());
             renderer->setHalftone(false);
         }
         y += lineHeight;
@@ -287,19 +374,24 @@ void InkEngine::redraw()
 
     if (_numChoices > 0) {
         y += (marginY / 2);
-        renderer->fillRect(marginX, y, narrativeWidth, 2, true);
+        
+        if ((y + 2 > 0) && (y < height)) {
+            renderer->fillRect(marginX, y, narrativeWidth, 2, true);
+        }
         y += (marginY / 2);
 
         for (int i = 0; i < _numChoices; ++i) {
             bool selected = (i == _selectedChoice);
             char buf[256];
-            snprintf(buf, sizeof(buf), "%s %d. %s", selected ? ">" : " ", i + 1, _choiceText[i]);
+            snprintf(buf, sizeof(buf), "%s %s", selected ? ">" : " ", _choiceText[i]);
 
-            if (selected) {
-                renderer->fillRect(marginX - 4, y, narrativeWidth + 8, choiceLineHeight, true);
-                renderer->drawText(FONT_CHOICE, marginX, y, buf, false);
-            } else {
-                renderer->drawText(FONT_CHOICE, marginX, y, buf, true);
+            if ((y + choiceLineHeight > 0) && (y < height)) {
+                if (selected) {
+                    renderer->fillRect(marginX - 4, y, narrativeWidth + 8, choiceLineHeight, true);
+                    renderer->drawText(FONT_CHOICE, marginX, y, buf, false);
+                } else {
+                    renderer->drawText(FONT_CHOICE, marginX, y, buf, true);
+                }
             }
             y += choiceLineHeight;
         }

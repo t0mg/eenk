@@ -15,6 +15,7 @@
 
 #include <cstddef>
 #include <vector>
+#include <deque>
 #include <string>
 
 class InkEngine
@@ -37,8 +38,13 @@ private:
     ink::runtime::globals _globals = nullptr;
     const unsigned char*  _storyBuf = nullptr;
 
-    std::vector<std::string> _narrativeLines;
-    size_t _oldTextLineCount = 0;
+    struct WrappedLine {
+        std::string text;
+        bool isOld;
+    };
+    std::deque<WrappedLine> _wrappedLines;
+    int _scrollY = 0;
+    int _maxScrollY = 0;
 
     static constexpr int MAX_CHOICES = 8;
     char  _choiceText[MAX_CHOICES][128] = {};

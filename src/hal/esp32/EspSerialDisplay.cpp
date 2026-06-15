@@ -28,9 +28,9 @@ void EspSerialDisplay::drawChoiceLine(int index, const char* text, bool selected
 {
     if (selected) {
         // Bold + invert via VT100
-        Serial.printf("\x1B[7m > %d. %s\x1B[0m\r\n", index + 1, text);
+        Serial.printf("\x1B[7m > %s\x1B[0m\r\n", text);
     } else {
-        Serial.printf("   %d. %s\r\n", index + 1, text);
+        Serial.printf("   %s\r\n", text);
     }
 }
 

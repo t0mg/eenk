@@ -36,9 +36,9 @@ ButtonEvent SDLInput::pollInput()
             // CONFIRM
             case SDLK_RETURN: case SDLK_RETURN2: case SDLK_SPACE:
                 return ButtonEvent::CONFIRM;
-            // BACK
+            // BACK / QUIT
             case SDLK_ESCAPE: case SDLK_BACKSPACE:
-                return ButtonEvent::BACK;
+                return ButtonEvent::QUIT;
             default:
                 break;
             }
