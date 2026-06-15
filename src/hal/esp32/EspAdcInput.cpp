@@ -1,6 +1,8 @@
 #ifdef PLATFORM_ESP32
 
 #include "EspAdcInput.h"
+#include <esp_sleep.h>
+#include <driver/rtc_io.h>
 
 EspAdcInput::EspAdcInput()
 {
@@ -10,6 +12,15 @@ EspAdcInput::EspAdcInput()
 ButtonEvent EspAdcInput::pollInput()
 {
     _input.update();
+
+    if (_input.isPressed(InputManager::BTN_POWER) && _input.getHeldTime() > 2000) {
+        // Wait for the user to release the button so we don't immediately wake up!
+        while (digitalRead(InputManager::POWER_BUTTON_PIN) == LOW) {
+            delay(10);
+        }
+        esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
+        esp_deep_sleep_start();
+    }
 
     if (_input.wasPressed(InputManager::BTN_UP))      return ButtonEvent::UP;
     if (_input.wasPressed(InputManager::BTN_DOWN))    return ButtonEvent::DOWN;
