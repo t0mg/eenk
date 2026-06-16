@@ -26,9 +26,22 @@ public:
 
     bool loadStory(const char* path);
     bool loadStoryFromMemory(const unsigned char* data, std::size_t size);
+    
+    // Save/Load system
+    const unsigned char* createSnapshot(std::size_t* outLength);
+    void freeSnapshot();
+    bool loadSnapshot(const unsigned char* data, std::size_t length);
+    
     void update();
     bool isDone() const { return _state == State::DONE; }
     bool shouldSleep() const { return _shouldSleep; }
+
+    struct WrappedLine {
+        std::string text;
+        bool isOld;
+    };
+    const std::deque<WrappedLine>& getHistory() const { return _wrappedLines; }
+    void setHistory(const std::deque<WrappedLine>& history) { _wrappedLines = history; }
 
 private:
     IDisplay& _display;
@@ -36,14 +49,11 @@ private:
     IStorage& _storage;
 
     ink::runtime::story*  _story   = nullptr;
-    ink::runtime::runner  _runner  = nullptr;
+    ink::runtime::runner  _runner;
+    ink::runtime::snapshot* _currentSnapshot = nullptr;
     ink::runtime::globals _globals = nullptr;
     const unsigned char*  _storyBuf = nullptr;
 
-    struct WrappedLine {
-        std::string text;
-        bool isOld;
-    };
     std::deque<WrappedLine> _wrappedLines;
     int _scrollY = 0;
     int _maxScrollY = 0;

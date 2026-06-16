@@ -96,6 +96,7 @@ FlashCache *flashCache = nullptr;
 #endif
 InkEngine *engine = nullptr;
 SystemUI *systemUI = nullptr;
+String saveFilePath = "";
 
 void setup() {
   Serial.begin(115200);
@@ -120,33 +121,35 @@ void setup() {
     Serial.println("[SD] SD card mounted OK");
 
     // Discover first .bin file in /eenk
-    String sdStoryPathStr = "";
-    File root = SD.open("/eenk");
-    if (root) {
-      while (true) {
-        File entry = root.openNextFile();
-        if (!entry) break;
-        if (!entry.isDirectory()) {
-          String name = entry.name();
-          if (name.endsWith(".bin")) {
-            // ESP32 SD library returns full path in name() or just name? 
-            // Better to reconstruct it safely or just use it.
-            if (name.startsWith("/")) {
-              sdStoryPathStr = name;
-            } else {
-              sdStoryPathStr = String("/eenk/") + name;
-            }
-            entry.close();
+    const char *sdStoryPath = nullptr;
+    File eenkDir = SD.open("/eenk");
+    if (!eenkDir || !eenkDir.isDirectory()) {
+      errorMessage = "/eenk/ directory not found on SD card";
+    } else {
+      // Ensure saves directory exists
+      if (!SD.exists("/.eenk_saves")) {
+          SD.mkdir("/.eenk_saves");
+      }
+      
+      File file = eenkDir.openNextFile();
+      while (file) {
+        if (!file.isDirectory()) {
+          String filename = file.name();
+          if (filename.endsWith(".bin")) {
+            // We found a story!
+            sdStoryPath = new char[filename.length() + 7]; // "/eenk/" + filename
+            sprintf((char*)sdStoryPath, "/eenk/%s", filename.c_str());
+            
+            saveFilePath = String("/.eenk_saves/") + filename + ".save";
             break;
           }
         }
-        entry.close();
+        file = eenkDir.openNextFile();
       }
-      root.close();
+      eenkDir.close();
     }
 
-    if (sdStoryPathStr.length() > 0) {
-      const char *sdStoryPath = sdStoryPathStr.c_str();
+    if (sdStoryPath != nullptr) {
       Serial.printf("[SD] Found story: %s\n", sdStoryPath);
 
       // Try the flash cache path first (zero-copy mmap for large stories)
@@ -164,13 +167,67 @@ void setup() {
 
         if (flashCache->loadStoryStreaming(*sdStorage, sdStoryPath, &mappedPtr, &mappedSize)) {
           engine = new InkEngine(*display, *input, *storage);
-          if (engine->loadStoryFromMemory(mappedPtr, mappedSize)) {
-            Serial.printf("[FlashCache] Story mmap'd from flash (%u bytes, zero-copy)\n", (unsigned)mappedSize);
-            storyLoaded = true;
-          } else {
-            errorMessage = "InkCPP failed to parse mmap'd story";
-            delete engine;
-            engine = nullptr;
+          storyLoaded = engine->loadStoryFromMemory(mappedPtr, mappedSize);
+          
+          if (storyLoaded && SD.exists(saveFilePath)) {
+             File saveFile = SD.open(saveFilePath, FILE_READ);
+             if (saveFile) {
+                 uint32_t magic = 0;
+                 if (saveFile.read((uint8_t*)&magic, 4) == 4 && magic == 0x314B4E45) { // "ENK1"
+                     uint32_t snapSize = 0;
+                     if (saveFile.read((uint8_t*)&snapSize, 4) == 4) {
+                         // Cap size to reasonable limit (e.g. 1MB) to prevent bad allocs on corrupt files
+                         if (snapSize < 1024 * 1024) {
+                             unsigned char* buf = new (std::nothrow) unsigned char[snapSize];
+                             if (buf) {
+                                 saveFile.read(buf, snapSize);
+                                 if (engine->loadSnapshot(buf, snapSize)) {
+                                     Serial.println("Save loaded successfully!");
+                                     
+                                     // Read history
+                                     uint16_t historySize = 0;
+                                     if (saveFile.read((uint8_t*)&historySize, 2) == 2) {
+                                         std::deque<InkEngine::WrappedLine> history;
+                                         for (uint16_t i = 0; i < historySize; i++) {
+                                             uint16_t lineLen;
+                                             if (saveFile.read((uint8_t*)&lineLen, 2) != 2) break;
+                                             char* lineBuf = new (std::nothrow) char[lineLen + 1];
+                                             if (lineBuf) {
+                                                 saveFile.read((uint8_t*)lineBuf, lineLen);
+                                                 lineBuf[lineLen] = '\0';
+                                                 uint8_t isOld;
+                                                 saveFile.read(&isOld, 1);
+                                                 history.push_back({std::string(lineBuf), isOld > 0});
+                                                 delete[] lineBuf;
+                                             } else {
+                                                 break;
+                                             }
+                                         }
+                                         engine->setHistory(history);
+                                     }
+                                 } else {
+                                     Serial.println("Failed to load save file.");
+                                     errorMessage = "Failed to load save file.";
+                                     storyLoaded = false;
+                                 }
+                                 delete[] buf;
+                             } else {
+                                 Serial.println("Out of memory reading save.");
+                                 errorMessage = "Out of memory reading save.";
+                                 storyLoaded = false;
+                             }
+                         } else {
+                             Serial.println("Save file snapshot too large.");
+                             errorMessage = "Save file corrupt (size).";
+                             storyLoaded = false;
+                         }
+                     }
+                 } else {
+                     Serial.println("Incompatible save file. Starting fresh.");
+                     // It's an old save file. Just ignore it and start fresh.
+                 }
+                 saveFile.close();
+             }
           }
         } else {
           errorMessage = "Failed to stream story to flash";
@@ -237,6 +294,50 @@ void setup() {
 void loop() {
   if (engine && engine->shouldSleep()) {
 #ifdef PLATFORM_ESP32
+    systemUI->showLoading("Saving Progress...", 1.0f);
+    delay(100);
+    
+    size_t snapLen = 0;
+    const unsigned char* snapData = engine->createSnapshot(&snapLen);
+    if (snapData) {
+        File f = SD.open(saveFilePath, FILE_WRITE);
+        if (f) {
+            uint32_t magic = 0x314B4E45; // "ENK1"
+            f.write((const uint8_t*)&magic, 4);
+            
+            uint32_t snapSize32 = snapLen;
+            f.write((const uint8_t*)&snapSize32, 4);
+            f.write(snapData, snapLen);
+            
+            // Write history
+            const auto& history = engine->getHistory();
+            uint16_t historySize = history.size();
+            f.write((const uint8_t*)&historySize, 2);
+            for (const auto& line : history) {
+                uint16_t len = line.text.length();
+                f.write((const uint8_t*)&len, 2);
+                f.write((const uint8_t*)line.text.c_str(), len);
+                uint8_t isOld = line.isOld ? 1 : 0;
+                f.write(&isOld, 1);
+            }
+            
+            f.close();
+            Serial.println("Game saved successfully!");
+        } else {
+            systemUI->showError("EENK SYSTEM ERROR", "Failed to write save file to SD.");
+            while(true) {
+                if (input->pollInput() == ButtonEvent::SLEEP) break;
+                delay(10);
+            }
+        }
+    } else {
+        systemUI->showError("EENK SYSTEM ERROR", "Failed to create runtime snapshot.");
+        while(true) {
+            if (input->pollInput() == ButtonEvent::SLEEP) break;
+            delay(10);
+        }
+    }
+
     Serial.println("Power off requested. Entering deep sleep...");
     systemUI->showSleepCover();
     delay(500); // Give e-ink time to finish updating

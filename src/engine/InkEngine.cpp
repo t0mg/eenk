@@ -7,8 +7,9 @@
 // InkCPP public API (already via InkEngine.h, but choice.h is also needed)
 #include <choice.h>
 
-#include <cstdio>
+#include "InkEngine.h"
 #include <cstring>
+#include <snapshot.h>
 #include <cctype>
 
 #ifdef PLATFORM_NATIVE
@@ -43,6 +44,7 @@ InkEngine::InkEngine(IDisplay& display, IInput& input, IStorage& storage)
 
 InkEngine::~InkEngine()
 {
+    freeSnapshot();
     if (_story) {
         delete _story;
         _story = nullptr;
@@ -118,6 +120,49 @@ bool InkEngine::loadStoryFromMemory(const unsigned char* data, std::size_t size)
     _scrollY = 0;
     _maxScrollY = 0;
     _state = State::RUNNING_TEXT;
+    return true;
+}
+
+const unsigned char* InkEngine::createSnapshot(std::size_t* outLength)
+{
+    freeSnapshot();
+    if (!_runner) return nullptr;
+    
+    _currentSnapshot = _runner->create_snapshot();
+    if (_currentSnapshot) {
+        *outLength = _currentSnapshot->get_data_len();
+        return _currentSnapshot->get_data();
+    }
+    return nullptr;
+}
+
+void InkEngine::freeSnapshot()
+{
+    if (_currentSnapshot) {
+        delete _currentSnapshot;
+        _currentSnapshot = nullptr;
+    }
+}
+
+bool InkEngine::loadSnapshot(const unsigned char* data, std::size_t length)
+{
+    if (!_story) return false;
+    
+    // from_binary takes ownership of data if freeOnDestroy is true.
+    // We pass false so we can manage the memory buffer ourselves (e.g. from SD read).
+    ink::runtime::snapshot* snap = ink::runtime::snapshot::from_binary(data, length, false);
+    if (!snap) return false;
+    
+    _globals = _story->new_globals_from_snapshot(*snap);
+    _runner = _story->new_runner_from_snapshot(*snap, _globals);
+    
+    delete snap;
+    
+    _wrappedLines.clear();
+    _scrollY = 0;
+    _maxScrollY = 0;
+    _state = State::RUNNING_TEXT;
+    
     return true;
 }
 
