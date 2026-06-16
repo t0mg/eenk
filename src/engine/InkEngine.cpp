@@ -92,6 +92,36 @@ bool InkEngine::loadStory(const char* path)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+bool InkEngine::loadStoryFromMemory(const unsigned char* data, std::size_t size)
+{
+    // NOTE: _storyBuf is NOT set — we don't own this memory (it's mmap'd)
+    _story = ink::runtime::story::from_binary(data, size, false);
+    if (!_story) {
+        fprintf(stderr, "[InkEngine] story::from_binary() failed (mmap)\n");
+        return false;
+    }
+
+    _globals = _story->new_globals();
+    _runner  = _story->new_runner(_globals);
+
+    printf("[InkEngine] Story loaded from memory — %zu bytes\n", size);
+
+#ifndef SERIAL_DEBUG
+    GfxRenderer* renderer = _display.getRenderer();
+    if (renderer) {
+        renderer->insertFont(FONT_NARRATIVE, fontNarrativeFamily);
+        renderer->insertFont(FONT_CHOICE, fontChoiceFamily);
+    }
+#endif
+
+    _wrappedLines.clear();
+    _scrollY = 0;
+    _maxScrollY = 0;
+    _state = State::RUNNING_TEXT;
+    return true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 void InkEngine::update()
 {
     switch (_state) {

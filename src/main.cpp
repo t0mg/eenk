@@ -69,70 +69,98 @@ int main(int argc, char *argv[]) {
 
 #include "engine/InkEngine.h"
 #include "hal/esp32/EspLittleFSStorage.h"
+#ifdef HAS_SD_CARD
+#include "hal/esp32/EspSdStorage.h"
+#endif
 #include <Arduino.h>
 
-#ifdef SERIAL_DEBUG
-// ── Debug mode: render to serial terminal, no e-ink hardware required ───────
-#include "hal/esp32/EspSerialDisplay.h"
-#include "hal/esp32/EspSerialInput.h"
-using DisplayType = EspSerialDisplay;
-using InputType = EspSerialInput;
-#else
-// ── Hardware mode: e-ink display + ADC D-Pad (Xteink X4) ─────────────────
 #include "hal/esp32/EspAdcInput.h"
 #include "hal/esp32/EspEinkDisplay.h"
 using DisplayType = EspEinkDisplay;
 using InputType = EspAdcInput;
-#endif
 
 DisplayType *display = nullptr;
 InputType *input = nullptr;
 EspLittleFSStorage *storage = nullptr;
+#ifdef HAS_SD_CARD
+EspSdStorage *sdStorage = nullptr;
+#endif
 InkEngine *engine = nullptr;
 
 void setup() {
   Serial.begin(115200);
 
-#ifdef SERIAL_DEBUG
-  // Wait for the serial monitor to connect before booting the game
-  while (!Serial) {
-    delay(10);
-  }
-  // VT100 clear is handled by EspSerialDisplay constructor
-  Serial.println(
-      "=== EENK Interactive Fiction Runtime (ESP32-C3 / Serial Debug) ===");
-#else
   delay(1000);
   Serial.print("\x1B[2J\x1B[H");
   Serial.println("=== EENK Interactive Fiction Runtime (ESP32-C3) ===");
-#endif
   Serial.printf("Free heap before init: %u bytes\n", ESP.getFreeHeap());
 
   display = new DisplayType();
   input = new InputType();
   storage = new EspLittleFSStorage();
 
-  engine = new InkEngine(*display, *input, *storage);
+  bool storyLoaded = false;
 
-  const char *storyPath = "/the_intercept.bin";
-  if (!storage->fileExists(storyPath)) {
-    Serial.printf("ERROR: Story not found in Embedded Flash: %s\n", storyPath);
-    return;
+#ifdef HAS_SD_CARD
+  // Try loading story from SD card first
+  sdStorage = new EspSdStorage();
+  if (sdStorage->begin()) {
+    Serial.println("[SD] SD card mounted OK");
+
+    const char *sdStoryPath = "/eenk/the_intercept.bin";
+    if (sdStorage->fileExists(sdStoryPath)) {
+      Serial.printf("[SD] Found story: %s\n", sdStoryPath);
+
+      std::size_t storySize = 0;
+      const unsigned char *storyData = sdStorage->readFileBinary(sdStoryPath, &storySize);
+      if (storyData && storySize > 0) {
+        engine = new InkEngine(*display, *input, *storage);
+        if (engine->loadStoryFromMemory(storyData, storySize)) {
+          Serial.printf("[SD] Story loaded from SD card (%u bytes)\n", (unsigned)storySize);
+          storyLoaded = true;
+        } else {
+          Serial.println("[SD] ERROR: InkCPP failed to parse story from SD");
+          delete engine;
+          engine = nullptr;
+        }
+        // Note: storyData must remain valid for the engine's lifetime.
+        // InkCPP reads from the pointer directly — do NOT free it.
+      } else {
+        Serial.println("[SD] ERROR: Failed to read story file");
+      }
+    } else {
+      Serial.printf("[SD] Story not found on SD: %s\n", sdStoryPath);
+    }
+  } else {
+    Serial.println("[SD] No SD card detected, falling back to embedded story");
+  }
+#endif
+
+  // Fall back to embedded LittleFS story if SD didn't work
+  if (!storyLoaded) {
+    const char *storyPath = "/the_intercept.bin";
+    if (storage->fileExists(storyPath)) {
+      engine = new InkEngine(*display, *input, *storage);
+      if (engine->loadStory(storyPath)) {
+        Serial.printf("[LittleFS] Story loaded from embedded flash\n");
+        storyLoaded = true;
+      } else {
+        Serial.println("ERROR: Failed to load embedded story!");
+      }
+    } else {
+      Serial.printf("ERROR: No story found (no SD card file, no embedded file)\n");
+    }
   }
 
-  if (!engine->loadStory(storyPath)) {
-    Serial.println("ERROR: Failed to load story!");
-    return;
+  if (!storyLoaded) {
+    Serial.println("FATAL: No story available. Halting.");
+    while(true) delay(100);
   }
 
   Serial.printf("Free heap after load: %u bytes\n", ESP.getFreeHeap());
   delay(2000); // Give user time to see RAM stats
 
-#ifdef SERIAL_DEBUG
-  Serial.println(
-      "Controls: W/S = Up/Down, Enter = Confirm, B = Back, Q = Quit");
-  Serial.println("────────────────────────────────────────");
-#endif
+
 }
 
 void loop() {

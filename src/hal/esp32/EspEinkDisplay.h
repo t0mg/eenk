@@ -1,5 +1,5 @@
 #pragma once
-#if defined(PLATFORM_ESP32) && !defined(SERIAL_DEBUG)
+#ifdef PLATFORM_ESP32
 
 #include "../IDisplay.h"
 #include <EInkDisplay.h>
@@ -28,4 +28,4 @@ private:
     static constexpr int WIN_H = 800;
 };
 
-#endif // PLATFORM_ESP32 && !SERIAL_DEBUG
+#endif // PLATFORM_ESP32

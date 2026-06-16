@@ -25,6 +25,7 @@ public:
     ~InkEngine();
 
     bool loadStory(const char* path);
+    bool loadStoryFromMemory(const unsigned char* data, std::size_t size);
     void update();
     bool isDone() const { return _state == State::DONE; }
 

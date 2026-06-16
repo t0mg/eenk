@@ -5,7 +5,6 @@
  * Implemented by:
  *   SDLDisplay        (PLATFORM_NATIVE)              — SDL2 800×480 software-rendered window
  *   EspEinkDisplay    (PLATFORM_ESP32)               — SSD1677 driver via Papyrix GfxRenderer
- *   EspSerialDisplay  (PLATFORM_ESP32 + SERIAL_DEBUG) — VT100 serial terminal for dev boards
  */
 
 class GfxRenderer;
