@@ -2,12 +2,13 @@
 #include <cstdio>
 #include <cstring>
 
+#include <GfxRenderer.h> // from Papyrix
+
 #ifdef PLATFORM_ESP32
 #include <Arduino.h>
 #include <EpdFont.h>
 #include <builtinFonts/ui_12.h>
 #include <builtinFonts/ui_bold_12.h>
-#include <GfxRenderer.h> // from Papyrix
 
 static EpdFont sysFontNormal(&ui_12);
 static EpdFontFamily sysFamilyNormal(&sysFontNormal);
@@ -69,13 +70,13 @@ void SystemUI::showLoading(const char* title, float progress)
     if (renderer) {
         _display.clear();
         
+#ifdef PLATFORM_ESP32
         // Draw progress bar
         int barWidth = _display.getWidth() - 100;
         int barHeight = 20;
         int barX = 50;
         int barY = (_display.getHeight() - barHeight) / 2;
         
-#ifdef PLATFORM_ESP32
         renderer->drawText(11, barX, barY - 40, title);
         
         // Frame
