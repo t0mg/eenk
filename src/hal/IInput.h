@@ -17,6 +17,7 @@ enum class ButtonEvent
     RIGHT,     ///< Scroll right / page forward
     CONFIRM,   ///< Select / advance narrative
     BACK,      ///< Save / exit / cancel
+    SLEEP,     ///< Device power off / sleep requested
     QUIT,      ///< Platform quit (window close, power button)
 };
 

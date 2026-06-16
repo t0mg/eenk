@@ -314,9 +314,13 @@ void InkEngine::tickWaitingInput()
     case ButtonEvent::BACK:
         _wrappedLines.push_back({"[Save system coming in Milestone 5]", false});
         _state = State::SAVE_STUB;
+        redraw();
         break;
     case ButtonEvent::QUIT:
         _state = State::DONE;
+        break;
+    case ButtonEvent::SLEEP:
+        _shouldSleep = true;
         break;
     default:
         break;
@@ -356,6 +360,8 @@ void InkEngine::tickStoryEnded()
         redraw();
     } else if (ev == ButtonEvent::QUIT) {
         _state = State::DONE;
+    } else if (ev == ButtonEvent::SLEEP) {
+        _shouldSleep = true;
     }
 }
 

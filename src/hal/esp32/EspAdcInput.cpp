@@ -18,8 +18,7 @@ ButtonEvent EspAdcInput::pollInput()
         while (digitalRead(InputManager::POWER_BUTTON_PIN) == LOW) {
             delay(10);
         }
-        esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
-        esp_deep_sleep_start();
+        return ButtonEvent::SLEEP;
     }
 
     if (_input.wasPressed(InputManager::BTN_UP))      return ButtonEvent::UP;
@@ -28,7 +27,7 @@ ButtonEvent EspAdcInput::pollInput()
     if (_input.wasPressed(InputManager::BTN_RIGHT))   return ButtonEvent::RIGHT;
     if (_input.wasPressed(InputManager::BTN_CONFIRM)) return ButtonEvent::CONFIRM;
     if (_input.wasPressed(InputManager::BTN_BACK))    return ButtonEvent::QUIT;
-    if (_input.wasPressed(InputManager::BTN_POWER))   return ButtonEvent::CONFIRM;
+    if (_input.wasReleased(InputManager::BTN_POWER))  return ButtonEvent::CONFIRM;
 
     return ButtonEvent::NONE;
 }

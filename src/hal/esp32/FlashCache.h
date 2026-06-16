@@ -39,8 +39,11 @@ public:
     bool isLoaded() const { return _mapped; }
 
     /** Progress callback for UI during flash writes. 0.0 to 1.0. */
-    using ProgressCallback = void(*)(float progress);
-    void setProgressCallback(ProgressCallback cb) { _progressCb = cb; }
+    using ProgressCallback = void(*)(float progress, void* ctx);
+    void setProgressCallback(ProgressCallback cb, void* ctx = nullptr) { _progressCb = cb; _progressCtx = ctx; }
+
+    /** Check if the ink_cache partition exists. */
+    bool findPartition();
 
 private:
     const esp_partition_t*        _partition = nullptr;
@@ -50,8 +53,8 @@ private:
     std::size_t                   _cachedSize = 0;
     uint32_t                      _cachedHash = 0;
     ProgressCallback              _progressCb = nullptr;
+    void*                         _progressCtx = nullptr;
 
-    bool findPartition();
     bool mapFromFlash(std::size_t size);
     bool loadHashFromNvs(uint32_t* outHash, std::size_t* outSize);
     void saveHashToNvs(uint32_t hash, std::size_t size);

@@ -2,12 +2,11 @@
 
 #include "EspLittleFSStorage.h"
 #include <Arduino.h>
-
-extern const uint8_t intercept_start[] asm("_binary_data_the_intercept_bin_start");
-extern const uint8_t intercept_end[]   asm("_binary_data_the_intercept_bin_end");
+#include <LittleFS.h>
 
 EspLittleFSStorage::EspLittleFSStorage()
 {
+    LittleFS.begin(true); // format on fail
 }
 
 EspLittleFSStorage::~EspLittleFSStorage()
@@ -18,22 +17,28 @@ const unsigned char* EspLittleFSStorage::readFileBinary(const char* filename, st
 {
     if (outSize) *outSize = 0;
 
-    // We only support the_intercept.bin via embedded symbols for this Wokwi milestone
-    if (strstr(filename, "the_intercept.bin") == nullptr) {
-        Serial.printf("[EspLittleFSStorage] File not found: %s\n", filename);
+    File file = LittleFS.open(filename, "r");
+    if (!file) {
+        Serial.printf("[LittleFS] File not found: %s\n", filename);
         return nullptr;
     }
 
-    size_t size = intercept_end - intercept_start;
-    
-    // Allocate RAM buffer (simulating a file read to accurately test memory budget)
+    size_t size = file.size();
     void* buffer = malloc(size);
     if (!buffer) {
-        Serial.printf("[EspLittleFSStorage] Failed to allocate %zu bytes\n", size);
+        Serial.printf("[LittleFS] Failed to allocate %zu bytes\n", size);
+        file.close();
         return nullptr;
     }
 
-    memcpy(buffer, intercept_start, size);
+    size_t readBytes = file.read((uint8_t*)buffer, size);
+    file.close();
+
+    if (readBytes != size) {
+        Serial.printf("[LittleFS] Short read: %zu of %zu bytes\n", readBytes, size);
+        free(buffer);
+        return nullptr;
+    }
 
     if (outSize) {
         *outSize = size;
@@ -50,7 +55,7 @@ void EspLittleFSStorage::freeBuffer(const unsigned char* buffer)
 
 bool EspLittleFSStorage::fileExists(const char* path)
 {
-    return strstr(path, "the_intercept.bin") != nullptr;
+    return LittleFS.exists(path);
 }
 
 #endif // PLATFORM_ESP32

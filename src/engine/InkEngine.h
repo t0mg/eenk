@@ -28,6 +28,7 @@ public:
     bool loadStoryFromMemory(const unsigned char* data, std::size_t size);
     void update();
     bool isDone() const { return _state == State::DONE; }
+    bool shouldSleep() const { return _shouldSleep; }
 
 private:
     IDisplay& _display;
@@ -62,6 +63,7 @@ private:
         DONE,
     };
     State _state = State::IDLE;
+    bool _shouldSleep = false;
 
     void tickRunningText();
     void tickWaitingInput();

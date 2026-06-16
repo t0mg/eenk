@@ -37,7 +37,7 @@ void FlashCache::unload()
 bool FlashCache::findPartition()
 {
     if (_partition) return true;
-    _partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, (esp_partition_subtype_t)0x82, "ink_cache");
+    _partition = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_1, "app1");
     return _partition != nullptr;
 }
 
@@ -112,7 +112,7 @@ bool FlashCache::loadStoryStreaming(EspSdStorage& sdStorage,
     uint8_t buf[4096];
     size_t offset = 0;
     
-    if (_progressCb) _progressCb(0.0f);
+    if (_progressCb) _progressCb(0.0f, _progressCtx);
     
     while (offset < fileSize) {
         size_t toRead = std::min(sizeof(buf), fileSize - offset);
@@ -160,13 +160,13 @@ bool FlashCache::loadStoryStreaming(EspSdStorage& sdStorage,
             
             offset += toRead;
             if (_progressCb) {
-                _progressCb((float)offset / fileSize);
+                _progressCb((float)offset / fileSize, _progressCtx);
             }
         }
         
         saveHashToNvs(fileCrc, fileSize);
     } else {
-        if (_progressCb) _progressCb(1.0f);
+        if (_progressCb) _progressCb(1.0f, _progressCtx);
     }
     
     file.close();

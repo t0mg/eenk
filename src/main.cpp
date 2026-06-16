@@ -71,11 +71,19 @@ int main(int argc, char *argv[]) {
 #include "hal/esp32/EspLittleFSStorage.h"
 #ifdef HAS_SD_CARD
 #include "hal/esp32/EspSdStorage.h"
+#include "hal/esp32/FlashCache.h"
 #endif
 #include <Arduino.h>
 
 #include "hal/esp32/EspAdcInput.h"
 #include "hal/esp32/EspEinkDisplay.h"
+#include <EpdFont.h>
+#include <builtinFonts/ui_12.h>
+#include "ui/SystemUI.h"
+#include <esp_sleep.h>
+
+extern const EpdFontFamily OpenSans;
+
 using DisplayType = EspEinkDisplay;
 using InputType = EspAdcInput;
 
@@ -84,8 +92,10 @@ InputType *input = nullptr;
 EspLittleFSStorage *storage = nullptr;
 #ifdef HAS_SD_CARD
 EspSdStorage *sdStorage = nullptr;
+FlashCache *flashCache = nullptr;
 #endif
 InkEngine *engine = nullptr;
+SystemUI *systemUI = nullptr;
 
 void setup() {
   Serial.begin(115200);
@@ -98,63 +108,124 @@ void setup() {
   display = new DisplayType();
   input = new InputType();
   storage = new EspLittleFSStorage();
+  systemUI = new SystemUI(*display);
 
   bool storyLoaded = false;
+  String errorMessage = "";
 
 #ifdef HAS_SD_CARD
-  // Try loading story from SD card first
+  // Try loading story from SD card via flash cache (mmap)
   sdStorage = new EspSdStorage();
   if (sdStorage->begin()) {
     Serial.println("[SD] SD card mounted OK");
 
-    const char *sdStoryPath = "/eenk/the_intercept.bin";
-    if (sdStorage->fileExists(sdStoryPath)) {
+    // Discover first .bin file in /eenk
+    String sdStoryPathStr = "";
+    File root = SD.open("/eenk");
+    if (root) {
+      while (true) {
+        File entry = root.openNextFile();
+        if (!entry) break;
+        if (!entry.isDirectory()) {
+          String name = entry.name();
+          if (name.endsWith(".bin")) {
+            // ESP32 SD library returns full path in name() or just name? 
+            // Better to reconstruct it safely or just use it.
+            if (name.startsWith("/")) {
+              sdStoryPathStr = name;
+            } else {
+              sdStoryPathStr = String("/eenk/") + name;
+            }
+            entry.close();
+            break;
+          }
+        }
+        entry.close();
+      }
+      root.close();
+    }
+
+    if (sdStoryPathStr.length() > 0) {
+      const char *sdStoryPath = sdStoryPathStr.c_str();
       Serial.printf("[SD] Found story: %s\n", sdStoryPath);
 
-      std::size_t storySize = 0;
-      const unsigned char *storyData = sdStorage->readFileBinary(sdStoryPath, &storySize);
-      if (storyData && storySize > 0) {
-        engine = new InkEngine(*display, *input, *storage);
-        if (engine->loadStoryFromMemory(storyData, storySize)) {
-          Serial.printf("[SD] Story loaded from SD card (%u bytes)\n", (unsigned)storySize);
-          storyLoaded = true;
+      // Try the flash cache path first (zero-copy mmap for large stories)
+      flashCache = new FlashCache();
+      const unsigned char *mappedPtr = nullptr;
+      std::size_t mappedSize = 0;
+
+      if (flashCache->findPartition()) {
+        Serial.println("[FlashCache] app1 partition found, streaming to flash...");
+        flashCache->setProgressCallback([](float p, void* ctx) {
+          SystemUI* sys = (SystemUI*)ctx;
+          sys->showLoading("Loading to Flash...", p);
+          Serial.printf("[FlashCache] Loading: %.0f%%\n", p * 100);
+        }, systemUI);
+
+        if (flashCache->loadStoryStreaming(*sdStorage, sdStoryPath, &mappedPtr, &mappedSize)) {
+          engine = new InkEngine(*display, *input, *storage);
+          if (engine->loadStoryFromMemory(mappedPtr, mappedSize)) {
+            Serial.printf("[FlashCache] Story mmap'd from flash (%u bytes, zero-copy)\n", (unsigned)mappedSize);
+            storyLoaded = true;
+          } else {
+            errorMessage = "InkCPP failed to parse mmap'd story";
+            delete engine;
+            engine = nullptr;
+          }
         } else {
-          Serial.println("[SD] ERROR: InkCPP failed to parse story from SD");
-          delete engine;
-          engine = nullptr;
+          errorMessage = "Failed to stream story to flash";
         }
-        // Note: storyData must remain valid for the engine's lifetime.
-        // InkCPP reads from the pointer directly — do NOT free it.
       } else {
-        Serial.println("[SD] ERROR: Failed to read story file");
+        Serial.println("[FlashCache] app1 partition not found, loading to RAM...");
+      }
+
+      // Fallback: load directly into RAM (works for small stories <200KB)
+      if (!storyLoaded && errorMessage.length() == 0) {
+        std::size_t storySize = 0;
+        const unsigned char *storyData = sdStorage->readFileBinary(sdStoryPath, &storySize);
+        if (storyData && storySize > 0) {
+          engine = new InkEngine(*display, *input, *storage);
+          if (engine->loadStoryFromMemory(storyData, storySize)) {
+            Serial.printf("[SD] Story loaded to RAM (%u bytes)\n", (unsigned)storySize);
+            storyLoaded = true;
+          } else {
+            errorMessage = "InkCPP failed to parse story from RAM";
+            delete engine;
+            engine = nullptr;
+            sdStorage->freeBuffer(storyData);
+          }
+        } else {
+          errorMessage = "Failed to read story file into RAM";
+        }
       }
     } else {
-      Serial.printf("[SD] Story not found on SD: %s\n", sdStoryPath);
+      errorMessage = "No .bin stories found in /eenk/ folder";
     }
   } else {
-    Serial.println("[SD] No SD card detected, falling back to embedded story");
+    errorMessage = "No SD card detected or mount failed";
   }
 #endif
 
-  // Fall back to embedded LittleFS story if SD didn't work
   if (!storyLoaded) {
-    const char *storyPath = "/the_intercept.bin";
-    if (storage->fileExists(storyPath)) {
-      engine = new InkEngine(*display, *input, *storage);
-      if (engine->loadStory(storyPath)) {
-        Serial.printf("[LittleFS] Story loaded from embedded flash\n");
-        storyLoaded = true;
-      } else {
-        Serial.println("ERROR: Failed to load embedded story!");
-      }
-    } else {
-      Serial.printf("ERROR: No story found (no SD card file, no embedded file)\n");
+    if (errorMessage.length() == 0) {
+      errorMessage = "No story available.";
     }
-  }
-
-  if (!storyLoaded) {
-    Serial.println("FATAL: No story available. Halting.");
-    while(true) delay(100);
+    Serial.printf("FATAL: %s\n", errorMessage.c_str());
+    
+    systemUI->showError("EENK SYSTEM ERROR", errorMessage.c_str());
+    
+    while(true) {
+#ifdef PLATFORM_ESP32
+      ButtonEvent ev = input->pollInput();
+      if (ev == ButtonEvent::SLEEP) {
+        systemUI->showSleepCover();
+        delay(500);
+        esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
+        esp_deep_sleep_start();
+      }
+#endif
+      delay(100);
+    }
   }
 
   Serial.printf("Free heap after load: %u bytes\n", ESP.getFreeHeap());
@@ -164,7 +235,18 @@ void setup() {
 }
 
 void loop() {
-  if (engine && !engine->isDone()) {
+  if (engine && engine->shouldSleep()) {
+#ifdef PLATFORM_ESP32
+    Serial.println("Power off requested. Entering deep sleep...");
+    systemUI->showSleepCover();
+    delay(500); // Give e-ink time to finish updating
+    esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
+    esp_deep_sleep_start();
+#else
+    Serial.println("Power off requested (not supported on native).");
+    delay(1000);
+#endif
+  } else if (engine && !engine->isDone()) {
     engine->update();
   } else {
 #ifdef PLATFORM_ESP32
