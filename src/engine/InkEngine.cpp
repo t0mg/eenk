@@ -231,7 +231,7 @@ void InkEngine::tickRunningText()
         }
     }
 
-    while (_wrappedLines.size() > 300) {
+    while (_wrappedLines.size() > 800) {
         _wrappedLines.pop_front();
     }
 
@@ -248,7 +248,7 @@ void InkEngine::tickRunningText()
         int newContentHeight = newLinesCount * renderer->getLineHeight(FONT_NARRATIVE) + choiceHeight;
         if (newContentHeight > availableHeight) {
             // Scroll so the first new line is at the top of the visible narrative area
-            int oldLinesCount = _wrappedLines.size() - newLinesCount;
+            int oldLinesCount = std::max(0, (int)_wrappedLines.size() - newLinesCount);
             _scrollY = std::min(_maxScrollY, oldLinesCount * renderer->getLineHeight(FONT_NARRATIVE));
         } else {
             // Snap to bottom

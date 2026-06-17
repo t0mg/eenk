@@ -37,7 +37,7 @@ void FlashCache::unload()
 bool FlashCache::findPartition()
 {
     if (_partition) return true;
-    _partition = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_1, "app1");
+    _partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, "ink_cache");
     return _partition != nullptr;
 }
 

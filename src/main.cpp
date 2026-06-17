@@ -74,6 +74,7 @@ int main(int argc, char *argv[]) {
 #include "hal/esp32/FlashCache.h"
 #endif
 #include <Arduino.h>
+#include <rom/crc.h>
 
 #include "hal/esp32/EspAdcInput.h"
 #include "hal/esp32/EspEinkDisplay.h"
@@ -97,6 +98,7 @@ FlashCache *flashCache = nullptr;
 InkEngine *engine = nullptr;
 SystemUI *systemUI = nullptr;
 String saveFilePath = "";
+uint32_t currentStoryHash = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -152,30 +154,50 @@ void setup() {
     if (sdStoryPath != nullptr) {
       Serial.printf("[SD] Found story: %s\n", sdStoryPath);
 
-      // Try the flash cache path first (zero-copy mmap for large stories)
-      flashCache = new FlashCache();
+      File storyFile = SD.open(sdStoryPath, FILE_READ);
+      size_t storySize = 0;
+      if (storyFile) {
+          storySize = storyFile.size();
+          storyFile.close();
+      }
+
+      if (storySize > 8388608) { // 8MB ESP32 MMU hardware limit
+          errorMessage = "Story is too large! Max supported size is 8.0MB.";
+      } else if (storySize == 0) {
+          errorMessage = "Failed to read story file or file is empty.";
+      } else {
+          // Try the flash cache path first (zero-copy mmap for large stories)
+          flashCache = new FlashCache();
       const unsigned char *mappedPtr = nullptr;
       std::size_t mappedSize = 0;
 
       if (flashCache->findPartition()) {
-        Serial.println("[FlashCache] app1 partition found, streaming to flash...");
+        Serial.println("[FlashCache] ink_cache partition found, streaming to flash...");
         flashCache->setProgressCallback([](float p, void* ctx) {
-          SystemUI* sys = (SystemUI*)ctx;
-          sys->showLoading("Loading to Flash...", p);
-          Serial.printf("[FlashCache] Loading: %.0f%%\n", p * 100);
+          static int lastPercent = -1;
+          int currentPercent = (int)(p * 100);
+          if (currentPercent != lastPercent) {
+              lastPercent = currentPercent;
+              SystemUI* sys = (SystemUI*)ctx;
+              sys->showLoading("Loading to Flash...", p);
+              Serial.printf("[FlashCache] Loading: %d%%\n", currentPercent);
+          }
         }, systemUI);
 
         if (flashCache->loadStoryStreaming(*sdStorage, sdStoryPath, &mappedPtr, &mappedSize)) {
           engine = new InkEngine(*display, *input, *storage);
           storyLoaded = engine->loadStoryFromMemory(mappedPtr, mappedSize);
+          currentStoryHash = flashCache->getHash();
           
           if (storyLoaded && SD.exists(saveFilePath)) {
              File saveFile = SD.open(saveFilePath, FILE_READ);
              if (saveFile) {
                  uint32_t magic = 0;
                  if (saveFile.read((uint8_t*)&magic, 4) == 4 && magic == 0x314B4E45) { // "ENK1"
-                     uint32_t snapSize = 0;
-                     if (saveFile.read((uint8_t*)&snapSize, 4) == 4) {
+                     uint32_t savedHash = 0;
+                     if (saveFile.read((uint8_t*)&savedHash, 4) == 4 && savedHash == currentStoryHash) {
+                         uint32_t snapSize = 0;
+                         if (saveFile.read((uint8_t*)&snapSize, 4) == 4) {
                          // Cap size to reasonable limit (e.g. 1MB) to prevent bad allocs on corrupt files
                          if (snapSize < 1024 * 1024) {
                              unsigned char* buf = new (std::nothrow) unsigned char[snapSize];
@@ -222,6 +244,9 @@ void setup() {
                              storyLoaded = false;
                          }
                      }
+                     } else {
+                         Serial.println("Save file is for an older version of the story. Starting fresh.");
+                     }
                  } else {
                      Serial.println("Incompatible save file. Starting fresh.");
                      // It's an old save file. Just ignore it and start fresh.
@@ -233,27 +258,9 @@ void setup() {
           errorMessage = "Failed to stream story to flash";
         }
       } else {
-        Serial.println("[FlashCache] app1 partition not found, loading to RAM...");
+        Serial.println("[FlashCache] ink_cache partition not found!");
+        errorMessage = "ink_cache partition missing! Update your partitions.";
       }
-
-      // Fallback: load directly into RAM (works for small stories <200KB)
-      if (!storyLoaded && errorMessage.length() == 0) {
-        std::size_t storySize = 0;
-        const unsigned char *storyData = sdStorage->readFileBinary(sdStoryPath, &storySize);
-        if (storyData && storySize > 0) {
-          engine = new InkEngine(*display, *input, *storage);
-          if (engine->loadStoryFromMemory(storyData, storySize)) {
-            Serial.printf("[SD] Story loaded to RAM (%u bytes)\n", (unsigned)storySize);
-            storyLoaded = true;
-          } else {
-            errorMessage = "InkCPP failed to parse story from RAM";
-            delete engine;
-            engine = nullptr;
-            sdStorage->freeBuffer(storyData);
-          }
-        } else {
-          errorMessage = "Failed to read story file into RAM";
-        }
       }
     } else {
       errorMessage = "No .bin stories found in /eenk/ folder";
@@ -304,6 +311,8 @@ void loop() {
         if (f) {
             uint32_t magic = 0x314B4E45; // "ENK1"
             f.write((const uint8_t*)&magic, 4);
+            
+            f.write((const uint8_t*)&currentStoryHash, 4);
             
             uint32_t snapSize32 = snapLen;
             f.write((const uint8_t*)&snapSize32, 4);

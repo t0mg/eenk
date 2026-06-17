@@ -45,6 +45,9 @@ public:
     /** Check if the ink_cache partition exists. */
     bool findPartition();
 
+    /** Get the CRC32 hash of the loaded story */
+    uint32_t getHash() const { return _cachedHash; }
+
 private:
     const esp_partition_t*        _partition = nullptr;
     esp_partition_mmap_handle_t   _mmapHandle = 0;

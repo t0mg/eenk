@@ -48,13 +48,29 @@ void SystemUI::showError(const char* title, const char* message)
     auto renderer = _display.getRenderer();
     if (renderer) {
         _display.clear();
+        int y = 50;
+        
 #ifdef PLATFORM_ESP32
-        renderer->drawText(11, 50, 50, title);
-        renderer->drawText(10, 50, 90, message);
+        renderer->drawText(11, 50, y, title);
+        y += renderer->getLineHeight(11) + 10;
+        
+        int maxWidth = _display.getWidth() - 100;
+        auto wrappedLines = renderer->wrapTextWithHyphenation(10, message, maxWidth, 20);
+        for (const auto& line : wrappedLines) {
+            renderer->drawText(10, 50, y, line.c_str());
+            y += renderer->getLineHeight(10);
+        }
 #else
         // Fallback for native
-        renderer->drawText(0, 50, 50, title);
-        renderer->drawText(0, 50, 90, message);
+        renderer->drawText(0, 50, y, title);
+        y += renderer->getLineHeight(0) + 10;
+        
+        int maxWidth = _display.getWidth() - 100;
+        auto wrappedLines = renderer->wrapTextWithHyphenation(0, message, maxWidth, 20);
+        for (const auto& line : wrappedLines) {
+            renderer->drawText(0, 50, y, line.c_str());
+            y += renderer->getLineHeight(0);
+        }
 #endif
         _display.fullRefresh();
     } else {
