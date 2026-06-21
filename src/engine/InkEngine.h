@@ -60,6 +60,7 @@ private:
 
     static constexpr int MAX_CHOICES = 8;
     char  _choiceText[MAX_CHOICES][128] = {};
+    std::vector<std::string> _wrappedChoices[MAX_CHOICES];
     int   _numChoices     = 0;
     int   _selectedChoice = 0;
 
@@ -82,4 +83,5 @@ private:
     void collectChoices();
     void drawNarrativeArea();
     void drawChoiceArea();
+    int getChoicesHeight(class GfxRenderer* renderer) const;
 };

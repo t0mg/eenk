@@ -8,18 +8,18 @@
 #include <choice.h>
 
 #include "InkEngine.h"
+#include <cctype>
 #include <cstring>
 #include <snapshot.h>
-#include <cctype>
 
 #ifdef PLATFORM_NATIVE
-#include <SDL.h>  // for SDL_Delay
+#include <SDL.h> // for SDL_Delay
 #endif
 
 #ifndef SERIAL_DEBUG
-#include <GfxRenderer.h>
 #include <EpdFont.h>
 #include <EpdFontFamily.h>
+#include <GfxRenderer.h>
 
 // Builtin fonts
 #include <builtinFonts/reader_medium_2b.h>
@@ -38,446 +38,522 @@ static EpdFontFamily fontChoiceFamily(&fontChoiceData);
 // Construction / destruction
 // ─────────────────────────────────────────────────────────────────────────────
 
-InkEngine::InkEngine(IDisplay& display, IInput& input, IStorage& storage)
-    : _display(display), _input(input), _storage(storage)
-{}
+InkEngine::InkEngine(IDisplay &display, IInput &input, IStorage &storage)
+    : _display(display), _input(input), _storage(storage) {}
 
-InkEngine::~InkEngine()
-{
-    freeSnapshot();
-    if (_story) {
-        delete _story;
-        _story = nullptr;
-    }
-    if (_storyBuf) {
-        _storage.freeBuffer(_storyBuf);
-        _storyBuf = nullptr;
-    }
+InkEngine::~InkEngine() {
+  freeSnapshot();
+  if (_story) {
+    delete _story;
+    _story = nullptr;
+  }
+  if (_storyBuf) {
+    _storage.freeBuffer(_storyBuf);
+    _storyBuf = nullptr;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-bool InkEngine::loadStory(const char* path)
-{
-    std::size_t size = 0;
-    _storyBuf = _storage.readFileBinary(path, &size);
-    if (!_storyBuf || size == 0) {
-        fprintf(stderr, "[InkEngine] Failed to read: %s\n", path);
-        return false;
-    }
+bool InkEngine::loadStory(const char *path) {
+  std::size_t size = 0;
+  _storyBuf = _storage.readFileBinary(path, &size);
+  if (!_storyBuf || size == 0) {
+    fprintf(stderr, "[InkEngine] Failed to read: %s\n", path);
+    return false;
+  }
 
-    _story = ink::runtime::story::from_binary(_storyBuf, size, false);
-    if (!_story) {
-        fprintf(stderr, "[InkEngine] story::from_binary() failed\n");
-        _storage.freeBuffer(_storyBuf);
-        _storyBuf = nullptr;
-        return false;
-    }
+  _story = ink::runtime::story::from_binary(_storyBuf, size, false);
+  if (!_story) {
+    fprintf(stderr, "[InkEngine] story::from_binary() failed\n");
+    _storage.freeBuffer(_storyBuf);
+    _storyBuf = nullptr;
+    return false;
+  }
 
-    _globals = _story->new_globals();
-    _runner  = _story->new_runner(_globals);
+  _globals = _story->new_globals();
+  _runner = _story->new_runner(_globals);
 
-    printf("[InkEngine] Story loaded — %zu bytes\n", size);
+  printf("[InkEngine] Story loaded — %zu bytes\n", size);
 
 #ifndef SERIAL_DEBUG
-    GfxRenderer* renderer = _display.getRenderer();
-    if (renderer) {
-        renderer->insertFont(FONT_NARRATIVE, fontNarrativeFamily);
-        renderer->insertFont(FONT_CHOICE, fontChoiceFamily);
-    }
+  GfxRenderer *renderer = _display.getRenderer();
+  if (renderer) {
+    renderer->insertFont(FONT_NARRATIVE, fontNarrativeFamily);
+    renderer->insertFont(FONT_CHOICE, fontChoiceFamily);
+  }
 #endif
 
-    _wrappedLines.clear();
-    _scrollY = 0;
-    _maxScrollY = 0;
-    _state = State::RUNNING_TEXT;
-    return true;
+  _wrappedLines.clear();
+  _scrollY = 0;
+  _maxScrollY = 0;
+  _state = State::RUNNING_TEXT;
+  return true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-bool InkEngine::loadStoryFromMemory(const unsigned char* data, std::size_t size)
-{
-    // NOTE: _storyBuf is NOT set — we don't own this memory (it's mmap'd)
-    _story = ink::runtime::story::from_binary(data, size, false);
-    if (!_story) {
-        fprintf(stderr, "[InkEngine] story::from_binary() failed (mmap)\n");
-        return false;
-    }
+bool InkEngine::loadStoryFromMemory(const unsigned char *data,
+                                    std::size_t size) {
+  // NOTE: _storyBuf is NOT set — we don't own this memory (it's mmap'd)
+  _story = ink::runtime::story::from_binary(data, size, false);
+  if (!_story) {
+    fprintf(stderr, "[InkEngine] story::from_binary() failed (mmap)\n");
+    return false;
+  }
 
-    _globals = _story->new_globals();
-    _runner  = _story->new_runner(_globals);
+  _globals = _story->new_globals();
+  _runner = _story->new_runner(_globals);
 
-    printf("[InkEngine] Story loaded from memory — %zu bytes\n", size);
+  printf("[InkEngine] Story loaded from memory — %zu bytes\n", size);
 
 #ifndef SERIAL_DEBUG
-    GfxRenderer* renderer = _display.getRenderer();
-    if (renderer) {
-        renderer->insertFont(FONT_NARRATIVE, fontNarrativeFamily);
-        renderer->insertFont(FONT_CHOICE, fontChoiceFamily);
-    }
+  GfxRenderer *renderer = _display.getRenderer();
+  if (renderer) {
+    renderer->insertFont(FONT_NARRATIVE, fontNarrativeFamily);
+    renderer->insertFont(FONT_CHOICE, fontChoiceFamily);
+  }
 #endif
 
-    _wrappedLines.clear();
-    _scrollY = 0;
-    _maxScrollY = 0;
-    _state = State::RUNNING_TEXT;
-    return true;
+  _wrappedLines.clear();
+  _scrollY = 0;
+  _maxScrollY = 0;
+  _state = State::RUNNING_TEXT;
+  return true;
 }
 
-const unsigned char* InkEngine::createSnapshot(std::size_t* outLength)
-{
-    freeSnapshot();
-    if (!_runner) return nullptr;
-    
-    _currentSnapshot = _runner->create_snapshot();
-    if (_currentSnapshot) {
-        *outLength = _currentSnapshot->get_data_len();
-        return _currentSnapshot->get_data();
-    }
+const unsigned char *InkEngine::createSnapshot(std::size_t *outLength) {
+  freeSnapshot();
+  if (!_runner)
     return nullptr;
+
+  _currentSnapshot = _runner->create_snapshot();
+  if (_currentSnapshot) {
+    *outLength = _currentSnapshot->get_data_len();
+    return _currentSnapshot->get_data();
+  }
+  return nullptr;
 }
 
-void InkEngine::freeSnapshot()
-{
-    if (_currentSnapshot) {
-        delete _currentSnapshot;
-        _currentSnapshot = nullptr;
-    }
+void InkEngine::freeSnapshot() {
+  if (_currentSnapshot) {
+    delete _currentSnapshot;
+    _currentSnapshot = nullptr;
+  }
 }
 
-bool InkEngine::loadSnapshot(const unsigned char* data, std::size_t length)
-{
-    if (!_story) return false;
-    
-    // from_binary takes ownership of data if freeOnDestroy is true.
-    // We pass false so we can manage the memory buffer ourselves (e.g. from SD read).
-    ink::runtime::snapshot* snap = ink::runtime::snapshot::from_binary(data, length, false);
-    if (!snap) return false;
-    
-    _globals = _story->new_globals_from_snapshot(*snap);
-    _runner = _story->new_runner_from_snapshot(*snap, _globals);
-    
-    delete snap;
-    
-    _wrappedLines.clear();
-    _scrollY = 0;
-    _maxScrollY = 0;
-    _state = State::RUNNING_TEXT;
-    
-    return true;
+bool InkEngine::loadSnapshot(const unsigned char *data, std::size_t length) {
+  if (!_story)
+    return false;
+
+  // from_binary takes ownership of data if freeOnDestroy is true.
+  // We pass false so we can manage the memory buffer ourselves (e.g. from SD
+  // read).
+  ink::runtime::snapshot *snap =
+      ink::runtime::snapshot::from_binary(data, length, false);
+  if (!snap)
+    return false;
+
+  _globals = _story->new_globals_from_snapshot(*snap);
+  _runner = _story->new_runner_from_snapshot(*snap, _globals);
+
+  delete snap;
+
+  _wrappedLines.clear();
+  _scrollY = 0;
+  _maxScrollY = 0;
+  _state = State::RUNNING_TEXT;
+
+  return true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-void InkEngine::update()
-{
-    switch (_state) {
-    case State::RUNNING_TEXT:
-        tickRunningText();
-        break;
-    case State::SHOWING_CHOICES:
-        _state = State::WAITING_INPUT;
-        redraw();
-        break;
-    case State::WAITING_INPUT:
-        tickWaitingInput();
-        break;
-    case State::STORY_ENDED:
-        tickStoryEnded();
-        break;
-    case State::SAVE_STUB:
-        _state = State::WAITING_INPUT;
-        redraw();
-        break;
-    case State::DONE:
-    case State::IDLE:
-        break;
-    }
+void InkEngine::update() {
+  switch (_state) {
+  case State::RUNNING_TEXT:
+    tickRunningText();
+    break;
+  case State::SHOWING_CHOICES:
+    _state = State::WAITING_INPUT;
+    redraw();
+    break;
+  case State::WAITING_INPUT:
+    tickWaitingInput();
+    break;
+  case State::STORY_ENDED:
+    tickStoryEnded();
+    break;
+  case State::SAVE_STUB:
+    _state = State::WAITING_INPUT;
+    redraw();
+    break;
+  case State::DONE:
+  case State::IDLE:
+    break;
+  }
 
 #ifdef PLATFORM_NATIVE
-    SDL_Delay(16); // cap at ~60 fps
+  SDL_Delay(16); // cap at ~60 fps
 #endif
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-void InkEngine::tickRunningText()
-{
-    GfxRenderer* renderer = _display.getRenderer();
-    int narrativeWidth = _display.getWidth() - 48; // 2 * marginX
-    int newLinesCount = 0;
+void InkEngine::tickRunningText() {
+  GfxRenderer *renderer = _display.getRenderer();
+  int narrativeWidth = _display.getWidth() - 48; // 2 * marginX
+  int newLinesCount = 0;
 
-    auto pushLine = [&](const std::string& str) {
-        if (str.empty()) {
-            _wrappedLines.push_back({"", false});
-            newLinesCount++;
-        } else if (renderer) {
-            auto wraps = renderer->wrapTextWithHyphenation(FONT_NARRATIVE, str.c_str(), narrativeWidth, 100);
-            for (auto& w : wraps) {
-                _wrappedLines.push_back({w, false});
-                newLinesCount++;
-            }
-        } else {
-            _wrappedLines.push_back({str, false});
-            newLinesCount++;
-        }
-    };
-
-    while (_runner->can_continue()) {
-        const char* line = _runner->getline_alloc();
-        if (line) {
-            std::string s(line);
-            while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) {
-                s.pop_back();
-            }
-            pushLine(s);
-        }
-    }
-
-    while (_wrappedLines.size() > 800) {
-        _wrappedLines.pop_front();
-    }
-
-    auto doAutoScroll = [&]() {
-        if (!renderer) return;
-        int height = _display.getHeight();
-        int marginY = 24;
-        int choiceHeight = (_numChoices > 0) ? ((_numChoices * renderer->getLineHeight(FONT_CHOICE)) + marginY) : 0;
-        int documentHeight = _wrappedLines.size() * renderer->getLineHeight(FONT_NARRATIVE) + choiceHeight;
-        int availableHeight = height - (2 * marginY);
-        
-        _maxScrollY = std::max(0, documentHeight - availableHeight);
-        
-        int newContentHeight = newLinesCount * renderer->getLineHeight(FONT_NARRATIVE) + choiceHeight;
-        if (newContentHeight > availableHeight) {
-            // Scroll so the first new line is at the top of the visible narrative area
-            int oldLinesCount = std::max(0, (int)_wrappedLines.size() - newLinesCount);
-            _scrollY = std::min(_maxScrollY, oldLinesCount * renderer->getLineHeight(FONT_NARRATIVE));
-        } else {
-            // Snap to bottom
-            _scrollY = _maxScrollY;
-        }
-
-        if (_numChoices > 0 && _scrollY > _maxScrollY - choiceHeight - marginY) {
-            _scrollY = _maxScrollY;
-        }
-    };
-
-    if (_runner->has_choices()) {
-        collectChoices();
-        doAutoScroll();
-        _state = State::SHOWING_CHOICES;
-        redraw();
+  auto pushLine = [&](const std::string &str) {
+    if (str.empty()) {
+      _wrappedLines.push_back({"", false});
+      newLinesCount++;
+    } else if (renderer) {
+      auto wraps = renderer->wrapTextWithHyphenation(
+          FONT_NARRATIVE, str.c_str(), narrativeWidth, 100);
+      for (auto &w : wraps) {
+        _wrappedLines.push_back({w, false});
+        newLinesCount++;
+      }
     } else {
-        pushLine("--- THE END ---");
-        pushLine("[Press ENTER to restart, ESC to quit]");
-        doAutoScroll();
-        _state = State::STORY_ENDED;
-        redraw();
+      _wrappedLines.push_back({str, false});
+      newLinesCount++;
     }
+  };
+
+  while (_runner->can_continue()) {
+    const char *line = _runner->getline_alloc();
+    if (line) {
+      std::string s(line);
+      while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) {
+        s.pop_back();
+      }
+      pushLine(s);
+    }
+  }
+
+  while (_wrappedLines.size() > 800) {
+    _wrappedLines.pop_front();
+  }
+
+  auto doAutoScroll = [&]() {
+    if (!renderer)
+      return;
+    int height = _display.getHeight();
+    int marginY = 24;
+    int choiceHeight = getChoicesHeight(renderer);
+    int documentHeight =
+        _wrappedLines.size() * renderer->getLineHeight(FONT_NARRATIVE) +
+        choiceHeight;
+    int availableHeight = height - (2 * marginY);
+
+    _maxScrollY = std::max(0, documentHeight - availableHeight);
+
+    int newContentHeight =
+        newLinesCount * renderer->getLineHeight(FONT_NARRATIVE) + choiceHeight;
+    if (newContentHeight > availableHeight) {
+      // Scroll so the first new line is at the top of the visible narrative
+      // area
+      int oldLinesCount =
+          std::max(0, (int)_wrappedLines.size() - newLinesCount);
+      _scrollY = std::min(
+          _maxScrollY, oldLinesCount * renderer->getLineHeight(FONT_NARRATIVE));
+    } else {
+      // Snap to bottom
+      _scrollY = _maxScrollY;
+    }
+
+    if (_numChoices > 0 && _scrollY > _maxScrollY - choiceHeight - marginY) {
+      _scrollY = _maxScrollY;
+    }
+  };
+
+  if (_runner->has_choices()) {
+    collectChoices();
+    doAutoScroll();
+    _state = State::SHOWING_CHOICES;
+    redraw();
+  } else {
+    pushLine("--- THE END ---");
+    pushLine("[Press ENTER to restart, ESC to quit]");
+    doAutoScroll();
+    _state = State::STORY_ENDED;
+    redraw();
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-void InkEngine::collectChoices()
-{
-    _numChoices     = 0;
-    _selectedChoice = 0;
-    for (const auto* c = _runner->begin(); c != _runner->end(); ++c) {
-        if (_numChoices >= MAX_CHOICES) break;
-        const char* txt = c->text();
-        if (txt) {
-            strncpy(_choiceText[_numChoices], txt, sizeof(_choiceText[0]) - 1);
-            _choiceText[_numChoices][sizeof(_choiceText[0]) - 1] = '\0';
-        } else {
-            _choiceText[_numChoices][0] = '\0';
-        }
-        ++_numChoices;
+void InkEngine::collectChoices() {
+  _numChoices = 0;
+  _selectedChoice = 0;
+
+  GfxRenderer *renderer = _display.getRenderer();
+  int narrativeWidth = 0;
+  if (renderer) {
+    int width = _display.getWidth();
+    int marginX = 24;
+    narrativeWidth = width - (2 * marginX);
+  }
+
+  for (const auto *c = _runner->begin(); c != _runner->end(); ++c) {
+    if (_numChoices >= MAX_CHOICES)
+      break;
+    const char *txt = c->text();
+    if (txt) {
+      strncpy(_choiceText[_numChoices], txt, sizeof(_choiceText[0]) - 1);
+      _choiceText[_numChoices][sizeof(_choiceText[0]) - 1] = '\0';
+    } else {
+      _choiceText[_numChoices][0] = '\0';
     }
+
+    _wrappedChoices[_numChoices].clear();
+    if (renderer && narrativeWidth > 0) {
+      int indicatorWidth = 24;
+      _wrappedChoices[_numChoices] = renderer->wrapTextWithHyphenation(
+          FONT_CHOICE, _choiceText[_numChoices],
+          narrativeWidth - indicatorWidth, 100);
+      if (_wrappedChoices[_numChoices].empty()) {
+        _wrappedChoices[_numChoices].push_back("");
+      }
+    }
+
+    ++_numChoices;
+  }
+}
+
+int InkEngine::getChoicesHeight(GfxRenderer *renderer) const {
+  if (!renderer || _numChoices == 0)
+    return 0;
+  int lines = 0;
+  for (int i = 0; i < _numChoices; ++i) {
+    lines += std::max((size_t)1, _wrappedChoices[i].size());
+  }
+  int marginY = 24;
+  int choiceLineHeight = renderer->getLineHeight(FONT_CHOICE);
+  int choicePadding = choiceLineHeight / 3;
+  return (lines * choiceLineHeight) + marginY +
+         ((_numChoices - 1) * choicePadding);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-void InkEngine::tickWaitingInput()
-{
-    ButtonEvent ev = _input.pollInput();
+void InkEngine::tickWaitingInput() {
+  ButtonEvent ev = _input.pollInput();
 
-    bool choicesVisible = false;
-    GfxRenderer* renderer = _display.getRenderer();
+  bool choicesVisible = false;
+  GfxRenderer *renderer = _display.getRenderer();
+  if (renderer && _numChoices > 0) {
+    int marginY = 24;
+    int choiceHeight = getChoicesHeight(renderer);
+    if (_scrollY > _maxScrollY - choiceHeight - marginY) {
+      choicesVisible = true;
+    }
+  } else if (!renderer) {
+    choicesVisible = true;
+  }
+
+  if (!choicesVisible) {
+    if (ev == ButtonEvent::UP)
+      ev = ButtonEvent::LEFT;
+    if (ev == ButtonEvent::DOWN)
+      ev = ButtonEvent::RIGHT;
+  }
+
+  switch (ev) {
+  case ButtonEvent::UP:
+    if (_selectedChoice > 0)
+      --_selectedChoice;
+    else if (_numChoices > 0)
+      _selectedChoice = _numChoices - 1;
+    redraw();
+    break;
+  case ButtonEvent::DOWN:
+    if (_selectedChoice < _numChoices - 1)
+      ++_selectedChoice;
+    else if (_numChoices > 0)
+      _selectedChoice = 0;
+    redraw();
+    break;
+  case ButtonEvent::LEFT: {
+    int scrollAmount = _display.getHeight() / 4;
+    _scrollY -= scrollAmount;
+    if (_scrollY < 0)
+      _scrollY = 0;
+    redraw();
+    break;
+  }
+  case ButtonEvent::RIGHT: {
+    int scrollAmount = _display.getHeight() / 4;
+    _scrollY += scrollAmount;
+
+    GfxRenderer *renderer = _display.getRenderer();
     if (renderer && _numChoices > 0) {
-        int marginY = 24;
-        int choiceHeight = (_numChoices * renderer->getLineHeight(FONT_CHOICE)) + marginY;
-        if (_scrollY > _maxScrollY - choiceHeight - marginY) {
-            choicesVisible = true;
-        }
-    } else if (!renderer) {
-        choicesVisible = true;
+      int marginY = 24;
+      int choiceHeight = getChoicesHeight(renderer);
+      if (_scrollY > _maxScrollY - choiceHeight - marginY) {
+        _scrollY = _maxScrollY;
+      }
     }
 
-    if (!choicesVisible) {
-        if (ev == ButtonEvent::UP) ev = ButtonEvent::LEFT;
-        if (ev == ButtonEvent::DOWN) ev = ButtonEvent::RIGHT;
+    if (_scrollY > _maxScrollY)
+      _scrollY = _maxScrollY;
+    redraw();
+    break;
+  }
+  case ButtonEvent::CONFIRM:
+    if (_numChoices > 0) {
+      for (auto &l : _wrappedLines)
+        l.isOld = true;
+      _runner->choose(static_cast<std::size_t>(_selectedChoice));
+      _state = State::RUNNING_TEXT;
     }
-
-    switch (ev) {
-    case ButtonEvent::UP:
-        if (_selectedChoice > 0) --_selectedChoice;
-        else if (_numChoices > 0) _selectedChoice = _numChoices - 1;
-        redraw();
-        break;
-    case ButtonEvent::DOWN:
-        if (_selectedChoice < _numChoices - 1) ++_selectedChoice;
-        else if (_numChoices > 0) _selectedChoice = 0;
-        redraw();
-        break;
-    case ButtonEvent::LEFT: {
-        int scrollAmount = _display.getHeight() / 4;
-        _scrollY -= scrollAmount;
-        if (_scrollY < 0) _scrollY = 0;
-        redraw();
-        break;
-    }
-    case ButtonEvent::RIGHT: {
-        int scrollAmount = _display.getHeight() / 4;
-        _scrollY += scrollAmount;
-        
-        GfxRenderer* renderer = _display.getRenderer();
-        if (renderer && _numChoices > 0) {
-            int marginY = 24;
-            int choiceHeight = (_numChoices * renderer->getLineHeight(FONT_CHOICE)) + marginY;
-            if (_scrollY > _maxScrollY - choiceHeight - marginY) {
-                _scrollY = _maxScrollY;
-            }
-        }
-        
-        if (_scrollY > _maxScrollY) _scrollY = _maxScrollY;
-        redraw();
-        break;
-    }
-    case ButtonEvent::CONFIRM:
-        if (_numChoices > 0) {
-            for (auto& l : _wrappedLines) l.isOld = true;
-            _runner->choose(static_cast<std::size_t>(_selectedChoice));
-            _state = State::RUNNING_TEXT;
-        }
-        break;
-    case ButtonEvent::BACK:
-        _wrappedLines.push_back({"[Save system coming in Milestone 5]", false});
-        _state = State::SAVE_STUB;
-        redraw();
-        break;
-    case ButtonEvent::QUIT:
-        _state = State::DONE;
-        break;
-    case ButtonEvent::SLEEP:
-        _shouldSleep = true;
-        break;
-    default:
-        break;
-    }
+    break;
+  case ButtonEvent::BACK:
+    _wrappedLines.push_back({"[Save system coming in Milestone 5]", false});
+    _state = State::SAVE_STUB;
+    redraw();
+    break;
+  case ButtonEvent::QUIT:
+    _state = State::DONE;
+    break;
+  case ButtonEvent::SLEEP:
+    _shouldSleep = true;
+    break;
+  default:
+    break;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-void InkEngine::tickStoryEnded()
-{
-    ButtonEvent ev = _input.pollInput();
-    if (ev == ButtonEvent::CONFIRM) {
-        _globals = _story->new_globals();
-        _runner  = _story->new_runner(_globals);
-        _wrappedLines.clear();
-        _scrollY = 0;
-        _maxScrollY = 0;
-        _state = State::RUNNING_TEXT;
-    } else if (ev == ButtonEvent::LEFT) {
-        int scrollAmount = _display.getHeight() / 4;
-        _scrollY -= scrollAmount;
-        if (_scrollY < 0) _scrollY = 0;
-        redraw();
-    } else if (ev == ButtonEvent::RIGHT) {
-        int scrollAmount = _display.getHeight() / 4;
-        _scrollY += scrollAmount;
-        
-        GfxRenderer* renderer = _display.getRenderer();
-        if (renderer && _numChoices > 0) {
-            int marginY = 24;
-            int choiceHeight = (_numChoices * renderer->getLineHeight(FONT_CHOICE)) + marginY;
-            if (_scrollY > _maxScrollY - choiceHeight - marginY) {
-                _scrollY = _maxScrollY;
-            }
-        }
-        
-        if (_scrollY > _maxScrollY) _scrollY = _maxScrollY;
-        redraw();
-    } else if (ev == ButtonEvent::QUIT) {
-        _state = State::DONE;
-    } else if (ev == ButtonEvent::SLEEP) {
-        _shouldSleep = true;
+void InkEngine::tickStoryEnded() {
+  ButtonEvent ev = _input.pollInput();
+  if (ev == ButtonEvent::CONFIRM) {
+    _globals = _story->new_globals();
+    _runner = _story->new_runner(_globals);
+    _wrappedLines.clear();
+    _scrollY = 0;
+    _maxScrollY = 0;
+    _state = State::RUNNING_TEXT;
+  } else if (ev == ButtonEvent::LEFT) {
+    int scrollAmount = _display.getHeight() / 4;
+    _scrollY -= scrollAmount;
+    if (_scrollY < 0)
+      _scrollY = 0;
+    redraw();
+  } else if (ev == ButtonEvent::RIGHT) {
+    int scrollAmount = _display.getHeight() / 4;
+    _scrollY += scrollAmount;
+
+    GfxRenderer *renderer = _display.getRenderer();
+    if (renderer && _numChoices > 0) {
+      int marginY = 24;
+      int choiceHeight = getChoicesHeight(renderer);
+      if (_scrollY > _maxScrollY - choiceHeight - marginY) {
+        _scrollY = _maxScrollY;
+      }
     }
+
+    if (_scrollY > _maxScrollY)
+      _scrollY = _maxScrollY;
+    redraw();
+  } else if (ev == ButtonEvent::QUIT) {
+    _state = State::DONE;
+  } else if (ev == ButtonEvent::SLEEP) {
+    _shouldSleep = true;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-void InkEngine::redraw()
-{
-    _display.clear();
+void InkEngine::redraw() {
+  _display.clear();
 
-    GfxRenderer* renderer = _display.getRenderer();
-    if (!renderer) {
-        // ── Text-mode (e.g. EspSerialDisplay) ───────────────────────────────
-        for (const auto& line : _wrappedLines) {
-            _display.drawNarrativeLine(line.text.c_str());
-        }
-        if (_numChoices > 0) {
-            _display.drawSeparator();
-            for (int i = 0; i < _numChoices; ++i) {
-                _display.drawChoiceLine(i, _choiceText[i], i == _selectedChoice);
-            }
-        }
-        _display.present();
-        return;
+  GfxRenderer *renderer = _display.getRenderer();
+  if (!renderer) {
+    // ── Text-mode (e.g. EspSerialDisplay) ───────────────────────────────
+    for (const auto &line : _wrappedLines) {
+      _display.drawNarrativeLine(line.text.c_str());
     }
+    if (_numChoices > 0) {
+      _display.drawSeparator();
+      for (int i = 0; i < _numChoices; ++i) {
+        _display.drawChoiceLine(i, _choiceText[i], i == _selectedChoice);
+      }
+    }
+    _display.present();
+    return;
+  }
 
 #ifndef SERIAL_DEBUG
-    int width = _display.getWidth();
-    int height = _display.getHeight();
+  int width = _display.getWidth();
+  int height = _display.getHeight();
 
-    int marginX = 24;
-    int marginY = 24;
-    int narrativeWidth = width - (2 * marginX);
+  int marginX = 24;
+  int marginY = 24;
+  int narrativeWidth = width - (2 * marginX);
 
-    int lineHeight = renderer->getLineHeight(FONT_NARRATIVE);
-    int choiceLineHeight = renderer->getLineHeight(FONT_CHOICE);
-    
-    int y = marginY - _scrollY;
+  int lineHeight = renderer->getLineHeight(FONT_NARRATIVE);
+  int choiceLineHeight = renderer->getLineHeight(FONT_CHOICE);
 
-    for (const auto& w : _wrappedLines) {
-        if (!w.text.empty() && (y + lineHeight > 0) && (y < height)) {
-            renderer->setHalftone(w.isOld);
-            renderer->drawText(FONT_NARRATIVE, marginX, y, w.text.c_str());
-            renderer->setHalftone(false);
-        }
-        y += lineHeight;
+  int y = marginY - _scrollY;
+
+  for (const auto &w : _wrappedLines) {
+    if (!w.text.empty() && (y + lineHeight > 0) && (y < height)) {
+      renderer->setHalftone(w.isOld);
+      renderer->drawText(FONT_NARRATIVE, marginX, y, w.text.c_str());
+      renderer->setHalftone(false);
     }
+    y += lineHeight;
+  }
 
-    if (_numChoices > 0) {
-        y += (marginY / 2);
-        
-        if ((y + 2 > 0) && (y < height)) {
-            renderer->fillRect(marginX, y, narrativeWidth, 2, true);
+  if (_numChoices > 0) {
+    y += (marginY / 2);
+
+    if ((y + 2 > 0) && (y < height)) {
+      renderer->fillRect(marginX, y, narrativeWidth, 2, true);
+    }
+    y += (marginY / 2);
+
+    int choicePadding = choiceLineHeight / 3;
+    int indicatorWidth = 24;
+
+    for (int i = 0; i < _numChoices; ++i) {
+      if (i > 0) {
+        // int lineY = y + (choicePadding / 2);
+        // if (lineY > 0 && lineY < height) {
+        //   renderer->setHalftone(true);
+        //   renderer->fillRect(marginX, lineY, narrativeWidth, 1, true);
+        //   renderer->setHalftone(false);
+        // }
+        y += choicePadding;
+      }
+
+      bool selected = (i == _selectedChoice);
+      int choiceBlockLines = std::max((size_t)1, _wrappedChoices[i].size());
+      int choiceBlockHeight = choiceBlockLines * choiceLineHeight;
+
+      if ((y + choiceBlockHeight > 0) && (y < height)) {
+        if (selected) {
+          renderer->fillRect(marginX - 4, y, narrativeWidth + 8,
+                             choiceBlockHeight, true);
         }
-        y += (marginY / 2);
+      }
 
-        for (int i = 0; i < _numChoices; ++i) {
-            bool selected = (i == _selectedChoice);
-            char buf[256];
-            snprintf(buf, sizeof(buf), "%s %s", selected ? ">" : " ", _choiceText[i]);
-
-            if ((y + choiceLineHeight > 0) && (y < height)) {
-                if (selected) {
-                    renderer->fillRect(marginX - 4, y, narrativeWidth + 8, choiceLineHeight, true);
-                    renderer->drawText(FONT_CHOICE, marginX, y, buf, false);
-                } else {
-                    renderer->drawText(FONT_CHOICE, marginX, y, buf, true);
-                }
+      if (_wrappedChoices[i].empty()) {
+        if (selected) {
+          renderer->drawText(FONT_CHOICE, marginX, y, ">", !selected);
+        }
+        y += choiceLineHeight;
+      } else {
+        for (size_t l = 0; l < _wrappedChoices[i].size(); ++l) {
+          if ((y + choiceLineHeight > 0) && (y < height)) {
+            if (l == 0 && selected) {
+              renderer->drawText(FONT_CHOICE, marginX, y, ">", !selected);
             }
-            y += choiceLineHeight;
+            renderer->drawText(FONT_CHOICE, marginX + indicatorWidth, y,
+                               _wrappedChoices[i][l].c_str(), !selected);
+          }
+          y += choiceLineHeight;
         }
+      }
     }
+  }
 
-    _display.present();
+  _display.present();
 #endif // !SERIAL_DEBUG
 }
