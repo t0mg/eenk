@@ -81,6 +81,12 @@ int main(int argc, char *argv[]) {
 #include <EpdFont.h>
 #include <builtinFonts/ui_12.h>
 #include "ui/SystemUI.h"
+#include "os/BootManager.h"
+#include "os/AppSettings.h"
+#include "ui/BatteryWidget.h"
+#include "ui/GameLibrary.h"
+#include "ui/SettingsView.h"
+#include <BatteryMonitor.h>
 #include <esp_sleep.h>
 
 extern const EpdFontFamily OpenSans;
@@ -96,7 +102,9 @@ EspSdStorage *sdStorage = nullptr;
 FlashCache *flashCache = nullptr;
 #endif
 InkEngine *engine = nullptr;
-SystemUI *systemUI = nullptr;
+SystemUI       *systemUI      = nullptr;
+BatteryMonitor *batteryMonitor = nullptr;
+BatteryWidget  *batteryWidget  = nullptr;
 String saveFilePath = "";
 uint32_t currentStoryHash = 0;
 
@@ -108,10 +116,50 @@ void setup() {
   Serial.println("=== EENK Interactive Fiction Runtime (ESP32-C3) ===");
   Serial.printf("Free heap before init: %u bytes\n", ESP.getFreeHeap());
 
+  // ── Initialise NVS (must be first — BootManager and AppSettings both use it)
+  BootManager::init();
+
   display = new DisplayType();
   input = new InputType();
   storage = new EspLittleFSStorage();
   systemUI = new SystemUI(*display);
+
+  // ── Battery
+  batteryMonitor = new BatteryMonitor(0 /*GPIO0*/);
+  batteryWidget  = new BatteryWidget(*display->getRenderer(), *batteryMonitor);
+
+  // ── Dual-boot dispatch ─────────────────────────────────────────────────────
+  AppSettings settings = AppSettings::load();
+  BootMode    mode     = BootManager::getBootMode();
+  Serial.printf("[Boot] mode=%d\n", (int)mode);
+
+  if (mode == BootMode::MENU) {
+    // Mount the SD card so GameLibrary can scan for stories.
+    sdStorage = new EspSdStorage();
+    if (!sdStorage->begin()) {
+      Serial.println("[Boot] MENU: SD mount failed — library will show empty.");
+    } else {
+      Serial.println("[Boot] MENU: SD mounted OK.");
+    }
+
+    // Menu / library loop — runs until the user launches a story (which
+    // calls BootManager::setBootMode(INK_RUNTIME) and reboots).
+    while (true) {
+      GameLibrary* library = new GameLibrary(*display, *input, *batteryWidget, settings);
+      bool goToSettings = library->run();
+      delete library;
+      if (goToSettings) {
+        SettingsView* settingsView = new SettingsView(*display, *input, *batteryWidget, settings);
+        settingsView->run();
+        delete settingsView;
+        settings = AppSettings::load(); // reload after save
+      }
+    }
+    // Unreachable: GameLibrary reboots the device when a story is launched.
+  }
+
+  // ── INK_RUNTIME — load and run the story selected in the library ──────────
+  Serial.println("[Boot] INK_RUNTIME — loading story...");
 
   bool storyLoaded = false;
   String errorMessage = "";
@@ -360,8 +408,10 @@ void loop() {
     engine->update();
   } else {
 #ifdef PLATFORM_ESP32
-    Serial.println("Engine done. Restarting...");
-    delay(1000);
+    // Story finished or user pressed BACK — return to the library.
+    Serial.println("Engine done. Returning to MENU...");
+    BootManager::setBootMode(BootMode::MENU);
+    delay(500);
     ESP.restart();
 #else
     delay(100);

@@ -405,11 +405,9 @@ void InkEngine::tickWaitingInput() {
     }
     break;
   case ButtonEvent::BACK:
-    _wrappedLines.push_back({"[Save system coming in Milestone 5]", false});
-    _state = State::SAVE_STUB;
-    redraw();
-    break;
   case ButtonEvent::QUIT:
+    // Exit to menu: save state, then signal done so main loop reboots to MENU.
+    _shouldSleep = false;
     _state = State::DONE;
     break;
   case ButtonEvent::SLEEP:

@@ -1,0 +1,881 @@
+// EENK — SettingsView implementation
+//
+// Font ID allocations (must not clash with InkEngine 0/1, SystemUI 10/11,
+// BatteryWidget 20):
+//   30  ui_12       (normal body text in settings rows)
+//   31  ui_bold_12  (bold labels, status bar, page headers)
+//   32  small14     (diagram labels on the Input page)
+//   33  ui_10       (small supplementary text)
+//
+// Display geometry (480 × 800 portrait):
+//   Status bar:  y=0..23  (STATUS_BAR_H = 24)
+//   Content area: y=24..799
+//   Row height: ROW_H = 60 px
+#include "SettingsView.h"
+#include "BatteryWidget.h"
+
+#include <cstdio>
+#include <cstring>
+
+#ifdef PLATFORM_ESP32
+#include <Arduino.h>
+#include <esp_sleep.h>
+#include "SystemUI.h"
+#include <InputManager.h>
+#include <EpdFont.h>
+#include <EpdFontFamily.h>
+#include <GfxRenderer.h>
+#include <builtinFonts/ui_10.h>
+#include <builtinFonts/ui_12.h>
+#include <builtinFonts/ui_bold_12.h>
+#include <builtinFonts/small14.h>
+
+static EpdFont    s_font12(&ui_12);
+static EpdFontFamily s_fam12(&s_font12);
+
+static EpdFont    s_fontBold12(&ui_bold_12);
+static EpdFontFamily s_famBold12(&s_fontBold12);
+
+static EpdFont    s_fontSmall14(&small14);
+static EpdFontFamily s_famSmall14(&s_fontSmall14);
+
+static EpdFont    s_font10(&ui_10);
+static EpdFontFamily s_fam10(&s_font10);
+#else
+#include <GfxRenderer.h>
+#endif
+
+static constexpr int kFontNormal  = 30;
+static constexpr int kFontBold    = 31;
+static constexpr int kFontDiagram = 32;
+static constexpr int kFontSmall   = 33;
+
+static constexpr int ROW_H        = 60;
+static constexpr int LEFT_MARGIN  = 8;
+static constexpr int DISP_W       = 480;
+static constexpr int DISP_H       = 800;
+
+// ─── ButtonAnnotation / InputLayout ──────────────────────────────────────────
+
+struct ButtonAnnotation {
+    const char* buttonName;  // label shown near the button
+    int bx, by;              // button position relative to diagram origin (top-left)
+    int bw, bh;              // button size in pixels
+    const char* action;      // action description
+    bool labelRight;         // if true, label is drawn to the right of the button
+};
+
+// Two layouts – cycle with LEFT/RIGHT on the Input page.
+// Coords are relative to the diagram rectangle origin.
+static const ButtonAnnotation kLayout0[] = {
+    { "Power",   82,   0,  36, 12, "Sleep/Save",        true  },
+    { "Left",    0,  140,  20, 28, "Back (Scroll Up)",  true  },
+    { "Right",   0,  178,  20, 28, "(Scroll Down)",     true  },
+    { "D-Pad",   40, 310,  40, 40, "Up/Prev Choice",    true  },
+    { "D-Pad",   40, 360,  40, 40, "Down/Next Choice",  true  },
+    { "OK",      18, 310,  20, 20, "Select",            false },
+};
+static const int kLayout0Count = 6;
+
+static const ButtonAnnotation kLayout1[] = {
+    { "Power",   82,   0,  36, 12, "Sleep/Save",       true  },
+    { "Left",    0,  140,  20, 28, "Page Back",        true  },
+    { "Right",   0,  178,  20, 28, "Page Forward",     true  },
+    { "D-Pad",   40, 310,  40, 40, "Prev Choice",      true  },
+    { "D-Pad",   40, 360,  40, 40, "Next Choice",      true  },
+    { "OK",      18, 310,  20, 20, "Confirm",          false },
+};
+static const int kLayout1Count = 6;
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// Map marginPx value (8/16/24/32) to a display string.
+static const char* marginName(uint8_t px) {
+    if (px <=  8) return "8 px (Tight)";
+    if (px <= 16) return "16 px (Normal)";
+    if (px <= 24) return "24 px (Wide)";
+    return "32 px (Extra Wide)";
+}
+
+// Map refreshInterval value (5/10/15/20) to a display string.
+static const char* refreshName(uint8_t n) {
+    static char buf[24];
+    snprintf(buf, sizeof(buf), "Every %u updates", (unsigned)n);
+    return buf;
+}
+
+// Map sleepTimeoutSec to a display string.
+static const char* sleepName(uint16_t sec) {
+    if (sec == 0)   return "Never";
+    if (sec <= 60)  return "1 minute";
+    if (sec <= 120) return "2 minutes";
+    return "5 minutes";
+}
+
+
+
+// ─── Construction / Destruction ───────────────────────────────────────────────
+
+SettingsView::SettingsView(IDisplay& display, IInput& input,
+                           BatteryWidget& battery, AppSettings& settings)
+    : _display(display)
+    , _input(input)
+    , _battery(battery)
+    , _settings(settings)
+{}
+
+SettingsView::~SettingsView() {}
+
+// ─── run() ───────────────────────────────────────────────────────────────────
+
+void SettingsView::run() {
+    // Register fonts once
+    auto* r = _display.getRenderer();
+    if (r) {
+#ifdef PLATFORM_ESP32
+        r->insertFont(kFontNormal,  s_fam12);
+        r->insertFont(kFontBold,    s_famBold12);
+        r->insertFont(kFontDiagram, s_famSmall14);
+        r->insertFont(kFontSmall,   s_fam10);
+#endif
+    }
+
+    _pageIndex = 0;
+    _itemIndex = 0;
+    bool running = true;
+
+#ifdef PLATFORM_ESP32
+    // Drain stale button events from the previous screen's button press.
+    // Without this, a BACK press that exits GameLibrary immediately re-fires
+    // in SettingsView and exits it too, making it look like a screen refresh.
+    {
+        unsigned long drainUntil = millis() + 150;
+        while (millis() < drainUntil) {
+            _input.pollInput();
+            delay(10);
+        }
+    }
+#endif
+
+    renderPage();
+
+    while (running) {
+        ButtonEvent ev = _input.pollInput();
+        if (ev == ButtonEvent::NONE) {
+#ifdef PLATFORM_ESP32
+            delay(16);
+#endif
+            continue;
+        }
+
+        // BACK / QUIT on page 0 exits the settings view.
+        if ((ev == ButtonEvent::BACK || ev == ButtonEvent::QUIT) && _pageIndex == 0) {
+            running = false;
+            break;
+        }
+
+        // BACK / QUIT on other pages goes to the previous page.
+        if ((ev == ButtonEvent::BACK || ev == ButtonEvent::QUIT) && _pageIndex > 0) {
+            _pageIndex--;
+            _itemIndex = 0;
+            renderPage();
+            continue;
+        }
+
+        if (ev == ButtonEvent::SLEEP) {
+#ifdef PLATFORM_ESP32
+            // Save settings before sleeping
+            if (_dirty) _settings.save();
+            
+            {
+                SystemUI ui(_display);
+                ui.showSleepCover();
+            }
+            esp_deep_sleep_enable_gpio_wakeup(
+                1ULL << InputManager::POWER_BUTTON_PIN,
+                ESP_GPIO_WAKEUP_GPIO_LOW);
+            esp_deep_sleep_start();
+#endif
+            continue;
+        }
+
+        // Dispatch to per-page handler.
+        switch (_pageIndex) {
+            case 0: handleReadingInput(ev);   break;
+            case 1: handleBehaviourInput(ev); break;
+            case 2: handleInputPageInput(ev); break;
+            case 3: handleDangerInput(ev);    break;
+            default: break;
+        }
+    }
+
+    // Persist if anything changed.
+    if (_dirty) {
+        _settings.save();
+    }
+}
+
+// ─── renderPage() ─────────────────────────────────────────────────────────────
+
+void SettingsView::renderPage() {
+    _display.clear();
+
+    switch (_pageIndex) {
+        case 0: renderReadingPage();   break;
+        case 1: renderBehaviourPage(); break;
+        case 2: renderInputPage();     break;
+        case 3: renderDangerPage();    break;
+        default: break;
+    }
+
+    _display.present();
+}
+
+// ─── renderStatusBar() ────────────────────────────────────────────────────────
+
+void SettingsView::renderStatusBar(const char* pageTitle) {
+    auto* r = _display.getRenderer();
+    if (!r) return;
+
+    const int barY = 0;
+    const int barH = STATUS_BAR_H;
+
+    // White background already from clear(); draw separator line at bottom.
+    r->drawLine(0, barY + barH - 1, DISP_W, barY + barH - 1, true);
+
+    // "Settings — {pageTitle}" on the left.
+    char title[64];
+    snprintf(title, sizeof(title), "Settings \xe2\x80\x94 %s", pageTitle);
+    // Battery widget: icon body+nub (27px) in top-right corner, label to its left.
+    static constexpr int kIconW = 27;
+    _battery.draw(DISP_W - kIconW - LEFT_MARGIN, barY + (barH - 14) / 2, false);
+
+    // Vertically centre the title text.
+    int bH = r->getLineHeight(kFontBold);
+    r->drawText(kFontBold, LEFT_MARGIN, barY + (barH - bH) / 2, title, true);
+
+    // Page-indicator dots: 4 small squares just left of the battery.
+    static constexpr int DOT_SIZE = 5;
+    static constexpr int DOT_GAP  = 3;
+    int dotTotalW = PAGE_COUNT * DOT_SIZE + (PAGE_COUNT - 1) * DOT_GAP;
+    int dotX = DISP_W - kIconW - LEFT_MARGIN - dotTotalW - 8;
+    int dotY = barY + (barH - DOT_SIZE) / 2;
+    for (int i = 0; i < PAGE_COUNT; i++) {
+        int x = dotX + i * (DOT_SIZE + DOT_GAP);
+        if (i == _pageIndex) {
+            r->fillRect(x, dotY, DOT_SIZE, DOT_SIZE, true);
+        } else {
+            r->drawRect(x, dotY, DOT_SIZE, DOT_SIZE, true);
+        }
+    }
+}
+
+// ─── drawSettingsRow() ────────────────────────────────────────────────────────
+
+void SettingsView::drawSettingsRow(int y, const char* label, const char* value, bool selected) {
+    auto* r = _display.getRenderer();
+    if (!r) return;
+
+    if (selected) {
+        r->fillRect(0, y, DISP_W, ROW_H, true);
+    }
+    bool ink = !selected;  // selected row: white text on black
+
+    // Label on the left.
+    int textY = y + (ROW_H - 12) / 2;  // vertically centre within row
+    r->drawText(kFontBold, LEFT_MARGIN + 8, textY, label, ink);
+
+    // Value right-aligned.
+    if (value && value[0] != '\0') {
+        int textW = r->getTextWidth(kFontNormal, value);
+        int valueX = DISP_W - textW - 16;
+        if (valueX < LEFT_MARGIN + 120) valueX = LEFT_MARGIN + 120;
+        r->drawText(kFontNormal, valueX, textY, value, ink);
+    }
+
+    // Separator line at the bottom of the row (not drawn when selected so the
+    // fill covers the whole cell cleanly).
+    if (!selected) {
+        r->drawLine(0, y + ROW_H - 1, DISP_W, y + ROW_H - 1, true);
+    }
+}
+
+// ─── renderReadingPage() ──────────────────────────────────────────────────────
+
+void SettingsView::renderReadingPage() {
+    renderStatusBar("Reading");
+
+    int y = STATUS_BAR_H;
+
+    // Row 0: Story Font
+    {
+        const char* val = AppSettings::STORY_FONT_NAMES[_settings.storyFontIndex];
+        drawSettingsRow(y, "Story Font", val, _itemIndex == 0);
+        y += ROW_H;
+    }
+    // Row 1: Choice Font
+    {
+        const char* val = AppSettings::CHOICE_FONT_NAMES[_settings.choiceFontIndex];
+        drawSettingsRow(y, "Choice Font", val, _itemIndex == 1);
+        y += ROW_H;
+    }
+    // Row 2: Margin
+    {
+        const char* val = marginName(_settings.marginPx);
+        drawSettingsRow(y, "Margin", val, _itemIndex == 2);
+        y += ROW_H;
+    }
+    // Row 3: Partial Refresh
+    {
+        const char* val = refreshName(_settings.refreshInterval);
+        drawSettingsRow(y, "Partial Refresh", val, _itemIndex == 3);
+    }
+}
+
+// ─── renderBehaviourPage() ────────────────────────────────────────────────────
+
+void SettingsView::renderBehaviourPage() {
+    renderStatusBar("Behaviour");
+
+    int y = STATUS_BAR_H;
+
+    // Row 0: Sleep & Save timeout
+    {
+        const char* val = sleepName(_settings.sleepTimeoutSec);
+        drawSettingsRow(y, "Sleep & Save", val, _itemIndex == 0);
+        y += ROW_H;
+    }
+    // Row 1: Full Refresh interval
+    {
+        static char buf[32];
+        snprintf(buf, sizeof(buf), "Every %u", (unsigned)_settings.refreshInterval);
+        drawSettingsRow(y, "Full Refresh", buf, _itemIndex == 1);
+    }
+}
+
+// ─── renderInputPage() ────────────────────────────────────────────────────────
+
+void SettingsView::renderInputPage() {
+    renderStatusBar("Input Mapping");
+
+    auto* r = _display.getRenderer();
+    if (!r) return;
+
+    // Layout name header.
+    static const char* kLayoutNames[2] = { "Layout A (Default)", "Layout B" };
+    int layoutIdx = _settings.inputLayoutIndex;
+    if (layoutIdx >= AppSettings::INPUT_LAYOUT_COUNT)
+        layoutIdx = 0;
+
+    char header[48];
+    snprintf(header, sizeof(header), "< %s >", kLayoutNames[layoutIdx]);
+    int hw = r->getTextWidth(kFontBold, header);
+    r->drawText(kFontBold, (DISP_W - hw) / 2, STATUS_BAR_H + 8, header, true);
+
+    // Device diagram.
+    int diagW = 200;
+    int diagH = 380;
+    int diagX = (DISP_W - diagW) / 2;
+    int diagY = STATUS_BAR_H + 40;
+    drawDeviceDiagram(diagX, diagY, diagW, diagH, layoutIdx);
+
+    // Hint at bottom.
+    const char* hint = "LEFT/RIGHT to change layout";
+    int hintW = r->getTextWidth(kFontSmall, hint);
+    r->drawText(kFontSmall, (DISP_W - hintW) / 2, DISP_H - 30, hint, true);
+}
+
+// ─── drawDeviceDiagram() ─────────────────────────────────────────────────────
+
+void SettingsView::drawDeviceDiagram(int x, int y, int width, int height, int layoutIndex) {
+    auto* r = _display.getRenderer();
+    if (!r) return;
+
+    // ── Device body (rounded via thick border approximation) ─────────────────
+    r->drawRect(x, y, width, height, true);
+    r->drawRect(x + 1, y + 1, width - 2, height - 2, true);  // 2px border
+
+    // Screen bezel inset (10 px each side, 20 top, 80 bottom).
+    int bezX = x + 10;
+    int bezY = y + 20;
+    int bezW = width - 20;
+    int bezH = height - 100;
+    r->drawRect(bezX, bezY, bezW, bezH, true);
+
+    // ── Physical buttons ──────────────────────────────────────────────────────
+    // Power button: top-centre strip.
+    int pwrW = 36, pwrH = 10;
+    int pwrX = x + (width - pwrW) / 2;
+    int pwrY = y - pwrH;
+    r->fillRect(pwrX, pwrY, pwrW, pwrH, true);
+
+    // Left side: two thumb buttons.
+    int sideW = 16, sideH = 26;
+    int sideX = x - sideW;
+    r->fillRect(sideX, y + 130, sideW, sideH, true);
+    r->fillRect(sideX, y + 170, sideW, sideH, true);
+
+    // D-pad (cross shape at bottom centre).
+    int dpadCX = x + width / 2;
+    int dpadCY = y + height - 60;
+    int dpadArmW = 14, dpadArmH = 12, dpadCoreH = 12;
+    // Up arm
+    r->fillRect(dpadCX - dpadArmW / 2, dpadCY - dpadCoreH - dpadArmH,
+                dpadArmW, dpadArmH, true);
+    // Down arm
+    r->fillRect(dpadCX - dpadArmW / 2, dpadCY + dpadCoreH, dpadArmW, dpadArmH, true);
+    // Left arm
+    r->fillRect(dpadCX - dpadCoreH - dpadArmH, dpadCY - dpadArmW / 2,
+                dpadArmH, dpadArmW, true);
+    // Right arm
+    r->fillRect(dpadCX + dpadCoreH, dpadCY - dpadArmW / 2,
+                dpadArmH, dpadArmW, true);
+    // Centre
+    r->fillRect(dpadCX - dpadCoreH, dpadCY - dpadCoreH, dpadCoreH * 2, dpadCoreH * 2, true);
+
+    // OK / Confirm button (bottom-left of D-pad cluster).
+    int okR = 8;
+    r->fillRect(dpadCX - 40 - okR, dpadCY - okR, okR * 2, okR * 2, true);
+
+    // ── Annotation lines + labels ─────────────────────────────────────────────
+    const ButtonAnnotation* layout = kLayout0;
+    int layoutCount = kLayout0Count;
+    if (layoutIndex == 1) {
+        layout = kLayout1;
+        layoutCount = kLayout1Count;
+    }
+
+    // Button screen-space origin centres — map from ButtonAnnotation relative coords
+    // to absolute positions using diagram origin x, y.
+    struct ButtonPos {
+        const char* buttonName;
+        int cx, cy;  // centre x, y
+    };
+
+    // Pre-computed button centres (absolute).
+
+    // Line endpoints for annotation labels.
+    for (int i = 0; i < layoutCount; i++) {
+        const ButtonAnnotation& ann = layout[i];
+        int bCX = x + ann.bx + ann.bw / 2;
+        int bCY = y + ann.by + ann.bh / 2;
+
+        // Override with computed centres for hardware buttons.
+        if (strcmp(ann.buttonName, "Power") == 0) {
+            bCX = pwrX + pwrW / 2; bCY = pwrY + pwrH / 2;
+        } else if (strcmp(ann.buttonName, "Left") == 0) {
+            bCX = sideX + sideW / 2; bCY = y + 130 + sideH / 2;
+        } else if (strcmp(ann.buttonName, "Right") == 0) {
+            bCX = sideX + sideW / 2; bCY = y + 170 + sideH / 2;
+        } else if (strcmp(ann.buttonName, "OK") == 0) {
+            bCX = dpadCX - 40; bCY = dpadCY;
+        }
+
+        // Label position.
+        int lineLen  = 40;
+        int labelX, labelY;
+        int lineEndX, lineEndY;
+        if (ann.labelRight) {
+            lineEndX = bCX + lineLen;
+            lineEndY = bCY;
+            labelX   = lineEndX + 4;
+            labelY   = lineEndY - 6;
+        } else {
+            lineEndX = bCX - lineLen;
+            lineEndY = bCY;
+            int tw = r->getTextWidth(kFontDiagram, ann.action);
+            labelX   = lineEndX - tw - 4;
+            labelY   = lineEndY - 6;
+        }
+
+        // Clamp label to display bounds.
+        if (labelX < 2) labelX = 2;
+        if (labelX + 100 > DISP_W) labelX = DISP_W - 104;
+
+        r->drawLine(bCX, bCY, lineEndX, lineEndY, true);
+        r->drawText(kFontDiagram, labelX, labelY, ann.action, true);
+    }
+}
+
+// ─── renderDangerPage() ───────────────────────────────────────────────────────
+
+void SettingsView::renderDangerPage() {
+    renderStatusBar("Danger Zone");
+
+    auto* r = _display.getRenderer();
+    if (!r) return;
+
+    int y = STATUS_BAR_H;
+
+    // Inverted title header.
+    r->fillRect(0, y, DISP_W, ROW_H, true);
+    const char* dangerTitle = "! Danger Zone !";
+    int tw = r->getTextWidth(kFontBold, dangerTitle);
+    r->drawText(kFontBold, (DISP_W - tw) / 2,
+                y + (ROW_H - 12) / 2, dangerTitle, false);
+    y += ROW_H;
+
+    drawSettingsRow(y, "Delete Save",  "Current story save file", _itemIndex == 0);
+    y += ROW_H;
+    drawSettingsRow(y, "Delete Story", "Remove .bin from SD card", _itemIndex == 1);
+    y += ROW_H;
+    drawSettingsRow(y, "Format SD",    "Erase entire SD card!",    _itemIndex == 2);
+}
+
+// ─── handleReadingInput() ────────────────────────────────────────────────────
+
+void SettingsView::handleReadingInput(ButtonEvent ev) {
+    static constexpr int kItems = 4;
+
+    switch (ev) {
+        case ButtonEvent::UP:
+            _itemIndex = (_itemIndex - 1 + kItems) % kItems;
+            renderPage();
+            break;
+
+        case ButtonEvent::DOWN:
+            _itemIndex = (_itemIndex + 1) % kItems;
+            renderPage();
+            break;
+
+        case ButtonEvent::LEFT: {
+            _dirty = true;
+            switch (_itemIndex) {
+                case 0:
+                    _settings.storyFontIndex =
+                        (uint8_t)((_settings.storyFontIndex - 1 +
+                                   AppSettings::STORY_FONT_COUNT) %
+                                  AppSettings::STORY_FONT_COUNT);
+                    break;
+                case 1:
+                    _settings.choiceFontIndex =
+                        (uint8_t)((_settings.choiceFontIndex - 1 +
+                                   AppSettings::CHOICE_FONT_COUNT) %
+                                  AppSettings::CHOICE_FONT_COUNT);
+                    break;
+                case 2: {
+                    // Cycle margin: 8 → 32 → 24 → 16 → 8 (backwards).
+                    static const uint8_t kMargins[] = {8, 16, 24, 32};
+                    static const int kMCount = 4;
+                    int cur = 1;
+                    for (int i = 0; i < kMCount; i++) {
+                        if (kMargins[i] == _settings.marginPx) { cur = i; break; }
+                    }
+                    cur = (cur - 1 + kMCount) % kMCount;
+                    _settings.marginPx = kMargins[cur];
+                    break;
+                }
+                case 3: {
+                    // Cycle refresh: 5 → 20 → 15 → 10 → 5 (backwards).
+                    static const uint8_t kRefresh[] = {5, 10, 15, 20};
+                    static const int kRCount = 4;
+                    int cur = 0;
+                    for (int i = 0; i < kRCount; i++) {
+                        if (kRefresh[i] == _settings.refreshInterval) { cur = i; break; }
+                    }
+                    cur = (cur - 1 + kRCount) % kRCount;
+                    _settings.refreshInterval = kRefresh[cur];
+                    break;
+                }
+                default: break;
+            }
+            renderPage();
+            break;
+        }
+
+        case ButtonEvent::RIGHT: {
+            _dirty = true;
+            switch (_itemIndex) {
+                case 0:
+                    _settings.storyFontIndex =
+                        (uint8_t)((_settings.storyFontIndex + 1) %
+                                  AppSettings::STORY_FONT_COUNT);
+                    break;
+                case 1:
+                    _settings.choiceFontIndex =
+                        (uint8_t)((_settings.choiceFontIndex + 1) %
+                                  AppSettings::CHOICE_FONT_COUNT);
+                    break;
+                case 2: {
+                    static const uint8_t kMargins[] = {8, 16, 24, 32};
+                    static const int kMCount = 4;
+                    int cur = 1;
+                    for (int i = 0; i < kMCount; i++) {
+                        if (kMargins[i] == _settings.marginPx) { cur = i; break; }
+                    }
+                    cur = (cur + 1) % kMCount;
+                    _settings.marginPx = kMargins[cur];
+                    break;
+                }
+                case 3: {
+                    static const uint8_t kRefresh[] = {5, 10, 15, 20};
+                    static const int kRCount = 4;
+                    int cur = 0;
+                    for (int i = 0; i < kRCount; i++) {
+                        if (kRefresh[i] == _settings.refreshInterval) { cur = i; break; }
+                    }
+                    cur = (cur + 1) % kRCount;
+                    _settings.refreshInterval = kRefresh[cur];
+                    break;
+                }
+                default: break;
+            }
+            renderPage();
+            break;
+        }
+
+        case ButtonEvent::CONFIRM:
+            // Navigate forward to next page on confirm.
+            if (_pageIndex < PAGE_COUNT - 1) {
+                _pageIndex++;
+                _itemIndex = 0;
+                renderPage();
+            }
+            break;
+
+        default: break;
+    }
+}
+
+// ─── handleBehaviourInput() ──────────────────────────────────────────────────
+
+void SettingsView::handleBehaviourInput(ButtonEvent ev) {
+    static constexpr int kItems = 2;
+
+    switch (ev) {
+        case ButtonEvent::UP:
+            _itemIndex = (_itemIndex - 1 + kItems) % kItems;
+            renderPage();
+            break;
+
+        case ButtonEvent::DOWN:
+            _itemIndex = (_itemIndex + 1) % kItems;
+            renderPage();
+            break;
+
+        case ButtonEvent::LEFT: {
+            _dirty = true;
+            if (_itemIndex == 0) {
+                static const uint16_t kSleep[] = {0, 60, 120, 300};
+                static const int kSCount = 4;
+                int cur = 1;
+                for (int i = 0; i < kSCount; i++) {
+                    if (kSleep[i] == _settings.sleepTimeoutSec) { cur = i; break; }
+                }
+                cur = (cur - 1 + kSCount) % kSCount;
+                _settings.sleepTimeoutSec = kSleep[cur];
+            } else if (_itemIndex == 1) {
+                static const uint8_t kRefresh[] = {5, 10, 15, 20};
+                static const int kRCount = 4;
+                int cur = 0;
+                for (int i = 0; i < kRCount; i++) {
+                    if (kRefresh[i] == _settings.refreshInterval) { cur = i; break; }
+                }
+                cur = (cur - 1 + kRCount) % kRCount;
+                _settings.refreshInterval = kRefresh[cur];
+            }
+            renderPage();
+            break;
+        }
+
+        case ButtonEvent::RIGHT: {
+            _dirty = true;
+            if (_itemIndex == 0) {
+                static const uint16_t kSleep[] = {0, 60, 120, 300};
+                static const int kSCount = 4;
+                int cur = 1;
+                for (int i = 0; i < kSCount; i++) {
+                    if (kSleep[i] == _settings.sleepTimeoutSec) { cur = i; break; }
+                }
+                cur = (cur + 1) % kSCount;
+                _settings.sleepTimeoutSec = kSleep[cur];
+            } else if (_itemIndex == 1) {
+                static const uint8_t kRefresh[] = {5, 10, 15, 20};
+                static const int kRCount = 4;
+                int cur = 0;
+                for (int i = 0; i < kRCount; i++) {
+                    if (kRefresh[i] == _settings.refreshInterval) { cur = i; break; }
+                }
+                cur = (cur + 1) % kRCount;
+                _settings.refreshInterval = kRefresh[cur];
+            }
+            renderPage();
+            break;
+        }
+
+        case ButtonEvent::CONFIRM:
+            if (_pageIndex < PAGE_COUNT - 1) {
+                _pageIndex++;
+                _itemIndex = 0;
+                renderPage();
+            }
+            break;
+
+        default: break;
+    }
+}
+
+// ─── handleInputPageInput() ──────────────────────────────────────────────────
+
+void SettingsView::handleInputPageInput(ButtonEvent ev) {
+    switch (ev) {
+        case ButtonEvent::LEFT:
+            _settings.inputLayoutIndex =
+                (uint8_t)((_settings.inputLayoutIndex - 1 +
+                           AppSettings::INPUT_LAYOUT_COUNT) %
+                          AppSettings::INPUT_LAYOUT_COUNT);
+            _dirty = true;
+            renderPage();
+            break;
+
+        case ButtonEvent::RIGHT:
+            _settings.inputLayoutIndex =
+                (uint8_t)((_settings.inputLayoutIndex + 1) %
+                          AppSettings::INPUT_LAYOUT_COUNT);
+            _dirty = true;
+            renderPage();
+            break;
+
+        case ButtonEvent::CONFIRM:
+            if (_pageIndex < PAGE_COUNT - 1) {
+                _pageIndex++;
+                _itemIndex = 0;
+                renderPage();
+            }
+            break;
+
+        default: break;
+    }
+}
+
+// ─── handleDangerInput() ─────────────────────────────────────────────────────
+
+void SettingsView::handleDangerInput(ButtonEvent ev) {
+    static constexpr int kItems = 3;
+
+    switch (ev) {
+        case ButtonEvent::UP:
+            _itemIndex = (_itemIndex - 1 + kItems) % kItems;
+            renderPage();
+            break;
+
+        case ButtonEvent::DOWN:
+            _itemIndex = (_itemIndex + 1) % kItems;
+            renderPage();
+            break;
+
+        case ButtonEvent::CONFIRM:
+            switch (_itemIndex) {
+                case 0: deleteSave();  break;
+                case 1: deleteStory(); break;
+                case 2: formatSD();    break;
+                default: break;
+            }
+            break;
+
+        default: break;
+    }
+}
+
+// ─── showConfirmDialog() ──────────────────────────────────────────────────────
+
+bool SettingsView::showConfirmDialog(const char* title, const char* message) {
+    auto* r = _display.getRenderer();
+    if (!r) return false;
+
+    static constexpr int DLG_W = 300;
+    static constexpr int DLG_H = 200;
+    int dlgX = (DISP_W - DLG_W) / 2;
+    int dlgY = (DISP_H - DLG_H) / 2;
+
+    // Background + border.
+    r->fillRect(dlgX, dlgY, DLG_W, DLG_H, false);       // white fill
+    r->drawRect(dlgX, dlgY, DLG_W, DLG_H, true);         // black border
+    r->drawRect(dlgX + 1, dlgY + 1, DLG_W - 2, DLG_H - 2, true);  // 2 px border
+
+    // Title (bold, centred).
+    int tw = r->getTextWidth(kFontBold, title);
+    r->drawText(kFontBold, dlgX + (DLG_W - tw) / 2, dlgY + 14, title, true);
+
+    // Separator.
+    r->drawLine(dlgX, dlgY + 34, dlgX + DLG_W, dlgY + 34, true);
+
+    // Message body (truncated to two lines for simplicity).
+    r->drawText(kFontNormal, dlgX + 10, dlgY + 44, message, true);
+
+    // Action hints at bottom.
+    r->drawLine(dlgX, dlgY + DLG_H - 40, dlgX + DLG_W, dlgY + DLG_H - 40, true);
+    const char* confirmLabel = "[CONFIRM]";
+    const char* cancelLabel  = "[CANCEL]";
+    r->drawText(kFontBold, dlgX + 10,                        dlgY + DLG_H - 28, cancelLabel,  true);
+    int cw = r->getTextWidth(kFontBold, confirmLabel);
+    r->drawText(kFontBold, dlgX + DLG_W - cw - 10,          dlgY + DLG_H - 28, confirmLabel, true);
+
+    _display.present();
+
+    // Wait for user response.
+    while (true) {
+        ButtonEvent ev = _input.pollInput();
+        if (ev == ButtonEvent::CONFIRM) return true;
+        if (ev == ButtonEvent::BACK)    return false;
+        if (ev == ButtonEvent::SLEEP)   return false;
+#ifdef PLATFORM_ESP32
+        delay(16);
+#endif
+    }
+}
+
+// ─── Danger zone actions ──────────────────────────────────────────────────────
+
+void SettingsView::deleteSave() {
+    if (!showConfirmDialog("Delete Save?",
+                           "This will erase your\ncurrent progress.")) {
+        renderPage();
+        return;
+    }
+
+#ifdef PLATFORM_ESP32
+    // Delete the save file from SD.  The save path is written by main.cpp into
+    // NVS — for now we remove the well-known save directory.
+    // A proper implementation would retrieve the path from BootManager / NVS.
+    // (Full implementation pending GameLibrary integration.)
+    Serial.println("[Settings] Delete save requested (not yet wired to path).");
+#endif
+
+    renderPage();
+}
+
+void SettingsView::deleteStory() {
+    if (!showConfirmDialog("Delete Story?",
+                           "This removes the .bin\nfile from the SD card.")) {
+        renderPage();
+        return;
+    }
+
+#ifdef PLATFORM_ESP32
+    Serial.println("[Settings] Delete story requested (not yet wired to path).");
+#endif
+
+    renderPage();
+}
+
+void SettingsView::formatSD() {
+    // Two-step confirm for the most destructive action.
+    if (!showConfirmDialog("Format SD?",
+                           "ALL data will be erased.\nAre you sure?")) {
+        renderPage();
+        return;
+    }
+    if (!showConfirmDialog("FORMAT SD — FINAL WARNING",
+                           "Press CONFIRM to erase\neverything on the SD card.")) {
+        renderPage();
+        return;
+    }
+
+#ifdef PLATFORM_ESP32
+    // TODO: Unmount and format the SD card via ESP-IDF f_mkfs.
+    Serial.println("[Settings] Format SD requested (not yet implemented).");
+#endif
+
+    renderPage();
+}
