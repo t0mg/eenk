@@ -372,58 +372,65 @@ void setup() {
   delay(2000); // Give user time to see RAM stats
 }
 
-void loop() {
-  if (engine && engine->shouldSleep()) {
+void saveProgress() {
+  if (!engine) return;
 #ifdef PLATFORM_ESP32
-    systemUI->showLoading("Saving Progress...", 1.0f);
-    delay(100);
+  systemUI->showLoading("Saving Progress...", 1.0f);
+  delay(100);
 
-    size_t snapLen = 0;
-    const unsigned char *snapData = engine->createSnapshot(&snapLen);
-    if (snapData) {
-      File f = SD.open(saveFilePath, FILE_WRITE);
-      if (f) {
-        uint32_t magic = 0x314B4E45; // "ENK1"
-        f.write((const uint8_t *)&magic, 4);
+  size_t snapLen = 0;
+  const unsigned char *snapData = engine->createSnapshot(&snapLen);
+  if (snapData) {
+    File f = SD.open(saveFilePath, FILE_WRITE);
+    if (f) {
+      uint32_t magic = 0x314B4E45; // "ENK1"
+      f.write((const uint8_t *)&magic, 4);
 
-        f.write((const uint8_t *)&currentStoryHash, 4);
+      f.write((const uint8_t *)&currentStoryHash, 4);
 
-        uint32_t snapSize32 = snapLen;
-        f.write((const uint8_t *)&snapSize32, 4);
-        f.write(snapData, snapLen);
+      uint32_t snapSize32 = snapLen;
+      f.write((const uint8_t *)&snapSize32, 4);
+      f.write(snapData, snapLen);
 
-        // Write history
-        const auto &history = engine->getHistory();
-        uint16_t historySize = history.size();
-        f.write((const uint8_t *)&historySize, 2);
-        for (const auto &line : history) {
-          uint16_t len = line.text.length();
-          f.write((const uint8_t *)&len, 2);
-          f.write((const uint8_t *)line.text.c_str(), len);
-          uint8_t isOld = line.isOld ? 1 : 0;
-          f.write(&isOld, 1);
-        }
-
-        f.close();
-        Serial.println("Game saved successfully!");
-      } else {
-        systemUI->showError("EENK SYSTEM ERROR",
-                            "Failed to write save file to SD.");
-        while (true) {
-          if (input->pollInput() == ButtonEvent::SLEEP)
-            break;
-          delay(10);
-        }
+      // Write history
+      const auto &history = engine->getHistory();
+      uint16_t historySize = history.size();
+      f.write((const uint8_t *)&historySize, 2);
+      for (const auto &line : history) {
+        uint16_t len = line.text.length();
+        f.write((const uint8_t *)&len, 2);
+        f.write((const uint8_t *)line.text.c_str(), len);
+        uint8_t isOld = line.isOld ? 1 : 0;
+        f.write(&isOld, 1);
       }
+
+      f.close();
+      Serial.println("Game saved successfully!");
     } else {
       systemUI->showError("EENK SYSTEM ERROR",
-                          "Failed to create runtime snapshot.");
+                          "Failed to write save file to SD.");
       while (true) {
         if (input->pollInput() == ButtonEvent::SLEEP)
           break;
         delay(10);
       }
     }
+  } else {
+    systemUI->showError("EENK SYSTEM ERROR",
+                        "Failed to create runtime snapshot.");
+    while (true) {
+      if (input->pollInput() == ButtonEvent::SLEEP)
+        break;
+      delay(10);
+    }
+  }
+#endif
+}
+
+void loop() {
+  if (engine && engine->shouldSleep()) {
+#ifdef PLATFORM_ESP32
+    saveProgress();
 
     Serial.println("Power off requested. Entering deep sleep...");
     systemUI->showSleepCover();
@@ -441,8 +448,9 @@ void loop() {
 #ifdef PLATFORM_ESP32
     // Story finished or user pressed BACK — return to the library.
     Serial.println("Engine done. Returning to MENU...");
+    saveProgress();
     if (systemUI) {
-      systemUI->showLoading("Returning to menu...", 0.0f);
+      systemUI->showLoading("Loading...", 0.0f);
     }
     BootManager::setBootMode(BootMode::MENU);
     delay(500);
