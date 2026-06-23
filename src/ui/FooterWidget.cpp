@@ -9,6 +9,9 @@ void FooterWidget::render(GfxRenderer* r, int displayWidth, int displayHeight, i
     // Draw top separator line (black line, 2px thick)
     r->fillRect(0, startY, displayWidth, 2, true);
 
+    // Clear footer background below separator to white
+    r->fillRect(0, startY + 2, displayWidth, HEIGHT - 2, false);
+
     const FooterAction* actions[4] = {&btnBack, &btnConfirm, &btnPrev, &btnNext};
 
     for (int i = 0; i < 4; ++i) {

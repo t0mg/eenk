@@ -71,8 +71,5 @@ private:
     void deleteSave();
     void deleteStory();
     void formatSD();
-
-    // Show a centered confirmation dialog.
-    // Returns true if the user pressed CONFIRM, false if BACK / no action.
-    bool showConfirmDialog(const char* title, const char* message);
 };
+
