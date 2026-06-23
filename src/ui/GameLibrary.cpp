@@ -259,40 +259,6 @@ void GameLibrary::clampScroll() {
     _scrollOffset = 0;
 }
 
-// ─── renderStatusBar()
-// ────────────────────────────────────────────────────────
-
-void GameLibrary::renderStatusBar() {
-  auto *r = _display.getRenderer();
-  if (!r)
-    return;
-
-#ifdef PLATFORM_ESP32
-  // Poll battery so the widget shows a fresh reading on first render.
-  _battery.tick();
-
-  // Clear status bar strip.
-  r->fillRect(0, 0, DISPLAY_W, STATUS_BAR_H, false /*white*/);
-
-  // Left: "EENK" in bold, vertically centred.
-  int boldH = r->getLineHeight(FONT_BOLD);
-  int textY = (STATUS_BAR_H - boldH) / 2;
-  r->drawText(FONT_BOLD, ITEM_MARGIN_X, textY, "EENK", true /*black*/);
-
-  // Right: battery widget.
-  // Label is now drawn LEFT of the body, so icon body+nub (27px) sits in the
-  // top-right corner. The label extends leftward automatically.
-  static constexpr int kIconW = 27; // body(24) + nub(3)
-  static constexpr int kBatH = 14;
-  int batX = DISPLAY_W - kIconW - ITEM_MARGIN_X;
-  int batY = (STATUS_BAR_H - kBatH) / 2;
-  _battery.draw(batX, batY, false /*not inverted*/);
-
-  // Bottom separator line.
-  r->drawLine(0, STATUS_BAR_H - 1, DISPLAY_W, STATUS_BAR_H - 1, true);
-#endif
-}
-
 // ─── renderEntry()
 // ────────────────────────────────────────────────────────────
 
@@ -301,7 +267,7 @@ void GameLibrary::renderEntry(int index, int yPos, bool selected) {
   if (!r)
     return;
 
-#ifdef PLATFORM_ESP32
+#if defined(PLATFORM_ESP32) || defined(PIO_UNIT_TESTING)
   const StoryEntry &e = _entries[index];
 
   // Background: fill row black if selected, white otherwise.
@@ -332,13 +298,11 @@ void GameLibrary::renderEntry(int index, int yPos, bool selected) {
   formatSize(e.sizeBytes, sizeStr, sizeof(sizeStr));
   int sizeW = r->getTextWidth(FONT_SMALL, sizeStr);
 
-  // Save indicator: a checkmark if hasSave.
-  // Use ASCII to keep it simple and avoid glyph-missing issues.
-  const char *saveStr = e.hasSave ? "[S]" : "";
-  int saveW = e.hasSave ? r->getTextWidth(FONT_BOLD, saveStr) : 0;
+  // Save indicator: 16x16 floppy icon if hasSave.
+  int saveW = e.hasSave ? 16 : 0;
 
   // Currently-loaded marker.
-  const char *loadedStr = e.isCurrentlyLoaded ? "[*]" : "";
+  const char *loadedStr = e.isCurrentlyLoaded ? "[LOADED]" : "";
   int loadedW =
       e.isCurrentlyLoaded ? r->getTextWidth(FONT_SMALL, loadedStr) : 0;
 
@@ -349,10 +313,24 @@ void GameLibrary::renderEntry(int index, int yPos, bool selected) {
   r->drawText(FONT_SMALL, annotX, textY + (lineH_bold - lineH_small) / 2,
               sizeStr, ink);
 
-  // Draw save indicator (bold) to the left of size.
+  // Draw save indicator (floppy icon) to the left of size.
   if (e.hasSave) {
     int svX = annotX - saveW - 6;
-    r->drawText(FONT_BOLD, svX, textY, saveStr, ink);
+    int svY = textY + (lineH_bold - 16) / 2;
+    static const uint8_t kFloppyIcon16[32] = {
+        0xf0, 0x6c, 0xf0, 0x6e, 0xf0, 0x6f, 0xf0, 0x6f, 0xf0, 0x0f, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc0, 0x03, 0xd9, 0x2b,
+        0xd2, 0xab, 0xcb, 0xab, 0xda, 0x93, 0xc0, 0x03, 0xff, 0xff};
+    for (int fy = 0; fy < 16; fy++) {
+      for (int fx_byte = 0; fx_byte < 2; fx_byte++) {
+        uint8_t b = kFloppyIcon16[fy * 2 + fx_byte];
+        for (int fx_bit = 0; fx_bit < 8; fx_bit++) {
+          if (b & (1 << (7 - fx_bit))) {
+            r->drawPixel(svX + fx_byte * 8 + fx_bit, svY + fy, ink);
+          }
+        }
+      }
+    }
   }
 
   // Draw currently-loaded marker below save indicator.
@@ -393,7 +371,7 @@ void GameLibrary::renderEmpty() {
   if (!r)
     return;
 
-#ifdef PLATFORM_ESP32
+#if defined(PLATFORM_ESP32) || defined(PIO_UNIT_TESTING)
   static const char *kLine1 = "No stories found.";
   static const char *kLine2 = "Copy .bin files to";
   static const char *kLine3 = "/eenk/ on the SD card.";
@@ -401,8 +379,8 @@ void GameLibrary::renderEmpty() {
   int lineH = r->getLineHeight(FONT_NORMAL);
   int totalH = lineH * 3 + 8;
   // Centre within the content area (between status bar and hint bar).
-  int contentH = DISPLAY_H - STATUS_BAR_H - FooterWidget::HEIGHT;
-  int startY = STATUS_BAR_H + (contentH - totalH) / 2;
+  int contentH = DISPLAY_H - HeaderWidget::HEIGHT - FooterWidget::HEIGHT;
+  int startY = HeaderWidget::HEIGHT + (contentH - totalH) / 2;
 
   r->drawCenteredText(FONT_BOLD, startY, kLine1, true);
   r->drawCenteredText(FONT_NORMAL, startY + lineH + 4, kLine2, true);
@@ -442,7 +420,8 @@ void GameLibrary::render() {
   }
 
   _display.clear();
-  renderStatusBar();
+  HeaderWidget header(_display, _battery);
+  header.render("EENK", FONT_BOLD);
 
   if (_numEntries == 0) {
     renderEmpty();
@@ -454,7 +433,7 @@ void GameLibrary::render() {
 
     for (int i = _scrollOffset; i < lastVisible; i++) {
       int row = i - _scrollOffset;
-      int yPos = STATUS_BAR_H + row * ITEM_H;
+      int yPos = HeaderWidget::HEIGHT + row * ITEM_H;
       renderEntry(i, yPos, i == _selectedIndex);
     }
 
@@ -462,11 +441,12 @@ void GameLibrary::render() {
     // Scroll arrows.
     if (_scrollOffset > 0) {
       // Up arrow at top-right of list area.
-      r->drawText(FONT_BOLD, DISPLAY_W / 2, STATUS_BAR_H + 2, "^", true);
+      r->drawText(FONT_BOLD, DISPLAY_W / 2, HeaderWidget::HEIGHT + 2, "^",
+                  true);
     }
     if (_scrollOffset + VISIBLE_ITEMS < _numEntries) {
-      // Down arrow at bottom of list area.
-      int arrowY = STATUS_BAR_H + VISIBLE_ITEMS * ITEM_H - 14;
+      // Down arrow at bottom-right of list area.
+      int arrowY = HeaderWidget::HEIGHT + VISIBLE_ITEMS * ITEM_H - 14;
       r->drawText(FONT_BOLD, DISPLAY_W / 2, arrowY, "v", true);
     }
 #endif

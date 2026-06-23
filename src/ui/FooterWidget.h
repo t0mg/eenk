@@ -11,7 +11,8 @@ struct FooterAction {
 
 class FooterWidget {
 public:
-    static constexpr int HEIGHT = 48;
+    static constexpr int BEZEL_OFFSET_Y = 4;
+    static constexpr int HEIGHT = 48 + BEZEL_OFFSET_Y;
     static constexpr int BTN_WIDTH = 120;
     static constexpr int MAX_LABEL_WIDTH = 110;
 

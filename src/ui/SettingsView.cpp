@@ -8,9 +8,8 @@
 //   33  ui_10       (small supplementary text)
 //
 // Display geometry (480 × 800 portrait):
-//   Status bar:  y=0..23  (STATUS_BAR_H = 24)
-//   Content area: y=24..799
-//   Row height: ROW_H = 60 px
+//   Status bar:  y=0..31  (HeaderWidget::HEIGHT = 32)
+//   List items:  y=32..751 (48px per row) height: ROW_H = 60 px
 #include "SettingsView.h"
 #include "BatteryWidget.h"
 #include "SystemUI.h"
@@ -279,48 +278,6 @@ void SettingsView::renderFooter() {
   footer.render(r, DISP_W, DISP_H, kFontSmall);
 }
 
-// ─── renderStatusBar()
-// ────────────────────────────────────────────────────────
-
-void SettingsView::renderStatusBar(const char *pageTitle) {
-  auto *r = _display.getRenderer();
-  if (!r)
-    return;
-
-  const int barY = 0;
-  const int barH = STATUS_BAR_H;
-
-  // White background already from clear(); draw separator line at bottom.
-  r->drawLine(0, barY + barH - 1, DISP_W, barY + barH - 1, true);
-
-  // "Settings — {pageTitle}" on the left.
-  char title[64];
-  snprintf(title, sizeof(title), "Settings \xe2\x80\x94 %s", pageTitle);
-  // Battery widget: icon body+nub (27px) in top-right corner, label to its
-  // left.
-  static constexpr int kIconW = 27;
-  _battery.draw(DISP_W - kIconW - LEFT_MARGIN, barY + (barH - 14) / 2, false);
-
-  // Vertically centre the title text.
-  int bH = r->getLineHeight(kFontBold);
-  r->drawText(kFontBold, LEFT_MARGIN, barY + (barH - bH) / 2, title, true);
-
-  // Page-indicator dots: 4 small squares just left of the battery.
-  static constexpr int DOT_SIZE = 5;
-  static constexpr int DOT_GAP = 3;
-  int dotTotalW = PAGE_COUNT * DOT_SIZE + (PAGE_COUNT - 1) * DOT_GAP;
-  int dotX = DISP_W - kIconW - LEFT_MARGIN - dotTotalW - 8;
-  int dotY = barY + (barH - DOT_SIZE) / 2;
-  for (int i = 0; i < PAGE_COUNT; i++) {
-    int x = dotX + i * (DOT_SIZE + DOT_GAP);
-    if (i == _pageIndex) {
-      r->fillRect(x, dotY, DOT_SIZE, DOT_SIZE, true);
-    } else {
-      r->drawRect(x, dotY, DOT_SIZE, DOT_SIZE, true);
-    }
-  }
-}
-
 // ─── drawSettingsRow()
 // ────────────────────────────────────────────────────────
 
@@ -359,9 +316,10 @@ void SettingsView::drawSettingsRow(int y, const char *label, const char *value,
 // ──────────────────────────────────────────────────────
 
 void SettingsView::renderReadingPage() {
-  renderStatusBar("Reading");
+  HeaderWidget header(_display, _battery);
+  header.render("Settings — Reading", kFontBold);
 
-  int y = STATUS_BAR_H;
+  int y = HeaderWidget::HEIGHT;
 
   // Row 0: Story Font
   {
@@ -392,9 +350,10 @@ void SettingsView::renderReadingPage() {
 // ────────────────────────────────────────────────────
 
 void SettingsView::renderBehaviourPage() {
-  renderStatusBar("Behaviour");
+  HeaderWidget header(_display, _battery);
+  header.render("Settings — Behaviour", kFontBold);
 
-  int y = STATUS_BAR_H;
+  int y = HeaderWidget::HEIGHT;
 
   // Row 0: Sleep & Save timeout
   {
@@ -414,7 +373,8 @@ void SettingsView::renderBehaviourPage() {
 // ────────────────────────────────────────────────────────
 
 void SettingsView::renderInputPage() {
-  renderStatusBar("Input Mapping");
+  HeaderWidget header(_display, _battery);
+  header.render("Settings — Input Mapping", kFontBold);
 
   auto *r = _display.getRenderer();
   if (!r)
@@ -426,16 +386,16 @@ void SettingsView::renderInputPage() {
   if (layoutIdx >= AppSettings::INPUT_LAYOUT_COUNT)
     layoutIdx = 0;
 
-  char header[48];
-  snprintf(header, sizeof(header), "< %s >", kLayoutNames[layoutIdx]);
-  int hw = r->getTextWidth(kFontBold, header);
-  r->drawText(kFontBold, (DISP_W - hw) / 2, STATUS_BAR_H + 8, header, true);
+  char headerTxt[48];
+  snprintf(headerTxt, sizeof(headerTxt), "< %s >", kLayoutNames[layoutIdx]);
+  int hw = r->getTextWidth(kFontBold, headerTxt);
+  r->drawText(kFontBold, (DISP_W - hw) / 2, HeaderWidget::HEIGHT + 8, headerTxt, true);
 
   // Device diagram.
   int diagW = 200;
-  int diagH = 380;
   int diagX = (DISP_W - diagW) / 2;
-  int diagY = STATUS_BAR_H + 40;
+  int diagY = HeaderWidget::HEIGHT + 40;
+  int diagH = DISP_H - HeaderWidget::HEIGHT - FooterWidget::HEIGHT - 100;
   drawDeviceDiagram(diagX, diagY, diagW, diagH, layoutIdx);
 
   // Hint at bottom.
@@ -570,13 +530,14 @@ void SettingsView::drawDeviceDiagram(int x, int y, int width, int height,
 // ───────────────────────────────────────────────────────
 
 void SettingsView::renderDangerPage() {
-  renderStatusBar("Danger Zone");
+  HeaderWidget header(_display, _battery);
+  header.render("Settings — Danger Zone", kFontBold);
 
   auto *r = _display.getRenderer();
   if (!r)
     return;
 
-  int y = STATUS_BAR_H;
+  int y = HeaderWidget::HEIGHT;
 
   // Inverted title header.
   r->fillRect(0, y, DISP_W, ROW_H, true);

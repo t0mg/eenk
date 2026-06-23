@@ -18,6 +18,7 @@
 #include "hal/IInput.h"
 #include "os/AppSettings.h"
 #include "FooterWidget.h"
+#include "HeaderWidget.h"
 
 class BatteryWidget;
 
@@ -39,13 +40,12 @@ private:
 
     int  _pageIndex = 0;   // 0=Reading, 1=Behaviour, 2=Input, 3=Danger Zone
     int  _itemIndex = 0;   // selected row within page
-    bool _dirty     = false; // settings changed, need save
-
-    static constexpr int STATUS_BAR_H = 28;
+    bool _dirty     = false;
+    static constexpr int DISP_H = 800;
+    static constexpr int ROW_H = 48;
     static constexpr int PAGE_COUNT   = 4;
 
     void renderPage();
-    void renderStatusBar(const char* pageTitle);
     void renderFooter();
     void renderReadingPage();
     void renderBehaviourPage();

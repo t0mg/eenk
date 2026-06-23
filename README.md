@@ -43,6 +43,13 @@ Once built, the executable is created at `.pio/build/native/program.exe`. The ru
 
 Use `W/S` or the **Arrow Keys** to navigate choices, and **Enter** to confirm.
 
+### Running Unit Tests
+Unit tests are built using the PlatformIO Unity framework. The tests cover scripting detection, rendering components, and generate an E-Ink simulator screenshot (`test_battery_widget.pbm`).
+
+```powershell
+pio test -e native
+```
+
 ---
 
 ## 3. ESP32-C3 Target (`esp32c3` configuration)

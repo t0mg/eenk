@@ -24,12 +24,12 @@ void FooterWidget::render(GfxRenderer* r, int displayWidth, int displayHeight, i
             // Truncate if > MAX_LABEL_WIDTH
             std::string truncLabel = r->truncatedText(fontIndex, label.c_str(), MAX_LABEL_WIDTH);
 
-            // Center horizontally and vertically
+            // Center horizontally and vertically (compensating for bottom bezel)
             int textW = r->getTextWidth(fontIndex, truncLabel.c_str());
             int textH = r->getLineHeight(fontIndex);
 
             int x = i * BTN_WIDTH + (BTN_WIDTH - textW) / 2;
-            int y = startY + (HEIGHT - textH) / 2;
+            int y = startY + (HEIGHT - BEZEL_OFFSET_Y - textH) / 2;
 
             r->drawText(fontIndex, x, y, truncLabel.c_str(), true);
         }

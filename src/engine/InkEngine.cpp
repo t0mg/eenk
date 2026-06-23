@@ -69,7 +69,17 @@ bool InkEngine::loadStory(const char *path) {
     return false;
   }
 
-  _story = ink::runtime::story::from_binary(_storyBuf, size, false);
+  const unsigned char* dataToLoad = _storyBuf;
+  std::size_t sizeToLoad = size;
+  if (sizeToLoad >= 128) {
+    uint32_t magic = dataToLoad[0] | (dataToLoad[1] << 8) | (dataToLoad[2] << 16) | (dataToLoad[3] << 24);
+    if (magic == 0x4B4E4545) { // 'EENK'
+      dataToLoad += 128;
+      sizeToLoad -= 128;
+    }
+  }
+
+  _story = ink::runtime::story::from_binary(dataToLoad, sizeToLoad, false);
   if (!_story) {
     fprintf(stderr, "[InkEngine] story::from_binary() failed\n");
     _storage.freeBuffer(_storyBuf);
@@ -110,7 +120,18 @@ void InkEngine::applySettings(const AppSettings& settings) {
 bool InkEngine::loadStoryFromMemory(const unsigned char *data,
                                     std::size_t size) {
   // NOTE: _storyBuf is NOT set — we don't own this memory (it's mmap'd)
-  _story = ink::runtime::story::from_binary(data, size, false);
+  
+  const unsigned char* dataToLoad = data;
+  std::size_t sizeToLoad = size;
+  if (sizeToLoad >= 128) {
+    uint32_t magic = dataToLoad[0] | (dataToLoad[1] << 8) | (dataToLoad[2] << 16) | (dataToLoad[3] << 24);
+    if (magic == 0x4B4E4545) { // 'EENK'
+      dataToLoad += 128;
+      sizeToLoad -= 128;
+    }
+  }
+
+  _story = ink::runtime::story::from_binary(dataToLoad, sizeToLoad, false);
   if (!_story) {
     fprintf(stderr, "[InkEngine] story::from_binary() failed (mmap)\n");
     return false;

@@ -21,6 +21,7 @@
 #include <SDL.h>
 #include <cstdio>
 
+#ifndef PIO_UNIT_TESTING
 int main(int argc, char *argv[]) {
   const char *storyPath = "stories/the_intercept.bin";
   if (argc > 1)
@@ -62,6 +63,7 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
+#endif
 
 // ════════════════════════════════════════════════════════════════════════════
 #elif defined(PLATFORM_ESP32)

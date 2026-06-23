@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <cstddef>
 #include "FooterWidget.h"
+#include "HeaderWidget.h"
 
 class BatteryWidget;
 
@@ -27,7 +28,7 @@ public:
     // Never returns on game launch (reboots inside).
     bool run();
 
-private:
+protected:
     IDisplay&      _display;
     IInput&        _input;
     BatteryWidget& _battery;
@@ -44,7 +45,6 @@ private:
     };
 
     static constexpr int MAX_STORIES   = 32;
-    static constexpr int STATUS_BAR_H  = 28;   // px — height of the status bar strip
     static constexpr int ITEM_H        = 64;   // px per story list entry
     // floor((800 - STATUS_BAR_H - FooterWidget::HEIGHT) / ITEM_H)
     static constexpr int VISIBLE_ITEMS = 11;
@@ -71,7 +71,7 @@ private:
     void ensureFonts();
 
     // Populate _entries[] by scanning the SD card (or local stories/ dir on native).
-    void scanSD();
+    virtual void scanSD();
 
     // Sort _entries[0.._numEntries) alphabetically by title (insertion sort — n≤32).
     void sortEntries();
@@ -87,9 +87,6 @@ private:
 
     // Full-screen redraw.
     void render();
-
-    // Draw the top status bar (EENK title + battery widget + separator line).
-    void renderStatusBar();
 
     // Draw one story row at vertical position yPos.
     // index: entry index in _entries[]; selected: true if currently highlighted.
