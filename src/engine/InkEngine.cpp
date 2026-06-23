@@ -37,7 +37,7 @@ static EpdFontFamily fontChoiceFamily(&fontChoiceData);
 
 static int g_marginPx = 16;
 static int g_refreshInterval = 10;
-static int g_refreshCounter = 0;
+
 
 #endif // !SERIAL_DEBUG
 

@@ -20,7 +20,7 @@ class BatteryWidget;
 class GameLibrary {
 public:
     GameLibrary(IDisplay& display, IInput& input, BatteryWidget& battery, AppSettings& settings);
-    ~GameLibrary() = default;
+    virtual ~GameLibrary() = default;
 
     // Run the game library loop. Blocks until the user selects a game
     // (which sets BootManager and reboots) or presses RIGHT/BACK to go to settings.

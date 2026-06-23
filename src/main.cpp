@@ -174,34 +174,29 @@ void setup() {
   if (sdStorage->begin()) {
     Serial.println("[SD] SD card mounted OK");
 
-    // Discover first .bin file in /eenk
     const char *sdStoryPath = nullptr;
-    File eenkDir = SD.open("/eenk");
-    if (!eenkDir || !eenkDir.isDirectory()) {
-      errorMessage = "/eenk/ directory not found on SD card";
+
+    // Ensure saves directory exists
+    if (!SD.exists("/.eenk_saves")) {
+      SD.mkdir("/.eenk_saves");
+    }
+
+    char savedPath[128] = {0};
+    if (BootManager::getStoryPath(savedPath, sizeof(savedPath)) && savedPath[0] != '\0') {
+      if (SD.exists(savedPath)) {
+        size_t len = strlen(savedPath);
+        char* pathCopy = new char[len + 1];
+        strcpy(pathCopy, savedPath);
+        sdStoryPath = pathCopy;
+
+        const char* slash = strrchr(savedPath, '/');
+        const char* filename = slash ? slash + 1 : savedPath;
+        saveFilePath = String("/.eenk_saves/") + filename + ".save";
+      } else {
+        errorMessage = String("Selected story not found: ") + savedPath;
+      }
     } else {
-      // Ensure saves directory exists
-      if (!SD.exists("/.eenk_saves")) {
-        SD.mkdir("/.eenk_saves");
-      }
-
-      File file = eenkDir.openNextFile();
-      while (file) {
-        if (!file.isDirectory()) {
-          String filename = file.name();
-          if (filename.endsWith(".bin")) {
-            // We found a story!
-            sdStoryPath =
-                new char[filename.length() + 7]; // "/eenk/" + filename
-            sprintf((char *)sdStoryPath, "/eenk/%s", filename.c_str());
-
-            saveFilePath = String("/.eenk_saves/") + filename + ".save";
-            break;
-          }
-        }
-        file = eenkDir.openNextFile();
-      }
-      eenkDir.close();
+      errorMessage = "No story selected. Please return to the menu.";
     }
 
     if (sdStoryPath != nullptr) {
