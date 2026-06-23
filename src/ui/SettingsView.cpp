@@ -228,7 +228,30 @@ void SettingsView::renderPage() {
         default: break;
     }
 
+    renderFooter();
+
     _display.present();
+}
+
+// ─── renderFooter() ───────────────────────────────────────────────────────────
+
+void SettingsView::renderFooter() {
+    auto* r = _display.getRenderer();
+    if (!r) return;
+
+    FooterWidget footer;
+    if (_pageIndex == 0) {
+        footer.btnBack = {true, "Exit", "Back"};
+        footer.btnConfirm = {false, "", ""};
+        footer.btnPrev = {true, "Up", "Prev"};
+        footer.btnNext = {true, "Down", "Next"};
+    } else {
+        footer.btnBack = {true, "Back", "Back"};
+        footer.btnConfirm = {(_pageIndex == 3), "Apply", "Confirm"};
+        footer.btnPrev = {true, "Up", "Prev"};
+        footer.btnNext = {true, "Down", "Next"};
+    }
+    footer.render(r, DISP_W, DISP_H, kFontSmall);
 }
 
 // ─── renderStatusBar() ────────────────────────────────────────────────────────

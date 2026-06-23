@@ -17,6 +17,7 @@
 #include "hal/IDisplay.h"
 #include "hal/IInput.h"
 #include "os/AppSettings.h"
+#include "FooterWidget.h"
 
 class BatteryWidget;
 
@@ -45,8 +46,7 @@ private:
 
     void renderPage();
     void renderStatusBar(const char* pageTitle);
-
-    // Page renderers
+    void renderFooter();
     void renderReadingPage();
     void renderBehaviourPage();
     void renderInputPage();     // annotated device diagram

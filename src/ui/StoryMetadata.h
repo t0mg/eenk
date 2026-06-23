@@ -19,7 +19,7 @@ struct StoryMetadata {
     char     title[64];      // null-terminated UTF-8 title
     char     author[32];     // null-terminated UTF-8 author
     uint32_t compileTime;    // Unix timestamp
-    uint32_t flags;          // reserved
+    uint32_t flags;          // bit 0: has_media_sidecar (1 = true), other bits reserved
     uint8_t  reserved[16];   // reserved, zero
 
     // Parse a metadata header from the start of a .bin buffer.

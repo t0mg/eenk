@@ -25,6 +25,8 @@
 #include <builtinFonts/reader_medium_2b.h>
 #include <builtinFonts/ui_12.h>
 
+#include "os/AppSettings.h"
+
 static constexpr int FONT_NARRATIVE = 1;
 static constexpr int FONT_CHOICE = 2;
 
@@ -32,6 +34,11 @@ static EpdFont fontNarrativeData(&reader_medium_2b);
 static EpdFont fontChoiceData(&ui_12);
 static EpdFontFamily fontNarrativeFamily(&fontNarrativeData);
 static EpdFontFamily fontChoiceFamily(&fontChoiceData);
+
+static int g_marginPx = 16;
+static int g_refreshInterval = 10;
+static int g_refreshCounter = 0;
+
 #endif // !SERIAL_DEBUG
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -90,7 +97,16 @@ bool InkEngine::loadStory(const char *path) {
   return true;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+void InkEngine::applySettings(const AppSettings& settings) {
+#ifndef SERIAL_DEBUG
+  GfxRenderer *renderer = _display.getRenderer();
+  if (renderer) {
+    g_marginPx = settings.marginPx;
+    g_refreshInterval = settings.refreshInterval;
+  }
+#endif
+}
+
 bool InkEngine::loadStoryFromMemory(const unsigned char *data,
                                     std::size_t size) {
   // NOTE: _storyBuf is NOT set — we don't own this memory (it's mmap'd)
@@ -288,7 +304,7 @@ void InkEngine::collectChoices() {
   int narrativeWidth = 0;
   if (renderer) {
     int width = _display.getWidth();
-    int marginX = 24;
+    int marginX = g_marginPx;
     narrativeWidth = width - (2 * marginX);
   }
 
@@ -325,7 +341,7 @@ int InkEngine::getChoicesHeight(GfxRenderer *renderer) const {
   for (int i = 0; i < _numChoices; ++i) {
     lines += std::max((size_t)1, _wrappedChoices[i].size());
   }
-  int marginY = 24;
+  int marginY = g_marginPx;
   int choiceLineHeight = renderer->getLineHeight(FONT_CHOICE);
   int choicePadding = choiceLineHeight / 3;
   return (lines * choiceLineHeight) + marginY +
@@ -339,7 +355,7 @@ void InkEngine::tickWaitingInput() {
   bool choicesVisible = false;
   GfxRenderer *renderer = _display.getRenderer();
   if (renderer && _numChoices > 0) {
-    int marginY = 24;
+    int marginY = g_marginPx;
     int choiceHeight = getChoicesHeight(renderer);
     if (_scrollY > _maxScrollY - choiceHeight - marginY) {
       choicesVisible = true;
@@ -384,7 +400,7 @@ void InkEngine::tickWaitingInput() {
 
     GfxRenderer *renderer = _display.getRenderer();
     if (renderer && _numChoices > 0) {
-      int marginY = 24;
+      int marginY = g_marginPx;
       int choiceHeight = getChoicesHeight(renderer);
       if (_scrollY > _maxScrollY - choiceHeight - marginY) {
         _scrollY = _maxScrollY;
@@ -440,7 +456,7 @@ void InkEngine::tickStoryEnded() {
 
     GfxRenderer *renderer = _display.getRenderer();
     if (renderer && _numChoices > 0) {
-      int marginY = 24;
+      int marginY = g_marginPx;
       int choiceHeight = getChoicesHeight(renderer);
       if (_scrollY > _maxScrollY - choiceHeight - marginY) {
         _scrollY = _maxScrollY;
@@ -481,8 +497,8 @@ void InkEngine::redraw() {
   int width = _display.getWidth();
   int height = _display.getHeight();
 
-  int marginX = 24;
-  int marginY = 24;
+  int marginX = g_marginPx;
+  int marginY = g_marginPx;
   int narrativeWidth = width - (2 * marginX);
 
   int lineHeight = renderer->getLineHeight(FONT_NARRATIVE);

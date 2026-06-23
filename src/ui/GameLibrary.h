@@ -12,6 +12,7 @@
 #include "os/AppSettings.h"
 #include <cstdint>
 #include <cstddef>
+#include "FooterWidget.h"
 
 class BatteryWidget;
 
@@ -44,9 +45,8 @@ private:
 
     static constexpr int MAX_STORIES   = 32;
     static constexpr int STATUS_BAR_H  = 28;   // px — height of the status bar strip
-    static constexpr int HINT_BAR_H    = 28;   // px — height of the bottom button hint bar
     static constexpr int ITEM_H        = 64;   // px per story list entry
-    // floor((800 - STATUS_BAR_H - HINT_BAR_H) / ITEM_H)
+    // floor((800 - STATUS_BAR_H - FooterWidget::HEIGHT) / ITEM_H)
     static constexpr int VISIBLE_ITEMS = 11;
     static constexpr int DISPLAY_W     = 480;
     static constexpr int DISPLAY_H     = 800;
@@ -99,7 +99,7 @@ private:
     void renderEmpty();
 
     // Draw the bottom hint bar showing available button actions.
-    void renderHintBar();
+    void renderFooter();
 
     // ── Actions ───────────────────────────────────────────────────────────────
 

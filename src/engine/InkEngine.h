@@ -43,10 +43,13 @@ public:
     const std::deque<WrappedLine>& getHistory() const { return _wrappedLines; }
     void setHistory(const std::deque<WrappedLine>& history) { _wrappedLines = history; }
 
+    void applySettings(const struct AppSettings& settings);
+
 private:
     IDisplay& _display;
     IInput&   _input;
     IStorage& _storage;
+    struct AppSettings* _settingsObj = nullptr;
 
     ink::runtime::story*  _story   = nullptr;
     ink::runtime::runner  _runner;
