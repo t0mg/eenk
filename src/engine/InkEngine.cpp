@@ -16,7 +16,6 @@
 #include <SDL.h> // for SDL_Delay
 #endif
 
-#ifndef SERIAL_DEBUG
 #include <EpdFont.h>
 #include <EpdFontFamily.h>
 #include <GfxRenderer.h>
@@ -37,9 +36,6 @@ static EpdFontFamily fontChoiceFamily(&fontChoiceData);
 
 static int g_marginPx = 16;
 static int g_refreshInterval = 10;
-
-
-#endif // !SERIAL_DEBUG
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Construction / destruction
@@ -92,13 +88,11 @@ bool InkEngine::loadStory(const char *path) {
 
   printf("[InkEngine] Story loaded — %zu bytes\n", size);
 
-#ifndef SERIAL_DEBUG
   GfxRenderer *renderer = _display.getRenderer();
   if (renderer) {
     renderer->insertFont(FONT_NARRATIVE, fontNarrativeFamily);
     renderer->insertFont(FONT_CHOICE, fontChoiceFamily);
   }
-#endif
 
   _wrappedLines.clear();
   _scrollY = 0;
@@ -108,13 +102,11 @@ bool InkEngine::loadStory(const char *path) {
 }
 
 void InkEngine::applySettings(const AppSettings& settings) {
-#ifndef SERIAL_DEBUG
   GfxRenderer *renderer = _display.getRenderer();
   if (renderer) {
     g_marginPx = settings.marginPx;
     g_refreshInterval = settings.refreshInterval;
   }
-#endif
 }
 
 bool InkEngine::loadStoryFromMemory(const unsigned char *data,
@@ -142,13 +134,11 @@ bool InkEngine::loadStoryFromMemory(const unsigned char *data,
 
   printf("[InkEngine] Story loaded from memory — %zu bytes\n", size);
 
-#ifndef SERIAL_DEBUG
   GfxRenderer *renderer = _display.getRenderer();
   if (renderer) {
     renderer->insertFont(FONT_NARRATIVE, fontNarrativeFamily);
     renderer->insertFont(FONT_CHOICE, fontChoiceFamily);
   }
-#endif
 
   _wrappedLines.clear();
   _scrollY = 0;
@@ -514,7 +504,6 @@ void InkEngine::redraw() {
     return;
   }
 
-#ifndef SERIAL_DEBUG
   int width = _display.getWidth();
   int height = _display.getHeight();
 
@@ -590,5 +579,4 @@ void InkEngine::redraw() {
   }
 
   _display.present();
-#endif // !SERIAL_DEBUG
 }
