@@ -13,14 +13,48 @@ struct StoryMetadata {
     static constexpr uint16_t VERSION = 1;
     static constexpr size_t   SIZE    = 128;
 
-    uint32_t magic;          // 0x4B4E4545
-    uint16_t version;        // 1
-    uint16_t headerSize;     // sizeof this struct = 128
-    char     title[64];      // null-terminated UTF-8 title
-    char     author[32];     // null-terminated UTF-8 author
-    uint32_t compileTime;    // Unix timestamp
-    uint32_t flags;          // bit 0: has_media_sidecar (1 = true), other bits reserved
-    uint8_t  reserved[16];   // reserved, zero
+    uint32_t magic;          // 0x4B4E4545                          offset   0
+    uint16_t version;        // 1                                   offset   4
+    uint16_t headerSize;     // sizeof this struct = 128            offset   6
+    char     title[64];      // null-terminated UTF-8 title         offset   8
+    char     author[32];     // null-terminated UTF-8 author        offset  72
+    uint32_t compileTime;    // Unix timestamp                      offset 104
+    uint32_t flags;          // bit 0: has_media_sidecar            offset 108
+
+    // Font hint — repurposed from formerly-reserved[16] (offset 112–127).
+    //
+    // fontNameLen == 0  → no font hint; runtime uses the user's setting.
+    // fontNameLen  > 0  → fontName holds the hint (fontNameLen bytes, null-padded to 15).
+    //
+    // Encoding of fontName:
+    //   Trailing dot (e.g. "palatino.")  → SD card font; resolve to
+    //                                      /eenk/<story>/<name>.epdfont then /fonts/<name>.epdfont
+    //                                      where <name> = fontName without the trailing dot.
+    //   No trailing dot (e.g. "serif")   → built-in token; look up in kBuiltinFonts[].
+    //
+    // The .epdfont extension is NOT stored — only the bare name + dot marker,
+    // giving 14 usable characters for the actual filename stem.
+    uint8_t  fontNameLen;    // 0 = no hint; >0 = valid byte count  offset 112
+    char     fontName[15];   // null-padded font hint                offset 113
+
+    // ── Helper: is the stored hint an SD font? ────────────────────────────────
+    bool fontIsExternal() const {
+        if (fontNameLen == 0) return false;
+        uint8_t len = fontNameLen < 15 ? fontNameLen : 15;
+        return fontName[len - 1] == '.';
+    }
+
+    // Copy the bare stem (without trailing dot) into buf[bufLen].
+    // Returns false if no hint or buf too small.
+    bool getFontStem(char* buf, size_t bufLen) const {
+        if (fontNameLen == 0 || bufLen == 0) return false;
+        uint8_t len = fontNameLen < 15 ? fontNameLen : 15;
+        uint8_t stemLen = (fontName[len - 1] == '.') ? len - 1 : len;
+        if (stemLen >= bufLen) return false;
+        memcpy(buf, fontName, stemLen);
+        buf[stemLen] = '\0';
+        return true;
+    }
 
     // Parse a metadata header from the start of a .bin buffer.
     // Returns true if the header is valid (magic + version match).

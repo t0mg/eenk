@@ -1,5 +1,5 @@
 #pragma once
-#include <LittleFS.h>
+#include <FS.h>
 #ifndef PLATFORM_NATIVE
 using File = fs::File;
 #endif

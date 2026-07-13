@@ -121,7 +121,7 @@ class StreamingEpdFont {
   uint32_t _glyphCount = 0;
 
   // File handle (kept open for streaming)
-  FsFile _fontFile;
+  SdFile _fontFile;
   uint32_t _bitmapOffset = 0;  // File offset where bitmap data starts
   bool _isLoaded = false;
 

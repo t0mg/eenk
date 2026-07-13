@@ -1,6 +1,6 @@
 #include "EpdFontLoader.h"
 
-#include <LittleFS.h>
+#include <FS.h>
 #include <Logging.h>
 #include <SDCardManager.h>
 
@@ -38,7 +38,7 @@ EpdFontLoader::LoadResult EpdFontLoader::loadFromFile(const char* path) {
 
     LoadResult result = {false, nullptr, nullptr, nullptr, nullptr, 0, 0, 0};
 
-    FsFile file = SdMan.open(path, O_RDONLY);
+    SdFile file = SdMan.open(path, 0 /*O_RDONLY*/);
     if (!file) {
       LOG_ERR(TAG, "Cannot open file: %s (attempt %d)", path, attempt + 1);
       continue;
@@ -178,7 +178,7 @@ EpdFontLoader::StreamingLoadResult EpdFontLoader::loadForStreaming(const char* p
 
     StreamingLoadResult result = {false, {}, nullptr, nullptr, 0, 0, 0, 0};
 
-    FsFile file = SdMan.open(path, O_RDONLY);
+    SdFile file = SdMan.open(path, 0 /*O_RDONLY*/);
     if (!file) {
       continue;
     }
@@ -290,125 +290,4 @@ void EpdFontLoader::freeStreamingResult(StreamingLoadResult& result) {
   delete[] result.glyphs;
   delete[] result.intervals;
   result = {false, {}, nullptr, nullptr, 0, 0, 0, 0};
-}
-
-EpdFontLoader::LoadResult EpdFontLoader::loadFromLittleFS(const char* path) {
-  LoadResult result = {false, nullptr, nullptr, nullptr, nullptr, 0, 0, 0};
-
-  File file = LittleFS.open(path, "r");
-  if (!file) {
-    LOG_ERR(TAG, "Cannot open LittleFS file: %s", path);
-    return result;
-  }
-
-  // Read and validate header
-  FileHeader header;
-  if (file.read(reinterpret_cast<uint8_t*>(&header), sizeof(header)) != sizeof(header)) {
-    LOG_ERR(TAG, "Failed to read header from LittleFS");
-    file.close();
-    return result;
-  }
-
-  if (header.magic != MAGIC) {
-    LOG_ERR(TAG, "Invalid magic: 0x%08X (expected 0x%08X)", header.magic, MAGIC);
-    file.close();
-    return result;
-  }
-
-  if (header.version != VERSION) {
-    LOG_ERR(TAG, "Unsupported version: %d (expected %d)", header.version, VERSION);
-    file.close();
-    return result;
-  }
-
-  bool is2Bit = (header.flags & 0x01) != 0;
-
-  // Read metrics
-  FileMetrics metrics;
-  if (file.read(reinterpret_cast<uint8_t*>(&metrics), sizeof(metrics)) != sizeof(metrics)) {
-    LOG_ERR(TAG, "Failed to read metrics from LittleFS");
-    file.close();
-    return result;
-  }
-
-  LOG_INF(TAG, "Font: advanceY=%d, ascender=%d, descender=%d, intervals=%u, glyphs=%u, bitmap=%u", metrics.advanceY,
-          metrics.ascender, metrics.descender, metrics.intervalCount, metrics.glyphCount, metrics.bitmapSize);
-
-  if (!validateMetricsAndMemory(metrics)) {
-    file.close();
-    return result;
-  }
-
-  // Allocate memory
-  result.intervals = new (std::nothrow) EpdUnicodeInterval[metrics.intervalCount];
-  result.glyphs = new (std::nothrow) EpdGlyph[metrics.glyphCount];
-  result.bitmap = new (std::nothrow) uint8_t[metrics.bitmapSize];
-  result.fontData = new (std::nothrow) EpdFontData;
-
-  if (!result.intervals || !result.glyphs || !result.bitmap || !result.fontData) {
-    LOG_ERR(TAG, "Memory allocation failed");
-    freeLoadResult(result);
-    file.close();
-    return result;
-  }
-
-  // Read intervals
-  size_t intervalsSize = metrics.intervalCount * sizeof(EpdUnicodeInterval);
-  if (file.read(reinterpret_cast<uint8_t*>(result.intervals), intervalsSize) != intervalsSize) {
-    LOG_ERR(TAG, "Failed to read intervals from LittleFS");
-    freeLoadResult(result);
-    file.close();
-    return result;
-  }
-
-  // Read glyphs (field by field from binary format)
-  for (uint32_t i = 0; i < metrics.glyphCount; i++) {
-    uint8_t glyphData[GLYPH_BINARY_SIZE];
-    if (file.read(glyphData, GLYPH_BINARY_SIZE) != GLYPH_BINARY_SIZE) {
-      LOG_ERR(TAG, "Failed to read glyph %u from LittleFS", i);
-      freeLoadResult(result);
-      file.close();
-      return result;
-    }
-    // Parse fields from binary format
-    result.glyphs[i].width = glyphData[0];
-    result.glyphs[i].height = glyphData[1];
-    result.glyphs[i].advanceX = glyphData[2];
-    // glyphData[3] is padding
-    result.glyphs[i].left = static_cast<int16_t>(glyphData[4] | (glyphData[5] << 8));
-    result.glyphs[i].top = static_cast<int16_t>(glyphData[6] | (glyphData[7] << 8));
-    result.glyphs[i].dataLength = static_cast<uint16_t>(glyphData[8] | (glyphData[9] << 8));
-    result.glyphs[i].dataOffset =
-        static_cast<uint32_t>(glyphData[10] | (glyphData[11] << 8) | (glyphData[12] << 16) | (glyphData[13] << 24));
-  }
-
-  // Read bitmap
-  if (file.read(result.bitmap, metrics.bitmapSize) != metrics.bitmapSize) {
-    LOG_ERR(TAG, "Failed to read bitmap from LittleFS");
-    freeLoadResult(result);
-    file.close();
-    return result;
-  }
-
-  // Populate font data structure
-  result.fontData->bitmap = result.bitmap;
-  result.fontData->glyph = result.glyphs;
-  result.fontData->intervals = result.intervals;
-  result.fontData->intervalCount = metrics.intervalCount;
-  result.fontData->advanceY = metrics.advanceY;
-  result.fontData->ascender = metrics.ascender;
-  result.fontData->descender = metrics.descender;
-  result.fontData->is2Bit = is2Bit;
-
-  // Store sizes for memory profiling
-  result.bitmapSize = metrics.bitmapSize;
-  result.glyphsSize = metrics.glyphCount * sizeof(EpdGlyph);
-  result.intervalsSize = intervalsSize;
-
-  result.success = true;
-  file.close();
-
-  LOG_INF(TAG, "Loaded %s: %zu bytes (bitmap=%u, glyphs=%zu, intervals=%zu)", path, result.totalSize(),
-          metrics.bitmapSize, result.glyphsSize, result.intervalsSize);
-  return result;
 }

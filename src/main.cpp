@@ -43,6 +43,7 @@ int main(int argc, char *argv[]) {
 
   // Run the engine
   InkEngine engine(display, input, storage);
+  engine.applySettings(AppSettings::load());
   if (!engine.loadStory(storyPath)) {
     fprintf(stderr, "ERROR: Failed to load story: %s\n", storyPath);
     return 1;
@@ -70,12 +71,14 @@ int main(int argc, char *argv[]) {
 // ════════════════════════════════════════════════════════════════════════════
 
 #include "engine/InkEngine.h"
-#include "hal/esp32/EspLittleFSStorage.h"
+
 #ifdef HAS_SD_CARD
 #include "hal/esp32/EspSdStorage.h"
 #include "hal/esp32/FlashCache.h"
 #endif
 #include <Arduino.h>
+#include <SPI.h>
+#include <SD.h>
 #include <rom/crc.h>
 
 #include "hal/esp32/EspAdcInput.h"
@@ -98,7 +101,7 @@ using InputType = EspAdcInput;
 
 DisplayType *display = nullptr;
 InputType *input = nullptr;
-EspLittleFSStorage *storage = nullptr;
+IStorage *storage = nullptr;
 #ifdef HAS_SD_CARD
 EspSdStorage *sdStorage = nullptr;
 FlashCache *flashCache = nullptr;
@@ -121,9 +124,45 @@ void setup() {
   // ── Initialise NVS (must be first — BootManager and AppSettings both use it)
   BootManager::init();
 
+  // ── Early check for updater mode ──
+  {
+    bool updaterMode = false;
+
+    // Check UP button
+    InputManager im;
+    im.begin();
+    im.update();
+    if (im.isPressed(InputManager::BTN_UP)) {
+      Serial.println("[Boot] UP button held. Forcing updater mode.");
+      updaterMode = true;
+    }
+
+    // Check SD card for /firmware.bin
+    if (!updaterMode) {
+      // Init SPI first so SD.begin() works
+      // Pins: SCLK=8, MISO=7, MOSI=10, CS=21
+      SPI.begin(8, 7, 10, 21);
+      if (SD.begin(12, SPI, 40000000)) {
+        if (SD.exists("/firmware.bin")) {
+          Serial.println("[Boot] /firmware.bin found on SD. Forcing updater mode.");
+          updaterMode = true;
+        }
+        SD.end();
+      }
+      SPI.end();
+    }
+
+    if (updaterMode) {
+      Serial.println("[Boot] Restarting into Updater (app1)...");
+      BootManager::bootUpdater();
+      return; // Will reboot
+    }
+  }
+
   display = new DisplayType();
   input = new InputType();
-  storage = new EspLittleFSStorage();
+  // Storage is assigned later in the STORY boot branch.
+  // storage = new EspLittleFSStorage();
   systemUI = new SystemUI(*display);
 
   // ── Battery
@@ -242,9 +281,10 @@ void setup() {
               mappedPtr += 128;
               mappedSize -= 128;
 
+              storage = sdStorage;
               engine = new InkEngine(*display, *input, *storage);
               engine->applySettings(AppSettings::load());
-              storyLoaded = engine->loadStoryFromMemory(mappedPtr, mappedSize);
+              storyLoaded = engine->loadStory(mappedPtr, mappedSize);
               currentStoryHash = flashCache->getHash();
             } else {
               errorMessage =
@@ -290,7 +330,7 @@ void setup() {
                                   uint8_t isOld;
                                   saveFile.read(&isOld, 1);
                                   history.push_back(
-                                      {std::string(lineBuf), isOld > 0});
+                                      {TextBlock(std::string(lineBuf)), isOld > 0});
                                   delete[] lineBuf;
                                 } else {
                                   break;
@@ -394,9 +434,10 @@ void saveProgress() {
       uint16_t historySize = history.size();
       f.write((const uint8_t *)&historySize, 2);
       for (const auto &line : history) {
-        uint16_t len = line.text.length();
+        std::string text = line.block.getText();
+        uint16_t len = text.length();
         f.write((const uint8_t *)&len, 2);
-        f.write((const uint8_t *)line.text.c_str(), len);
+        f.write((const uint8_t *)text.c_str(), len);
         uint8_t isOld = line.isOld ? 1 : 0;
         f.write(&isOld, 1);
       }

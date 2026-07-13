@@ -13,9 +13,13 @@
 #include "SettingsView.h"
 #include "BatteryWidget.h"
 #include "SystemUI.h"
+#include "os/BootManager.h"
 
 #include <cstdio>
 #include <cstring>
+
+// Builtin font table (for display names in the font picker)
+#include <BuiltinFonts.h>
 
 #ifdef PLATFORM_ESP32
 #include <Arduino.h>
@@ -139,6 +143,23 @@ void SettingsView::run() {
     r->insertFont(kFontDiagram, s_famSmall14);
     r->insertFont(kFontSmall, s_fam10);
 #endif
+  }
+
+  _fontCatalogue.scan();
+  _currentFontIndex = 0;
+  for (size_t i = 0; i < _fontCatalogue.getCount(); i++) {
+      const FontEntry& e = _fontCatalogue.getEntries()[i];
+      if (_settings.storyFontPath[0] != '\0') {
+          if (strcmp(e.path, _settings.storyFontPath) == 0) {
+              _currentFontIndex = i;
+              break;
+          }
+      } else {
+          if (e.path[0] == '\0' && e.builtinIndex == _settings.storyFontIndex) {
+              _currentFontIndex = i;
+              break;
+          }
+      }
   }
 
   _pageIndex = 0;
@@ -321,9 +342,12 @@ void SettingsView::renderReadingPage() {
 
   int y = HeaderWidget::HEIGHT;
 
-  // Row 0: Story Font
+  // Row 0: Story Font (cycles through SdFontCatalogue)
   {
-    const char *val = AppSettings::STORY_FONT_NAMES[_settings.storyFontIndex];
+    const char *val = "Default";
+    if (_fontCatalogue.getCount() > 0) {
+        val = _fontCatalogue.getEntries()[_currentFontIndex].displayName;
+    }
     drawSettingsRow(y, "Story Font", val, _itemIndex == 0);
     y += ROW_H;
   }
@@ -343,6 +367,14 @@ void SettingsView::renderReadingPage() {
   {
     const char *val = refreshName(_settings.refreshInterval);
     drawSettingsRow(y, "Partial Refresh", val, _itemIndex == 3);
+    y += ROW_H;
+  }
+  // Row 4: Override Story Font
+  //   When ON  → storyFontIndex always wins, even if the story has a @font hint.
+  //   When OFF → the story’s @font hint takes precedence when present.
+  {
+    const char *val = _settings.overrideStoryFont ? "On" : "Off";
+    drawSettingsRow(y, "Override Story Font", val, _itemIndex == 4);
   }
 }
 
@@ -531,7 +563,7 @@ void SettingsView::drawDeviceDiagram(int x, int y, int width, int height,
 
 void SettingsView::renderDangerPage() {
   HeaderWidget header(_display, _battery);
-  header.render("Settings — Danger Zone", kFontBold);
+  header.render("Settings — System", kFontBold);
 
   auto *r = _display.getRenderer();
   if (!r)
@@ -541,24 +573,26 @@ void SettingsView::renderDangerPage() {
 
   // Inverted title header.
   r->fillRect(0, y, DISP_W, ROW_H, true);
-  const char *dangerTitle = "! Danger Zone !";
+  const char *dangerTitle = "! System !";
   int tw = r->getTextWidth(kFontBold, dangerTitle);
   r->drawText(kFontBold, (DISP_W - tw) / 2, y + (ROW_H - 12) / 2, dangerTitle,
               false);
   y += ROW_H;
 
-  drawSettingsRow(y, "Delete Save", "Current story save file", _itemIndex == 0);
+  drawSettingsRow(y, "Update Firmware", "Requires /wifi.txt on SD", _itemIndex == 0);
+  y += ROW_H;
+  drawSettingsRow(y, "Delete Save", "Current story save file", _itemIndex == 1);
   y += ROW_H;
   drawSettingsRow(y, "Delete Story", "Remove .bin from SD card",
-                  _itemIndex == 1);
+                  _itemIndex == 2);
   y += ROW_H;
-  drawSettingsRow(y, "Format SD", "Erase entire SD card!", _itemIndex == 2);
+  drawSettingsRow(y, "Format SD", "Erase entire SD card!", _itemIndex == 3);
 }
 
 // ─── handleReadingInput() ────────────────────────────────────────────────────
 
 void SettingsView::handleReadingInput(ButtonEvent ev) {
-  static constexpr int kItems = 4;
+  static constexpr int kItems = 5; // 0=StoryFont, 1=ChoiceFont, 2=Margin, 3=Refresh, 4=Override
 
   switch (ev) {
   case ButtonEvent::UP:
@@ -575,9 +609,16 @@ void SettingsView::handleReadingInput(ButtonEvent ev) {
     _dirty = true;
     switch (_itemIndex) {
     case 0:
-      _settings.storyFontIndex = (uint8_t)((_settings.storyFontIndex - 1 +
-                                            AppSettings::STORY_FONT_COUNT) %
-                                           AppSettings::STORY_FONT_COUNT);
+      if (_fontCatalogue.getCount() > 0) {
+          _currentFontIndex = (_currentFontIndex - 1 + _fontCatalogue.getCount()) % _fontCatalogue.getCount();
+          const FontEntry& e = _fontCatalogue.getEntries()[_currentFontIndex];
+          if (e.path[0] != '\0') {
+              strncpy(_settings.storyFontPath, e.path, sizeof(_settings.storyFontPath)-1);
+          } else {
+              _settings.storyFontPath[0] = '\0';
+              _settings.storyFontIndex = e.builtinIndex;
+          }
+      }
       break;
     case 1:
       _settings.choiceFontIndex = (uint8_t)((_settings.choiceFontIndex - 1 +
@@ -614,6 +655,10 @@ void SettingsView::handleReadingInput(ButtonEvent ev) {
       _settings.refreshInterval = kRefresh[cur];
       break;
     }
+    case 4:
+      // Toggle: LEFT turns override off.
+      _settings.overrideStoryFont = false;
+      break;
     default:
       break;
     }
@@ -625,8 +670,16 @@ void SettingsView::handleReadingInput(ButtonEvent ev) {
     _dirty = true;
     switch (_itemIndex) {
     case 0:
-      _settings.storyFontIndex = (uint8_t)((_settings.storyFontIndex + 1) %
-                                           AppSettings::STORY_FONT_COUNT);
+      if (_fontCatalogue.getCount() > 0) {
+          _currentFontIndex = (_currentFontIndex + 1) % _fontCatalogue.getCount();
+          const FontEntry& e = _fontCatalogue.getEntries()[_currentFontIndex];
+          if (e.path[0] != '\0') {
+              strncpy(_settings.storyFontPath, e.path, sizeof(_settings.storyFontPath)-1);
+          } else {
+              _settings.storyFontPath[0] = '\0';
+              _settings.storyFontIndex = e.builtinIndex;
+          }
+      }
       break;
     case 1:
       _settings.choiceFontIndex = (uint8_t)((_settings.choiceFontIndex + 1) %
@@ -660,6 +713,10 @@ void SettingsView::handleReadingInput(ButtonEvent ev) {
       _settings.refreshInterval = kRefresh[cur];
       break;
     }
+    case 4:
+      // Toggle: RIGHT turns override on.
+      _settings.overrideStoryFont = true;
+      break;
     default:
       break;
     }
@@ -668,8 +725,13 @@ void SettingsView::handleReadingInput(ButtonEvent ev) {
   }
 
   case ButtonEvent::CONFIRM:
-    // Navigate forward to next page on confirm.
-    if (_pageIndex < PAGE_COUNT - 1) {
+    // Toggle the override setting with CONFIRM when on that row.
+    if (_itemIndex == 4) {
+      _settings.overrideStoryFont = !_settings.overrideStoryFont;
+      _dirty = true;
+      renderPage();
+    } else if (_pageIndex < PAGE_COUNT - 1) {
+      // Navigate forward to next page on confirm (when not on override row).
       _pageIndex++;
       _itemIndex = 0;
       renderPage();
@@ -807,7 +869,7 @@ void SettingsView::handleInputPageInput(ButtonEvent ev) {
 // ─── handleDangerInput() ─────────────────────────────────────────────────────
 
 void SettingsView::handleDangerInput(ButtonEvent ev) {
-  static constexpr int kItems = 3;
+  static constexpr int kItems = 4;
 
   switch (ev) {
   case ButtonEvent::UP:
@@ -823,12 +885,15 @@ void SettingsView::handleDangerInput(ButtonEvent ev) {
   case ButtonEvent::CONFIRM:
     switch (_itemIndex) {
     case 0:
-      deleteSave();
+      BootManager::bootUpdater();
       break;
     case 1:
-      deleteStory();
+      deleteSave();
       break;
     case 2:
+      deleteStory();
+      break;
+    case 3:
       formatSD();
       break;
     default:

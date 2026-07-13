@@ -4,9 +4,7 @@
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
-#include <LittleFS.h>
 
-FS LittleFS;
 
 // Colour palette — warm paper-white e-ink simulation
 static constexpr SDL_Color COLOR_BG  = {0xF5, 0xF1, 0xE8, 0xFF}; // parchment white

@@ -229,31 +229,35 @@ int GfxRenderer::getTextWidth(const int fontId, const char* text, const EpdFontF
     w = getArabicTextWidth(fontId, text, style);
   } else if (scripts.hasThai) {
     w = getThaiTextWidth(fontId, text, style);
-  } else if (isExternalFontAllowed(fontId) &&
-             ((_externalFont && _externalFont->isLoaded()) || tryResolveExternalFont())) {
-    // Character-by-character: try external font first, then builtin fallback
+  } else {
+    // Character-by-character advance summation
     const auto& font = it->second;
     const char* ptr = text;
     uint32_t cp;
+    
+    // Cache the external font check to avoid repeating it per character
+    const bool useExternal = isExternalFontAllowed(fontId) &&
+                             ((_externalFont && _externalFont->isLoaded()) || tryResolveExternalFont());
+                             
     while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&ptr)))) {
-      const int extWidth = getExternalGlyphWidth(cp);
-      if (extWidth > 0) {
-        w += extWidth;
+      if (useExternal) {
+        const int extWidth = getExternalGlyphWidth(cp);
+        if (extWidth > 0) {
+          w += extWidth;
+          continue;
+        }
+      }
+      
+      const EpdGlyph* glyph = font.getGlyph(cp, style);
+      if (glyph) {
+        w += glyph->advanceX;
       } else {
-        const EpdGlyph* glyph = font.getGlyph(cp, style);
-        if (glyph) {
-          w += glyph->advanceX;
-        } else {
-          const EpdGlyph* fallback = font.getGlyph('?', style);
-          if (fallback) {
-            w += fallback->advanceX;
-          }
+        const EpdGlyph* fallback = font.getGlyph('?', style);
+        if (fallback) {
+          w += fallback->advanceX;
         }
       }
     }
-  } else {
-    int h = 0;
-    it->second.getTextDimensions(text, &w, &h, style);
   }
 
   // Insert into flat hash table; clear if full
@@ -1140,6 +1144,15 @@ void GfxRenderer::renderChar(const EpdFontFamily& fontFamily, const uint32_t cp,
 
   const int is2Bit = fontFamily.getData(style)->is2Bit;
   const uint32_t offset = glyph->dataOffset;
+  
+  const EpdFont* fontUsed = fontFamily.getFont(style);
+  bool synthesizeItalic = false;
+  if (style == EpdFontFamily::BOLD_ITALIC && fontUsed == fontFamily.getFont(EpdFontFamily::BOLD)) {
+    synthesizeItalic = true;
+  } else if (style == EpdFontFamily::ITALIC && fontUsed == fontFamily.getFont(EpdFontFamily::REGULAR)) {
+    synthesizeItalic = true;
+  }
+  
   const uint8_t width = glyph->width;
   const uint8_t height = glyph->height;
   const int left = glyph->left;
@@ -1179,11 +1192,14 @@ void GfxRenderer::renderChar(const EpdFontFamily& fontFamily, const uint32_t cp,
 
       for (int gy = gyStart; gy < gyEnd; gy++) {
         const int sY = logTop + gy;
+        const int skewX = synthesizeItalic ? ((height - gy) / 4) : 0;
         for (int gx = gxStart; gx < gxEnd; gx++) {
           bool st;
           if (!extractFontPixel(bitmap, gy * width + gx, is2Bit, renderMode, pixelState, st)) continue;
-          const int sX = logLeft + gx;
-          orientedWriteFB(frameBuffer, stride, sX, sY, orientation, panelW, panelH, st, drawHalftone);
+          const int sX = logLeft + gx + skewX;
+          if (sX >= 0 && sX < screenW) {
+            orientedWriteFB(frameBuffer, stride, sX, sY, orientation, panelW, panelH, st, drawHalftone);
+          }
         }
       }
     }
@@ -1372,6 +1388,90 @@ void GfxRenderer::warmCodepointsBatch(const int fontId, const uint32_t* codepoin
                                  ((_externalFont && _externalFont->isLoaded()) || tryResolveExternalFont());
   if (externalAvailable) {
     _externalFont->preloadGlyphs(cjkCodepoints.data(), cjkCodepoints.size());
+  }
+}
+
+// ============================================================================
+// Rich Text Rendering
+// ============================================================================
+
+std::vector<TextBlock> GfxRenderer::wrapRichText(const int fontId, const std::vector<TextRun>& runs,
+                                                 const int maxWidth, const int maxLines) const {
+  std::vector<TextBlock> lines;
+  TextBlock currentLine;
+  int currentWidth = 0;
+
+  for (const auto& run : runs) {
+    if (run.text.empty()) continue;
+
+    int pos = 0;
+    int len = run.text.length();
+
+    while (pos < len) {
+      // Find the next space or newline or end of run
+      int nextSpace = run.text.find(' ', pos);
+      int nextNewline = run.text.find('\n', pos);
+      int breakPos = len;
+
+      bool isNewline = false;
+      if (nextNewline != std::string::npos && (nextSpace == std::string::npos || nextNewline < nextSpace)) {
+        breakPos = nextNewline;
+        isNewline = true;
+      } else if (nextSpace != std::string::npos) {
+        breakPos = nextSpace;
+      }
+
+      std::string word = run.text.substr(pos, breakPos - pos);
+      if (!word.empty()) {
+        int wordWidth = getTextWidth(fontId, word.c_str(), run.style);
+        
+        if (currentWidth + wordWidth > maxWidth && !currentLine.isEmpty()) {
+          // Push current line and start new one
+          lines.push_back(currentLine);
+          currentLine = TextBlock();
+          currentWidth = 0;
+          if (maxLines > 0 && lines.size() >= static_cast<size_t>(maxLines)) {
+            return lines;
+          }
+        }
+        
+        currentLine.addRun(word, run.style);
+        currentWidth += wordWidth;
+      }
+
+      if (isNewline) {
+        lines.push_back(currentLine);
+        currentLine = TextBlock();
+        currentWidth = 0;
+        if (maxLines > 0 && lines.size() >= static_cast<size_t>(maxLines)) {
+          return lines;
+        }
+        pos = breakPos + 1;
+      } else if (breakPos < len && run.text[breakPos] == ' ') {
+        int spaceWidth = getSpaceWidth(fontId);
+        if (currentWidth + spaceWidth <= maxWidth) {
+          currentLine.addRun(" ", run.style);
+          currentWidth += spaceWidth;
+        }
+        pos = breakPos + 1;
+      } else {
+        pos = breakPos;
+      }
+    }
+  }
+
+  if (!currentLine.isEmpty()) {
+    lines.push_back(currentLine);
+  }
+  return lines;
+}
+
+void GfxRenderer::drawRichText(const int fontId, const int x, const int y, const TextBlock& block,
+                               const bool black) const {
+  int currentX = x;
+  for (const auto& run : block.runs) {
+    drawText(fontId, currentX, y, run.text.c_str(), black, run.style);
+    currentX += getTextWidth(fontId, run.text.c_str(), run.style);
   }
 }
 

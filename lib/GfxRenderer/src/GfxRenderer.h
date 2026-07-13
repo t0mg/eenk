@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "Bitmap.h"
+#include "TextBlock.h"
 
 // Forward declaration for external CJK font support
 class ExternalFont;
@@ -211,6 +212,7 @@ class GfxRenderer {
                         EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
   void drawText(int fontId, int x, int y, const char* text, bool black = true,
                 EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
+  void drawRichText(int fontId, int x, int y, const TextBlock& block, bool black = true) const;
   int getSpaceWidth(int fontId) const;
   int getFontAscenderSize(int fontId) const;
   int getLineHeight(int fontId) const;
@@ -222,6 +224,7 @@ class GfxRenderer {
                                                     EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
   std::vector<std::string> wrapTextWithHyphenation(int fontId, const char* text, int maxWidth, int maxLines,
                                                    EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
+  std::vector<TextBlock> wrapRichText(int fontId, const std::vector<TextRun>& runs, int maxWidth, int maxLines) const;
   bool fontSupportsGrayscale(int fontId) const;
 
   // Glyph warming

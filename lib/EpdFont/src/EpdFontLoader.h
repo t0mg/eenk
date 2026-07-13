@@ -55,15 +55,6 @@ class EpdFontLoader {
   static LoadResult loadFromFile(const char* path);
 
   /**
-   * Load a font from internal flash (LittleFS).
-   * Allocates memory for font data, which caller must free.
-   *
-   * @param path Path to .epdfont file on LittleFS
-   * @return LoadResult with success status and allocated data
-   */
-  static LoadResult loadFromLittleFS(const char* path);
-
-  /**
    * Free memory allocated by loadFromFile.
    */
   static void freeLoadResult(LoadResult& result);

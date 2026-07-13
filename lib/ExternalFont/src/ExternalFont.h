@@ -97,7 +97,7 @@ class ExternalFont {
 
  private:
   // Font file handle (keep open to avoid repeated open/close)
-  FsFile _fontFile;
+  SdFile _fontFile;
   bool _isLoaded = false;
 
   // Properties parsed from filename

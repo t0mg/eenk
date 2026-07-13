@@ -2,6 +2,10 @@
 #include "hal/IDisplay.h"
 #include "hal/IInput.h"
 #include "hal/IStorage.h"
+#include "os/AppSettings.h"
+
+class StreamingEpdFont; // forward declaration — owned by InkEngine when SD font is active
+struct StoryMetadata;   // forward declaration
 
 // <cmath> must be included at global scope before InkCPP headers so GCC 15's
 // specfun.h special math functions (sph_bessel, etc.) are not injected into
@@ -17,6 +21,7 @@
 #include <vector>
 #include <deque>
 #include <string>
+#include <TextBlock.h>
 
 class InkEngine
 {
@@ -24,8 +29,11 @@ public:
     InkEngine(IDisplay& display, IInput& input, IStorage& storage);
     ~InkEngine();
 
+#ifdef PLATFORM_NATIVE
     bool loadStory(const char* path);
-    bool loadStoryFromMemory(const unsigned char* data, std::size_t size);
+#else
+    bool loadStory(const unsigned char* data, std::size_t size);
+#endif
     
     // Save/Load system
     const unsigned char* createSnapshot(std::size_t* outLength);
@@ -37,7 +45,7 @@ public:
     bool shouldSleep() const { return _shouldSleep; }
 
     struct WrappedLine {
-        std::string text;
+        TextBlock block;
         bool isOld;
     };
     const std::deque<WrappedLine>& getHistory() const { return _wrappedLines; }
@@ -46,10 +54,13 @@ public:
     void applySettings(const struct AppSettings& settings);
 
 private:
-    IDisplay& _display;
-    IInput&   _input;
-    IStorage& _storage;
+    IDisplay&  _display;
+    IInput&    _input;
+    IStorage&  _storage;
     struct AppSettings* _settingsObj = nullptr;
+
+    AppSettings _settings = AppSettings::defaults(); // cached settings for FontResolver
+    StreamingEpdFont* _streamingFont = nullptr;       // non-null when an SD .epdfont is active
 
     ink::runtime::story*  _story   = nullptr;
     ink::runtime::runner  _runner;
@@ -63,7 +74,7 @@ private:
 
     static constexpr int MAX_CHOICES = 8;
     char  _choiceText[MAX_CHOICES][128] = {};
-    std::vector<std::string> _wrappedChoices[MAX_CHOICES];
+    std::vector<TextBlock> _wrappedChoices[MAX_CHOICES];
     int   _numChoices     = 0;
     int   _selectedChoice = 0;
 
@@ -86,5 +97,8 @@ private:
     void collectChoices();
     void drawNarrativeArea();
     void drawChoiceArea();
-    int getChoicesHeight(class GfxRenderer* renderer) const;
+    int  getChoicesHeight(class GfxRenderer* renderer) const;
+
+    // FontResolver: parse header hint, select and apply the narrative font family.
+    void _resolveAndApplyFont(const StoryMetadata& meta, const char* storyBase);
 };

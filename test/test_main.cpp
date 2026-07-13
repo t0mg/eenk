@@ -13,9 +13,14 @@
 #include "ui/SettingsView.h"
 #include "ui/BatteryWidget.h"
 #include "os/AppSettings.h"
+#include "os/SdFontCatalogue.h"
 #include <builtinFonts/ui_10.h>
 #include <builtinFonts/ui_12.h>
 #include <builtinFonts/ui_bold_12.h>
+#include <builtinFonts/reader_medium_2b.h>
+#include <builtinFonts/reader_medium_bold_2b.h>
+#include <builtinFonts/reader_medium_italic_2b.h>
+#include "InkRichTextParser.h"
 #endif
 
 #include "ScriptDetector.h"
@@ -33,6 +38,25 @@ void test_script_detector(void) {
     TEST_ASSERT_EQUAL(ScriptDetector::Script::ARABIC, ScriptDetector::classify("مرحبا"));
     TEST_ASSERT_EQUAL(ScriptDetector::Script::THAI, ScriptDetector::classify("สวัสดี"));
 }
+
+#ifdef PLATFORM_NATIVE
+void test_sd_font_catalogue(void) {
+    SdFontCatalogue cat;
+    cat.scan(); // Should pick up kBuiltinFonts and any .epdfont files in fonts/ directory
+
+    TEST_ASSERT_GREATER_THAN(0, cat.getCount());
+    
+    // Check first font is a builtin (e.g. Sans)
+    bool foundBuiltin = false;
+    for (size_t i = 0; i < cat.getCount(); i++) {
+        if (cat.getEntries()[i].path[0] == '\0') {
+            foundBuiltin = true;
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(foundBuiltin);
+}
+#endif
 
 #ifdef PLATFORM_NATIVE
 void saveBMP(const char* filename, const uint8_t* frameBuffer, int width, int height) {
@@ -110,6 +134,11 @@ public:
     EpdFont sysFontSmall;
     EpdFontFamily sysFamilySmall;
 
+    EpdFont readerNormal;
+    EpdFont readerBold;
+    EpdFont readerItalic;
+    EpdFontFamily readerFamily;
+
     TestDisplay() : 
         renderer(eink), 
         sysFontNormal(&ui_12), 
@@ -117,7 +146,11 @@ public:
         sysFontBold(&ui_bold_12),
         sysFamilyBold(&sysFontBold),
         sysFontSmall(&ui_10),
-        sysFamilySmall(&sysFontSmall)
+        sysFamilySmall(&sysFontSmall),
+        readerNormal(&reader_medium_2b),
+        readerBold(&reader_medium_bold_2b),
+        readerItalic(&reader_medium_italic_2b),
+        readerFamily(&readerNormal, &readerBold, &readerItalic)
     {
         renderer.begin();
         renderer.setOrientation(GfxRenderer::PortraitInverted);
@@ -134,6 +167,9 @@ public:
         renderer.insertFont(32, sysFamilySmall);
         // SettingsView
         renderer.insertFont(33, sysFamilySmall);
+        
+        // Test Fonts
+        renderer.insertFont(50, readerFamily);
     }
     void clear() override { eink.clearScreen(0xFF); }
     void present() override {}
@@ -236,16 +272,86 @@ void test_settings_view_screenshot(void) {
     saveBMP("test/golden/test_settings_view.bmp", display.eink.getFrameBuffer(), display.getWidth(), display.getHeight());
     TEST_ASSERT_EQUAL(1, 1);
 }
+
+void test_fonts_screenshot(void) {
+    TestDisplay display;
+    display.clear();
+    
+    int y = 50;
+    
+    display.renderer.drawText(10, 20, y, "UI Normal 12: The quick brown fox");
+    y += display.renderer.getLineHeight(10) + 10;
+    
+    display.renderer.drawText(11, 20, y, "UI Bold 12: jumps over the lazy dog");
+    y += display.renderer.getLineHeight(11) + 10;
+    
+    display.renderer.drawText(20, 20, y, "UI Small 10: Sphynx of black quartz, judge my vow");
+    y += display.renderer.getLineHeight(20) + 30;
+    
+    display.renderer.drawText(50, 20, y, "Reader M Normal: The quick brown fox jumps", true, EpdFontFamily::REGULAR);
+    y += display.renderer.getLineHeight(50) + 10;
+    
+    display.renderer.drawText(50, 20, y, "Reader M Italic: The quick brown fox jumps", true, EpdFontFamily::ITALIC);
+    y += display.renderer.getLineHeight(50) + 10;
+    
+    display.renderer.drawText(50, 20, y, "Reader M Bold: The quick brown fox jumps", true, EpdFontFamily::BOLD);
+    y += display.renderer.getLineHeight(50) + 20;
+
+    auto runs1 = InkRichTextParser::parse("Rich HTML: <i>Italic</i>, <b>Bold</b>, <b><i>Both</i></b>!");
+    FILE* f = fopen("test_runs.txt", "w");
+    auto blocks1 = display.renderer.wrapRichText(50, runs1, 440, 10);
+    for (const auto& b : blocks1) {
+        fprintf(f, "Line with %d runs\n", (int)b.runs.size());
+        for (const auto& r : b.runs) {
+            int w = display.renderer.getTextWidth(50, r.text.c_str(), r.style);
+            
+            // SUPER DEBUG:
+            if (r.text == " ") {
+                fprintf(f, "  SUPERDEBUG SPACE: Calling getTextWidth again: %d ", display.renderer.getTextWidth(50, " ", r.style));
+            }
+
+            fprintf(f, "  Run: [%s] len=%d style=%d width=%d firstchar=%d\n", r.text.c_str(), (int)r.text.length(), (int)r.style, w, (int)r.text[0]);
+        }
+        display.renderer.drawRichText(50, 20, y, b);
+        y += display.renderer.getLineHeight(50);
+    }
+    fclose(f);
+    y += 10;
+
+    auto runs2 = InkRichTextParser::parse("Rich MD: *Italic*, **Bold**, **_Both_**!");
+    auto blocks2 = display.renderer.wrapRichText(50, runs2, 440, 10);
+    for (const auto& b : blocks2) {
+        display.renderer.drawRichText(50, 20, y, b);
+        y += display.renderer.getLineHeight(50);
+    }
+    y += 10;
+    
+    // Test choice rich text (using FONT_CHOICE = 11 for bold, 10 for normal UI font in test)
+    // Actually ui_12 is 10, ui_bold_12 is 11 in test setup.
+    // wait, FONT_CHOICE is not defined here. Let's just use 10.
+    auto runs3 = InkRichTextParser::parse("Choice: *Italic*, **Bold**, **_Both_**!");
+    auto blocks3 = display.renderer.wrapRichText(10, runs3, 440, 10);
+    for (const auto& b : blocks3) {
+        display.renderer.drawRichText(10, 20, y, b);
+        y += display.renderer.getLineHeight(10);
+    }
+    y += 10;
+    
+    saveBMP("test/golden/test_fonts.bmp", display.eink.getFrameBuffer(), display.getWidth(), display.getHeight());
+    TEST_ASSERT_EQUAL(1, 1);
+}
 #endif
 
 int main(int argc, char **argv) {
     UNITY_BEGIN();
     RUN_TEST(test_script_detector);
 #ifdef PLATFORM_NATIVE
+    RUN_TEST(test_sd_font_catalogue);
     RUN_TEST(test_system_ui_screenshot);
     RUN_TEST(test_battery_widget_screenshot);
     RUN_TEST(test_game_library_screenshot);
     RUN_TEST(test_settings_view_screenshot);
+    RUN_TEST(test_fonts_screenshot);
 #endif
     UNITY_END();
     return 0;

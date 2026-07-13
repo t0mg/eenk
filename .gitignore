@@ -5,3 +5,5 @@ compile_commands.json
 build/
 build_inkcpp/
 stories/*
+build.log
+sd_fonts/

@@ -1,45 +1,17 @@
 // EENK — AppSettings implementation
 // NVS namespace: "settings"
-//   key "sfont"   (uint8)  — storyFontIndex
-//   key "cfont"   (uint8)  — choiceFontIndex
-//   key "margin"  (uint8)  — marginPx
-//   key "sleep"   (uint16) — sleepTimeoutSec
-//   key "layout"  (uint8)  — inputLayoutIndex
-//   key "refresh" (uint8)  — refreshInterval
+//   key "sfont"     (uint8)  — storyFontIndex
+//   key "cfont"     (uint8)  — choiceFontIndex
+//   key "margin"    (uint8)  — marginPx
+//   key "sleep"     (uint16) — sleepTimeoutSec
+//   key "layout"    (uint8)  — inputLayoutIndex
+//   key "refresh"   (uint8)  — refreshInterval
+//   key "sfont_ovr" (uint8)  — overrideStoryFont (0/1)
 //
 // On PLATFORM_NATIVE all NVS calls are omitted; load() returns defaults().
 #include "AppSettings.h"
 
 // ─── Static option tables ─────────────────────────────────────────────────────
-
-// Story font names (index matches storyFontIndex).  These are shown verbatim
-// in the settings UI.  The order mirrors the builtinFonts headers:
-//   0  reader_xsmall_regular_2b.h  — "Reader XSmall"
-//   1  reader_xsmall_italic_2b.h   — "Reader XSmall Italic"
-//   2  reader_2b.h                 — "Reader Regular"
-//   3  reader_italic_2b.h          — "Reader Italic"
-//   4  reader_bold_2b.h            — "Reader Bold"
-//   5  reader_medium_2b.h          — "Reader Medium"       ← default
-//   6  reader_medium_italic_2b.h   — "Reader Medium Italic"
-//   7  reader_medium_bold_2b.h     — "Reader Medium Bold"
-//   8  reader_large_2b.h           — "Reader Large"
-//   9  reader_large_italic_2b.h    — "Reader Large Italic"
-//  10  reader_large_bold_2b.h      — "Reader Large Bold"
-const char* const AppSettings::STORY_FONT_NAMES[] = {
-    "Reader XSmall",
-    "Reader XSmall Italic",
-    "Reader Regular",
-    "Reader Italic",
-    "Reader Bold",
-    "Reader Medium",
-    "Reader Medium Italic",
-    "Reader Medium Bold",
-    "Reader Large",
-    "Reader Large Italic",
-    "Reader Large Bold",
-};
-const int AppSettings::STORY_FONT_COUNT =
-    static_cast<int>(sizeof(STORY_FONT_NAMES) / sizeof(STORY_FONT_NAMES[0]));
 
 // Choice / UI font names.
 //   0  ui_10.h        — "UI 10"
@@ -70,12 +42,14 @@ const uint8_t AppSettings::REFRESH_OPTIONS[] = {5, 10, 15, 20};
 
 AppSettings AppSettings::defaults() {
     AppSettings s;
-    s.storyFontIndex   = 5;    // "Reader Medium"
+    s.storyFontPath[0] = '\0'; // empty means builtin
+    s.storyFontIndex   = 0;    // "Sans M"
     s.choiceFontIndex  = 2;    // "UI 12"
     s.marginPx         = 16;
     s.sleepTimeoutSec  = 120;
     s.inputLayoutIndex = 0;
     s.refreshInterval  = 10;
+    s.overrideStoryFont = false;
     return s;
 }
 
@@ -85,13 +59,15 @@ AppSettings AppSettings::defaults() {
 #include <Arduino.h>
 #include <Preferences.h>
 
-static constexpr char kNvsNamespace[] = "settings";
-static constexpr char kKeyStoryFont[] = "sfont";
-static constexpr char kKeyChoiceFont[]= "cfont";
-static constexpr char kKeyMargin[]    = "margin";
-static constexpr char kKeySleep[]     = "sleep";
-static constexpr char kKeyLayout[]    = "layout";
-static constexpr char kKeyRefresh[]   = "refresh";
+static constexpr char kNvsNamespace[]   = "settings";
+static constexpr char kKeyStoryFont[]   = "sfont";
+static constexpr char kKeyStoryPath[]   = "sfont_p";
+static constexpr char kKeyChoiceFont[]  = "cfont";
+static constexpr char kKeyMargin[]      = "margin";
+static constexpr char kKeySleep[]       = "sleep";
+static constexpr char kKeyLayout[]      = "layout";
+static constexpr char kKeyRefresh[]     = "refresh";
+static constexpr char kKeyFontOverride[]= "sfont_ovr";
 
 AppSettings AppSettings::load() {
     AppSettings s = defaults();
@@ -104,17 +80,23 @@ AppSettings AppSettings::load() {
     }
 
     s.storyFontIndex   = prefs.getUChar(kKeyStoryFont, s.storyFontIndex);
+    String path = prefs.getString(kKeyStoryPath, "");
+    strncpy(s.storyFontPath, path.c_str(), sizeof(s.storyFontPath) - 1);
+    s.storyFontPath[sizeof(s.storyFontPath) - 1] = '\0';
     s.choiceFontIndex  = prefs.getUChar(kKeyChoiceFont, s.choiceFontIndex);
     s.marginPx         = prefs.getUChar(kKeyMargin, s.marginPx);
     s.sleepTimeoutSec  = prefs.getUShort(kKeySleep, s.sleepTimeoutSec);
     s.inputLayoutIndex = prefs.getUChar(kKeyLayout, s.inputLayoutIndex);
     s.refreshInterval  = prefs.getUChar(kKeyRefresh, s.refreshInterval);
+    s.overrideStoryFont = prefs.getUChar(kKeyFontOverride, 0) != 0;
 
     prefs.end();
 
     // Clamp indices to valid range (guards against corruption / version skew).
-    if (s.storyFontIndex  >= static_cast<uint8_t>(STORY_FONT_COUNT))
-        s.storyFontIndex  = defaults().storyFontIndex;
+    // Font fallback is handled cleanly at runtime by SdFontCatalogue and applyBuiltin
+    // No strict bound check here
+    
+    // Bounds check other things
     if (s.choiceFontIndex >= static_cast<uint8_t>(CHOICE_FONT_COUNT))
         s.choiceFontIndex = defaults().choiceFontIndex;
 
@@ -125,12 +107,14 @@ void AppSettings::save() const {
     Preferences prefs;
     prefs.begin(kNvsNamespace, false);
     
-    prefs.putUChar(kKeyStoryFont,  storyFontIndex);
+    prefs.putUChar(kKeyStoryFont, storyFontIndex);
+    prefs.putString(kKeyStoryPath, String(storyFontPath));
     prefs.putUChar(kKeyChoiceFont, choiceFontIndex);
     prefs.putUChar(kKeyMargin,     marginPx);
     prefs.putUShort(kKeySleep,     sleepTimeoutSec);
     prefs.putUChar(kKeyLayout,     inputLayoutIndex);
     prefs.putUChar(kKeyRefresh,    refreshInterval);
+    prefs.putUChar(kKeyFontOverride, overrideStoryFont ? 1 : 0);
 
     prefs.end();
 }

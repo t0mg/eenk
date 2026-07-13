@@ -5,18 +5,16 @@
 #include <cstdint>
 
 struct AppSettings {
-    uint8_t  storyFontIndex;    // 0..STORY_FONT_COUNT-1
+    char     storyFontPath[128]; // Path to .epdfont on SD card, or empty if builtin
+    uint8_t  storyFontIndex;    // fallback: index into kBuiltinFonts if path is empty
     uint8_t  choiceFontIndex;   // 0..CHOICE_FONT_COUNT-1
     uint8_t  marginPx;          // pixels: 8, 16, 24, 32
     uint16_t sleepTimeoutSec;   // 0=never, 60, 120, 300
     uint8_t  inputLayoutIndex;  // which button layout
     uint8_t  refreshInterval;   // full refresh every N partials: 5, 10, 15, 20
+    bool     overrideStoryFont; // if true, storyFontIndex always wins over story @font hint
 
     // ── Human-readable option lists (for UI display) ──────────────────────────
-
-    // Story font names correspond 1:1 to the builtinFonts reader_*.h files.
-    static const char* const STORY_FONT_NAMES[];
-    static const int         STORY_FONT_COUNT;
 
     // Choice / UI font names.
     static const char* const CHOICE_FONT_NAMES[];
@@ -29,6 +27,9 @@ struct AppSettings {
 
     // Number of supported input layouts (button mappings).
     static constexpr int INPUT_LAYOUT_COUNT = 2;
+
+    // NVS key for the override flag.
+    static constexpr char KEY_SFONT_OVERRIDE[] = "sfont_ovr";
 
     // ── Persistence ───────────────────────────────────────────────────────────
 

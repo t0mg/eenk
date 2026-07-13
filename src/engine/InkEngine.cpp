@@ -7,9 +7,13 @@
 // InkCPP public API (already via InkEngine.h, but choice.h is also needed)
 #include <choice.h>
 
-#include "InkEngine.h"
+#include "engine/InkEngine.h"
+#include "GfxRenderer.h"
+#include "InkRichTextParser.h"
+#include "os/AppSettings.h"
 #include <cctype>
 #include <cstring>
+#include <cstdio>
 #include <snapshot.h>
 
 #ifdef PLATFORM_NATIVE
@@ -19,23 +23,69 @@
 #include <EpdFont.h>
 #include <EpdFontFamily.h>
 #include <GfxRenderer.h>
+#include <StreamingEpdFont.h>
 
-// Builtin fonts
+// Builtin fonts — sans-serif (reader_* family)
 #include <builtinFonts/reader_medium_2b.h>
+#include <builtinFonts/reader_medium_italic_2b.h>
+#include <builtinFonts/reader_medium_bold_2b.h>
+// UI/choice fonts
+#include <builtinFonts/ui_10.h>
+#include <builtinFonts/ui_bold_10.h>
 #include <builtinFonts/ui_12.h>
+#include <builtinFonts/ui_bold_12.h>
+#include <builtinFonts/small14.h>
+
+// Builtin font table (token → EpdFontData* mapping)
+// Defined here because InkEngine includes all the font data headers.
+#include <BuiltinFonts.h>
+extern const BuiltinFontEntry kBuiltinFonts[] = {
+    // ── Sans-serif (Reader family) ───────────────────────────────────────────
+
+
+    { "sans-medium",  "Sans M",   // default story font (index 2)
+      &reader_medium_2b,         &reader_medium_bold_2b,  &reader_medium_italic_2b,  nullptr },
+
+    // ── Serif (Literata) ─────────────────────────────────────────────────────
+#ifdef EENK_HAS_LITERATA
+    { "serif-medium", "Serif M",
+      &literata_medium_2b, &literata_medium_bold_2b, &literata_medium_italic_2b, nullptr },
+
+    { "serif-large",  "Serif L",
+      &literata_large_2b,  &literata_large_bold_2b,  &literata_large_italic_2b,  nullptr },
+#endif
+
+    // ── Short aliases (resolve to medium size) ────────────────────────────────
+    { "sans",  "Sans",  &reader_medium_2b, &reader_medium_bold_2b, &reader_medium_italic_2b, nullptr },
+#ifdef EENK_HAS_LITERATA
+    { "serif", "Serif", &literata_medium_2b, &literata_medium_bold_2b, &literata_medium_italic_2b, nullptr },
+#endif
+};
+
+extern const size_t kBuiltinFontCount =
+    sizeof(kBuiltinFonts) / sizeof(kBuiltinFonts[0]);
 
 #include "os/AppSettings.h"
+#include "ui/StoryMetadata.h"
 
 static constexpr int FONT_NARRATIVE = 1;
-static constexpr int FONT_CHOICE = 2;
+static constexpr int FONT_CHOICE    = 2;
 
-static EpdFont fontNarrativeData(&reader_medium_2b);
-static EpdFont fontChoiceData(&ui_12);
-static EpdFontFamily fontNarrativeFamily(&fontNarrativeData);
-static EpdFontFamily fontChoiceFamily(&fontChoiceData);
+// ── Choice font pool ─────────────────────────────────────────────────────────
+// UI fonts used for the choice list. Index matches AppSettings::choiceFontIndex.
+static const EpdFontData* const kChoiceFontData[] = {
+    &ui_10,
+    &ui_bold_10,
+    &ui_12,
+    &ui_bold_12,
+    &small14,
+};
+static constexpr int kChoiceFontCount =
+    static_cast<int>(sizeof(kChoiceFontData) / sizeof(kChoiceFontData[0]));
 
-static int g_marginPx = 16;
+static int g_marginPx        = 16;
 static int g_refreshInterval = 10;
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Construction / destruction
@@ -54,9 +104,41 @@ InkEngine::~InkEngine() {
     _storage.freeBuffer(_storyBuf);
     _storyBuf = nullptr;
   }
+  // Clean up any streaming SD font.
+  if (_streamingFont) {
+    delete _streamingFont;
+    _streamingFont = nullptr;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// FontResolver — selects the active narrative EpdFontFamily for a story.
+//
+// Resolution order:
+//   1. overrideStoryFont is set → use AppSettings::storyFontIndex (builtin)
+//   2. hint is empty            → use AppSettings::storyFontIndex (builtin)
+//   3. hint has no trailing dot → builtin token lookup
+//   4. hint has trailing dot    → SD card .epdfont
+//       a. try /eenk/<storyBase>/<stem>.epdfont  (sidecar)
+//       b. try /fonts/<stem>.epdfont             (shared)
+//       c. fallback to AppSettings::storyFontIndex
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Build EpdFontFamily from a BuiltinFontEntry using caller-supplied storage.
+// The four EpdFont slots (r,b,it,bi) must outlive the returned family reference.
+static void buildFamilyFromEntry(const BuiltinFontEntry* e,
+                                  EpdFont& r, EpdFont& b, EpdFont& it, EpdFont& bi,
+                                  EpdFontFamily& family) {
+  const EpdFontData* reg = e->regular;
+  r  = EpdFont(reg);
+  b  = EpdFont(e->bold       ? e->bold       : reg);
+  it = EpdFont(e->italic     ? e->italic     : reg);
+  bi = EpdFont(e->boldItalic ? e->boldItalic : (e->bold ? e->bold : reg));
+  family = EpdFontFamily(&r, &b, &it, &bi);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+#ifdef PLATFORM_NATIVE
 bool InkEngine::loadStory(const char *path) {
   std::size_t size = 0;
   _storyBuf = _storage.readFileBinary(path, &size);
@@ -67,12 +149,14 @@ bool InkEngine::loadStory(const char *path) {
 
   const unsigned char* dataToLoad = _storyBuf;
   std::size_t sizeToLoad = size;
-  if (sizeToLoad >= 128) {
-    uint32_t magic = dataToLoad[0] | (dataToLoad[1] << 8) | (dataToLoad[2] << 16) | (dataToLoad[3] << 24);
-    if (magic == 0x4B4E4545) { // 'EENK'
-      dataToLoad += 128;
-      sizeToLoad -= 128;
-    }
+
+  // Parse EENK header if present.
+  StoryMetadata meta;
+  memset(&meta, 0, sizeof(meta));
+  if (sizeToLoad >= 128 && StoryMetadata::hasHeader(_storyBuf, sizeToLoad)) {
+    StoryMetadata::parse(_storyBuf, sizeToLoad, &meta);
+    dataToLoad += 128;
+    sizeToLoad -= 128;
   }
 
   _story = ink::runtime::story::from_binary(dataToLoad, sizeToLoad, false);
@@ -84,43 +168,63 @@ bool InkEngine::loadStory(const char *path) {
   }
 
   _globals = _story->new_globals();
-  _runner = _story->new_runner(_globals);
+  _runner  = _story->new_runner(_globals);
 
   printf("[InkEngine] Story loaded — %zu bytes\n", size);
 
-  GfxRenderer *renderer = _display.getRenderer();
-  if (renderer) {
-    renderer->insertFont(FONT_NARRATIVE, fontNarrativeFamily);
-    renderer->insertFont(FONT_CHOICE, fontChoiceFamily);
-  }
+  // Derive story base name from path for sidecar font lookup.
+  char storyBase[64] = {};
+  const char* lastSlash = strrchr(path, '/');
+  const char* fname = lastSlash ? lastSlash + 1 : path;
+  strncpy(storyBase, fname, sizeof(storyBase) - 1);
+  // strip .bin extension
+  char* dot = strrchr(storyBase, '.');
+  if (dot) *dot = '\0';
+
+  _resolveAndApplyFont(meta, storyBase);
 
   _wrappedLines.clear();
-  _scrollY = 0;
+  _scrollY    = 0;
   _maxScrollY = 0;
-  _state = State::RUNNING_TEXT;
+  _state      = State::RUNNING_TEXT;
   return true;
 }
+#endif
 
 void InkEngine::applySettings(const AppSettings& settings) {
-  GfxRenderer *renderer = _display.getRenderer();
+  g_marginPx        = settings.marginPx;
+  g_refreshInterval = settings.refreshInterval;
+  _settings         = settings;
+
+  // Wire choice font to the renderer (narrative font is resolved at story load
+  // time via FontResolver; choice font always follows the user setting).
+  GfxRenderer* renderer = _display.getRenderer();
   if (renderer) {
-    g_marginPx = settings.marginPx;
-    g_refreshInterval = settings.refreshInterval;
+    int idx = settings.choiceFontIndex;
+    if (idx < 0 || idx >= kChoiceFontCount) idx = 2; // default ui_12
+    static EpdFont        choiceFont(kChoiceFontData[idx]);
+    static EpdFontFamily  choiceFamily(&choiceFont);
+    choiceFont   = EpdFont(kChoiceFontData[idx]);
+    choiceFamily = EpdFontFamily(&choiceFont);
+    renderer->insertFont(FONT_CHOICE, choiceFamily);
   }
 }
 
-bool InkEngine::loadStoryFromMemory(const unsigned char *data,
-                                    std::size_t size) {
+#ifndef PLATFORM_NATIVE
+bool InkEngine::loadStory(const unsigned char *data,
+                          std::size_t size) {
   // NOTE: _storyBuf is NOT set — we don't own this memory (it's mmap'd)
-  
+
   const unsigned char* dataToLoad = data;
   std::size_t sizeToLoad = size;
-  if (sizeToLoad >= 128) {
-    uint32_t magic = dataToLoad[0] | (dataToLoad[1] << 8) | (dataToLoad[2] << 16) | (dataToLoad[3] << 24);
-    if (magic == 0x4B4E4545) { // 'EENK'
-      dataToLoad += 128;
-      sizeToLoad -= 128;
-    }
+
+  // Parse EENK header if present.
+  StoryMetadata meta;
+  memset(&meta, 0, sizeof(meta));
+  if (sizeToLoad >= 128 && StoryMetadata::hasHeader(dataToLoad, sizeToLoad)) {
+    StoryMetadata::parse(dataToLoad, sizeToLoad, &meta);
+    dataToLoad += 128;
+    sizeToLoad -= 128;
   }
 
   _story = ink::runtime::story::from_binary(dataToLoad, sizeToLoad, false);
@@ -130,22 +234,21 @@ bool InkEngine::loadStoryFromMemory(const unsigned char *data,
   }
 
   _globals = _story->new_globals();
-  _runner = _story->new_runner(_globals);
+  _runner  = _story->new_runner(_globals);
 
   printf("[InkEngine] Story loaded from memory — %zu bytes\n", size);
 
-  GfxRenderer *renderer = _display.getRenderer();
-  if (renderer) {
-    renderer->insertFont(FONT_NARRATIVE, fontNarrativeFamily);
-    renderer->insertFont(FONT_CHOICE, fontChoiceFamily);
-  }
+  // On ESP32 the story path is not available here; storyBase is left empty
+  // so sidecar lookup is skipped and only /fonts/ is tried.
+  _resolveAndApplyFont(meta, "");
 
   _wrappedLines.clear();
-  _scrollY = 0;
+  _scrollY    = 0;
   _maxScrollY = 0;
-  _state = State::RUNNING_TEXT;
+  _state      = State::RUNNING_TEXT;
   return true;
 }
+#endif
 
 const unsigned char *InkEngine::createSnapshot(std::size_t *outLength) {
   freeSnapshot();
@@ -193,6 +296,109 @@ bool InkEngine::loadSnapshot(const unsigned char *data, std::size_t length) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// FontResolver implementation
+// ─────────────────────────────────────────────────────────────────────────────
+
+void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* storyBase) {
+  // Clean up any previously active SD font.
+  if (_streamingFont) {
+    delete _streamingFont;
+    _streamingFont = nullptr;
+  }
+
+  GfxRenderer* renderer = _display.getRenderer();
+
+  // Persistent storage for the active narrative font family.
+  // Initialised to reader_medium_2b so they are never truly "empty".
+  static EpdFont       s_r(&reader_medium_2b),  s_b(&reader_medium_2b),
+                       s_it(&reader_medium_2b), s_bi(&reader_medium_2b);
+  static EpdFontFamily s_narrFamily(&s_r, &s_b, &s_it, &s_bi);
+
+  auto applyBuiltin = [&](size_t index) {
+    const BuiltinFontEntry* e = getBuiltinByIndex(index);
+    buildFamilyFromEntry(e, s_r, s_b, s_it, s_bi, s_narrFamily);
+    if (renderer) renderer->insertFont(FONT_NARRATIVE, s_narrFamily);
+    printf("[InkEngine] Font: builtin '%s'\n", e->token);
+  };
+
+  auto applyUserSetting = [&]() {
+    if (_settings.storyFontPath[0] != '\0') {
+      auto* sf = new StreamingEpdFont();
+      if (sf->load(_settings.storyFontPath)) {
+        _streamingFont = sf;
+        static EpdFont       s_sdR(&ui_12);
+        static EpdFontFamily s_sdFamily(&s_sdR);
+        s_sdR    = EpdFont(sf->getData());
+        s_sdFamily = EpdFontFamily(&s_sdR);
+        if (renderer) renderer->insertFont(FONT_NARRATIVE, s_sdFamily);
+        printf("[InkEngine] Font: user setting SD '%s'\n", _settings.storyFontPath);
+        return;
+      }
+      delete sf;
+      printf("[InkEngine] Font: user setting SD '%s' failed, fallback to builtin\n", _settings.storyFontPath);
+    }
+    applyBuiltin(_settings.storyFontIndex);
+  };
+
+  // 1. Override or no hint → user setting.
+  if (_settings.overrideStoryFont || meta.fontNameLen == 0) {
+    applyUserSetting();
+    return;
+  }
+
+  char stem[15] = {};
+  if (!meta.getFontStem(stem, sizeof(stem))) {
+    applyUserSetting();
+    return;
+  }
+
+  // 2. SD card font (trailing dot in stored name).
+  if (meta.fontIsExternal()) {
+    // Build candidate paths.
+    char sidecarPath[128] = {};
+    char sharedPath[96]   = {};
+    snprintf(sidecarPath, sizeof(sidecarPath), "/eenk/%s/%s.epdfont", storyBase, stem);
+    snprintf(sharedPath,  sizeof(sharedPath),  "/fonts/%s.epdfont", stem);
+
+    const char* candidates[] = { sidecarPath, sharedPath };
+    for (const char* fpath : candidates) {
+      if (!storyBase[0] && fpath == sidecarPath) continue; // skip sidecar if no base name
+      auto* sf = new StreamingEpdFont();
+      if (sf->load(fpath)) {
+        _streamingFont = sf;
+        // Wrap the streaming font's EpdFontData in a regular EpdFont+EpdFontFamily.
+        // Static storage initialised with ui_12 as a safe placeholder; overwritten each call.
+        static EpdFont       s_sdR(&ui_12);
+        static EpdFontFamily s_sdFamily(&s_sdR);
+        s_sdR    = EpdFont(sf->getData());
+        s_sdFamily = EpdFontFamily(&s_sdR);
+        if (renderer) renderer->insertFont(FONT_NARRATIVE, s_sdFamily);
+        printf("[InkEngine] Font: SD '%s'\n", fpath);
+        return;
+      }
+      delete sf;
+    }
+    // Both paths failed → fall through to user setting.
+    printf("[InkEngine] Font: SD '%s' not found, falling back to user setting\n", stem);
+    applyUserSetting();
+    return;
+  }
+
+  // 3. Builtin token.
+  const BuiltinFontEntry* e = findBuiltinByToken(stem);
+  if (e) {
+    buildFamilyFromEntry(e, s_r, s_b, s_it, s_bi, s_narrFamily);
+    if (renderer) renderer->insertFont(FONT_NARRATIVE, s_narrFamily);
+    printf("[InkEngine] Font: token '%s'\n", stem);
+    return;
+  }
+
+  // Token not found → user setting.
+  printf("[InkEngine] Font: unknown token '%s', falling back to builtin\n", stem);
+  applyBuiltin(_settings.storyFontIndex);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 void InkEngine::update() {
   switch (_state) {
   case State::RUNNING_TEXT:
@@ -230,17 +436,19 @@ void InkEngine::tickRunningText() {
 
   auto pushLine = [&](const std::string &str) {
     if (str.empty()) {
-      _wrappedLines.push_back({"", false});
+      _wrappedLines.push_back({TextBlock(), false});
       newLinesCount++;
     } else if (renderer) {
-      auto wraps = renderer->wrapTextWithHyphenation(
-          FONT_NARRATIVE, str.c_str(), narrativeWidth, 100);
+      std::vector<TextRun> runs = InkRichTextParser::parse(str.c_str());
+      auto wraps = renderer->wrapRichText(FONT_NARRATIVE, runs, narrativeWidth, 100);
       for (auto &w : wraps) {
         _wrappedLines.push_back({w, false});
         newLinesCount++;
       }
     } else {
-      _wrappedLines.push_back({str, false});
+      TextBlock tb;
+      tb.addRun(str, EpdFontFamily::REGULAR);
+      _wrappedLines.push_back({tb, false});
       newLinesCount++;
     }
   };
@@ -333,11 +541,13 @@ void InkEngine::collectChoices() {
     _wrappedChoices[_numChoices].clear();
     if (renderer && narrativeWidth > 0) {
       int indicatorWidth = 24;
-      _wrappedChoices[_numChoices] = renderer->wrapTextWithHyphenation(
-          FONT_CHOICE, _choiceText[_numChoices],
-          narrativeWidth - indicatorWidth, 100);
+      std::vector<TextRun> runs = InkRichTextParser::parse(_choiceText[_numChoices]);
+      _wrappedChoices[_numChoices] = renderer->wrapRichText(
+          FONT_CHOICE, runs, narrativeWidth - indicatorWidth, 100);
       if (_wrappedChoices[_numChoices].empty()) {
-        _wrappedChoices[_numChoices].push_back("");
+        TextBlock empty;
+        empty.addRun("", EpdFontFamily::REGULAR);
+        _wrappedChoices[_numChoices].push_back(empty);
       }
     }
 
@@ -492,7 +702,9 @@ void InkEngine::redraw() {
   if (!renderer) {
     // ── Text-mode (e.g. EspSerialDisplay) ───────────────────────────────
     for (const auto &line : _wrappedLines) {
-      _display.drawNarrativeLine(line.text.c_str());
+      std::string s;
+      for (const auto& r : line.block.runs) s += r.text;
+      _display.drawNarrativeLine(s.c_str());
     }
     if (_numChoices > 0) {
       _display.drawSeparator();
@@ -517,9 +729,9 @@ void InkEngine::redraw() {
   int y = marginY - _scrollY;
 
   for (const auto &w : _wrappedLines) {
-    if (!w.text.empty() && (y + lineHeight > 0) && (y < height)) {
+    if (!w.block.isEmpty() && (y + lineHeight > 0) && (y < height)) {
       renderer->setHalftone(w.isOld);
-      renderer->drawText(FONT_NARRATIVE, marginX, y, w.text.c_str());
+      renderer->drawRichText(FONT_NARRATIVE, marginX, y, w.block);
       renderer->setHalftone(false);
     }
     y += lineHeight;
@@ -569,8 +781,8 @@ void InkEngine::redraw() {
             if (l == 0 && selected) {
               renderer->drawText(FONT_CHOICE, marginX, y, ">", !selected);
             }
-            renderer->drawText(FONT_CHOICE, marginX + indicatorWidth, y,
-                               _wrappedChoices[i][l].c_str(), !selected);
+            renderer->drawRichText(FONT_CHOICE, marginX + indicatorWidth, y,
+                               _wrappedChoices[i][l], !selected);
           }
           y += choiceLineHeight;
         }

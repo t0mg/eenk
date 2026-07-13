@@ -19,4 +19,3 @@ public:
     File open(const char* path, const char* mode = "r") { return File(); }
     File open(const char* path, int flags) { return File(); }
 };
-extern FS LittleFS;
