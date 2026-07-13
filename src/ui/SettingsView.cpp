@@ -146,20 +146,10 @@ void SettingsView::run() {
   }
 
   _fontCatalogue.scan();
-  _currentFontIndex = 0;
-  for (size_t i = 0; i < _fontCatalogue.getCount(); i++) {
-      const FontEntry& e = _fontCatalogue.getEntries()[i];
-      if (_settings.storyFontPath[0] != '\0') {
-          if (strcmp(e.path, _settings.storyFontPath) == 0) {
-              _currentFontIndex = i;
-              break;
-          }
-      } else {
-          if (e.path[0] == '\0' && e.builtinIndex == _settings.storyFontIndex) {
-              _currentFontIndex = i;
-              break;
-          }
-      }
+  _currentFontIndex = _settings.storyFontIndex;
+  // Clamp to valid range (guards against catalogue shrinking between boots)
+  if (_currentFontIndex >= (int)_fontCatalogue.getCount()) {
+      _currentFontIndex = 0;
   }
 
   _pageIndex = 0;
@@ -611,13 +601,7 @@ void SettingsView::handleReadingInput(ButtonEvent ev) {
     case 0:
       if (_fontCatalogue.getCount() > 0) {
           _currentFontIndex = (_currentFontIndex - 1 + _fontCatalogue.getCount()) % _fontCatalogue.getCount();
-          const FontEntry& e = _fontCatalogue.getEntries()[_currentFontIndex];
-          if (e.path[0] != '\0') {
-              strncpy(_settings.storyFontPath, e.path, sizeof(_settings.storyFontPath)-1);
-          } else {
-              _settings.storyFontPath[0] = '\0';
-              _settings.storyFontIndex = e.builtinIndex;
-          }
+          _settings.storyFontIndex = (uint8_t)_currentFontIndex;
       }
       break;
     case 1:
@@ -672,13 +656,7 @@ void SettingsView::handleReadingInput(ButtonEvent ev) {
     case 0:
       if (_fontCatalogue.getCount() > 0) {
           _currentFontIndex = (_currentFontIndex + 1) % _fontCatalogue.getCount();
-          const FontEntry& e = _fontCatalogue.getEntries()[_currentFontIndex];
-          if (e.path[0] != '\0') {
-              strncpy(_settings.storyFontPath, e.path, sizeof(_settings.storyFontPath)-1);
-          } else {
-              _settings.storyFontPath[0] = '\0';
-              _settings.storyFontIndex = e.builtinIndex;
-          }
+          _settings.storyFontIndex = (uint8_t)_currentFontIndex;
       }
       break;
     case 1:
