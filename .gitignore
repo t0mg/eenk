@@ -6,4 +6,5 @@ build/
 build_inkcpp/
 stories/*
 build.log
-sd_fonts/
+sd_fonts/
+test_runs.txt
