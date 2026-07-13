@@ -5,8 +5,7 @@
 #include <cstdint>
 
 struct AppSettings {
-    char     storyFontPath[128]; // Path to .epdfont on SD card, or empty if builtin
-    uint8_t  storyFontIndex;    // fallback: index into kBuiltinFonts if path is empty
+    uint8_t  storyFontIndex;    // index into SdFontCatalogue combined list (builtins first, then SD)
     uint8_t  choiceFontIndex;   // 0..CHOICE_FONT_COUNT-1
     uint8_t  marginPx;          // pixels: 8, 16, 24, 32
     uint16_t sleepTimeoutSec;   // 0=never, 60, 120, 300

@@ -42,8 +42,7 @@ const uint8_t AppSettings::REFRESH_OPTIONS[] = {5, 10, 15, 20};
 
 AppSettings AppSettings::defaults() {
     AppSettings s;
-    s.storyFontPath[0] = '\0'; // empty means builtin
-    s.storyFontIndex   = 0;    // "Sans M"
+    s.storyFontIndex   = 0;    // "Sans M" (sans-medium, index 0)
     s.choiceFontIndex  = 2;    // "UI 12"
     s.marginPx         = 16;
     s.sleepTimeoutSec  = 120;
@@ -59,15 +58,14 @@ AppSettings AppSettings::defaults() {
 #include <Arduino.h>
 #include <Preferences.h>
 
-static constexpr char kNvsNamespace[]   = "settings";
-static constexpr char kKeyStoryFont[]   = "sfont";
-static constexpr char kKeyStoryPath[]   = "sfont_p";
-static constexpr char kKeyChoiceFont[]  = "cfont";
-static constexpr char kKeyMargin[]      = "margin";
-static constexpr char kKeySleep[]       = "sleep";
-static constexpr char kKeyLayout[]      = "layout";
-static constexpr char kKeyRefresh[]     = "refresh";
-static constexpr char kKeyFontOverride[]= "sfont_ovr";
+static constexpr char kNvsNamespace[]    = "settings";
+static constexpr char kKeyStoryFont[]    = "sfont";
+static constexpr char kKeyChoiceFont[]   = "cfont";
+static constexpr char kKeyMargin[]       = "margin";
+static constexpr char kKeySleep[]        = "sleep";
+static constexpr char kKeyLayout[]       = "layout";
+static constexpr char kKeyRefresh[]      = "refresh";
+static constexpr char kKeyFontOverride[] = "sfont_ovr";
 
 AppSettings AppSettings::load() {
     AppSettings s = defaults();
@@ -80,9 +78,6 @@ AppSettings AppSettings::load() {
     }
 
     s.storyFontIndex   = prefs.getUChar(kKeyStoryFont, s.storyFontIndex);
-    String path = prefs.getString(kKeyStoryPath, "");
-    strncpy(s.storyFontPath, path.c_str(), sizeof(s.storyFontPath) - 1);
-    s.storyFontPath[sizeof(s.storyFontPath) - 1] = '\0';
     s.choiceFontIndex  = prefs.getUChar(kKeyChoiceFont, s.choiceFontIndex);
     s.marginPx         = prefs.getUChar(kKeyMargin, s.marginPx);
     s.sleepTimeoutSec  = prefs.getUShort(kKeySleep, s.sleepTimeoutSec);
@@ -108,7 +103,6 @@ void AppSettings::save() const {
     prefs.begin(kNvsNamespace, false);
     
     prefs.putUChar(kKeyStoryFont, storyFontIndex);
-    prefs.putString(kKeyStoryPath, String(storyFontPath));
     prefs.putUChar(kKeyChoiceFont, choiceFontIndex);
     prefs.putUChar(kKeyMargin,     marginPx);
     prefs.putUShort(kKeySleep,     sleepTimeoutSec);
