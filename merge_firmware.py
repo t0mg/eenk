@@ -33,10 +33,19 @@ def merge_bin(source, target, env):
         (item[0], env.subst(item[1])) for item in env.get("FLASH_EXTRA_IMAGES", [])
     ]
     
-    # Add the main application binary
+    # Add the main application binary (app0)
     app_offset = env.subst("$ESP32_APP_OFFSET")
     app_path = env.subst(target[0].get_abspath())
     flash_images.append((app_offset, app_path))
+
+    # Add the updater application binary (app1) if it exists
+    # We assume it is built in .pio/build/esp32c3_updater/firmware.bin
+    app1_path = os.path.join(env.get('PROJECT_DIR'), ".pio", "build", "esp32c3_updater", "firmware.bin")
+    if os.path.exists(app1_path):
+        print(f"Found app1 updater at {app1_path}, including it in factory binary at 0x710000")
+        flash_images.append(("0x710000", app1_path))
+    else:
+        print(f"Note: app1 updater not found at {app1_path}. It will not be included in the factory binary. Build 'esp32c3_updater' to include it.")
 
     esptool_path = os.path.join(
         env.PioPlatform().get_package_dir("tool-esptoolpy"), "esptool.py"

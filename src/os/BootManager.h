@@ -29,4 +29,7 @@ public:
 
     // Reboot the device.
     static void reboot();
+    
+    // Set OTA_1 as active boot partition and restart
+    static void bootUpdater();
 };

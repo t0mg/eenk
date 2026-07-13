@@ -18,6 +18,7 @@
 #ifdef PLATFORM_ESP32
 #include <Arduino.h>
 #include <cstring>
+#include <esp_ota_ops.h>
 
 // RTC_NOINIT_ATTR places variables in .rtc.noinit which is NEVER re-copied from
 // flash at startup. This means values survive ESP.restart() (soft reset) but are
@@ -85,6 +86,19 @@ void BootManager::reboot() {
     ESP.restart();
 }
 
+// ─── bootUpdater() ───────────────────────────────────────────────────────────
+
+void BootManager::bootUpdater() {
+    Serial.println("[BootManager] Booting to OTA Updater (app1)...");
+    const esp_partition_t* app1_part = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_1, NULL);
+    if (app1_part) {
+        esp_ota_set_boot_partition(app1_part);
+        reboot();
+    } else {
+        Serial.println("[BootManager] ERROR: OTA_1 partition not found!");
+    }
+}
+
 // =============================================================================
 #else  // PLATFORM_NATIVE stubs
 // =============================================================================
@@ -107,6 +121,10 @@ bool BootManager::getStoryPath(char* /*outPath*/, size_t /*maxLen*/) {
 }
 
 void BootManager::reboot() {
+    exit(0);
+}
+
+void BootManager::bootUpdater() {
     exit(0);
 }
 
