@@ -4,8 +4,8 @@
 #include "hal/IStorage.h"
 #include "os/AppSettings.h"
 
-class StreamingEpdFont; // forward declaration — owned by InkEngine when SD font is active
-struct StoryMetadata;   // forward declaration
+class StreamingEpdFontFamily; // forward declaration — owned by InkEngine when SD font is active
+struct StoryMetadata;          // forward declaration
 
 // <cmath> must be included at global scope before InkCPP headers so GCC 15's
 // specfun.h special math functions (sph_bessel, etc.) are not injected into
@@ -60,7 +60,7 @@ private:
     struct AppSettings* _settingsObj = nullptr;
 
     AppSettings _settings = AppSettings::defaults(); // cached settings for FontResolver
-    StreamingEpdFont* _streamingFont = nullptr;       // non-null when an SD .epdfont is active
+    StreamingEpdFontFamily* _streamingFamily = nullptr; // non-null when an SD .epdfont family is active
 
     ink::runtime::story*  _story   = nullptr;
     ink::runtime::runner  _runner;

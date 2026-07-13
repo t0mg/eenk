@@ -24,8 +24,14 @@
 #include <EpdFontFamily.h>
 #include <GfxRenderer.h>
 #include <StreamingEpdFont.h>
+#include <StreamingEpdFontFamily.h>
 
 // Builtin fonts — sans-serif (reader_* family)
+// reader_medium_2b.h = 16pt (sans-medium, default)
+// reader_2b.h        = 14pt (sans-small)
+#include <builtinFonts/reader_2b.h>
+#include <builtinFonts/reader_bold_2b.h>
+#include <builtinFonts/reader_italic_2b.h>
 #include <builtinFonts/reader_medium_2b.h>
 #include <builtinFonts/reader_medium_italic_2b.h>
 #include <builtinFonts/reader_medium_bold_2b.h>
@@ -35,18 +41,25 @@
 #include <builtinFonts/ui_12.h>
 #include <builtinFonts/ui_bold_12.h>
 #include <builtinFonts/small14.h>
+// Note: reader_xsmall_*.h and reader_large_*.h are NOT included in flash.
+// Those sizes are served as .epdfont files from the SD card /fonts/ directory.
 
 // Builtin font table (token → EpdFontData* mapping)
 // Defined here because InkEngine includes all the font data headers.
+//
+// Index 0: sans-medium (16pt) — DEFAULT
+// Index 1: sans-small  (14pt)
 #include <BuiltinFonts.h>
 extern const BuiltinFontEntry kBuiltinFonts[] = {
     // ── Sans-serif (Reader family) ───────────────────────────────────────────
 
-
-    { "sans-medium",  "Sans M",   // default story font (index 2)
+    { "sans-medium",  "Sans M",   // index 0 — default story font
       &reader_medium_2b,         &reader_medium_bold_2b,  &reader_medium_italic_2b,  nullptr },
 
-    // ── Serif (Literata) ─────────────────────────────────────────────────────
+    { "sans-small",   "Sans S",   // index 1 — 14pt
+      &reader_2b,                &reader_bold_2b,          &reader_italic_2b,          nullptr },
+
+    // ── Serif (Literata) — compiled in only when EENK_HAS_LITERATA is set ────
 #ifdef EENK_HAS_LITERATA
     { "serif-medium", "Serif M",
       &literata_medium_2b, &literata_medium_bold_2b, &literata_medium_italic_2b, nullptr },
@@ -104,10 +117,10 @@ InkEngine::~InkEngine() {
     _storage.freeBuffer(_storyBuf);
     _storyBuf = nullptr;
   }
-  // Clean up any streaming SD font.
-  if (_streamingFont) {
-    delete _streamingFont;
-    _streamingFont = nullptr;
+  // Clean up any streaming SD font family.
+  if (_streamingFamily) {
+    delete _streamingFamily;
+    _streamingFamily = nullptr;
   }
 }
 
@@ -117,11 +130,11 @@ InkEngine::~InkEngine() {
 // Resolution order:
 //   1. overrideStoryFont is set → use AppSettings::storyFontIndex (builtin)
 //   2. hint is empty            → use AppSettings::storyFontIndex (builtin)
-//   3. hint has no trailing dot → builtin token lookup
-//   4. hint has trailing dot    → SD card .epdfont
-//       a. try /eenk/<storyBase>/<stem>.epdfont  (sidecar)
-//       b. try /fonts/<stem>.epdfont             (shared)
-//       c. fallback to AppSettings::storyFontIndex
+//   3. hint matches builtin token (case-insensitive) → use that builtin
+//   4. otherwise                → SD card font family by stem name:
+//       a. sidecar: /eenk/<storyBase>/<stem>[suffix].epdfont
+//       b. shared:  /fonts/<stem>[suffix].epdfont
+//       c. fallback to AppSettings::storyFontIndex if not found
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Build EpdFontFamily from a BuiltinFontEntry using caller-supplied storage.
@@ -300,103 +313,109 @@ bool InkEngine::loadSnapshot(const unsigned char *data, std::size_t length) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* storyBase) {
-  // Clean up any previously active SD font.
-  if (_streamingFont) {
-    delete _streamingFont;
-    _streamingFont = nullptr;
+  // Clean up any previously active SD font family.
+  if (_streamingFamily) {
+    delete _streamingFamily;
+    _streamingFamily = nullptr;
   }
 
   GfxRenderer* renderer = _display.getRenderer();
 
-  // Persistent storage for the active narrative font family.
+  // Static storage for the active narrative builtin font family.
   // Initialised to reader_medium_2b so they are never truly "empty".
   static EpdFont       s_r(&reader_medium_2b),  s_b(&reader_medium_2b),
                        s_it(&reader_medium_2b), s_bi(&reader_medium_2b);
   static EpdFontFamily s_narrFamily(&s_r, &s_b, &s_it, &s_bi);
 
+  // ── Helper: apply a builtin font entry ──────────────────────────────────
   auto applyBuiltin = [&](size_t index) {
     const BuiltinFontEntry* e = getBuiltinByIndex(index);
     buildFamilyFromEntry(e, s_r, s_b, s_it, s_bi, s_narrFamily);
-    if (renderer) renderer->insertFont(FONT_NARRATIVE, s_narrFamily);
+    if (renderer) {
+      renderer->removeStreamingFont(FONT_NARRATIVE);
+      renderer->insertFont(FONT_NARRATIVE, s_narrFamily);
+    }
     printf("[InkEngine] Font: builtin '%s'\n", e->token);
   };
 
   auto applyUserSetting = [&]() {
-    if (_settings.storyFontPath[0] != '\0') {
-      auto* sf = new StreamingEpdFont();
-      if (sf->load(_settings.storyFontPath)) {
-        _streamingFont = sf;
-        static EpdFont       s_sdR(&ui_12);
-        static EpdFontFamily s_sdFamily(&s_sdR);
-        s_sdR    = EpdFont(sf->getData());
-        s_sdFamily = EpdFontFamily(&s_sdR);
-        if (renderer) renderer->insertFont(FONT_NARRATIVE, s_sdFamily);
-        printf("[InkEngine] Font: user setting SD '%s'\n", _settings.storyFontPath);
-        return;
-      }
-      delete sf;
-      printf("[InkEngine] Font: user setting SD '%s' failed, fallback to builtin\n", _settings.storyFontPath);
-    }
-    applyBuiltin(_settings.storyFontIndex);
+    // storyFontIndex indexes the combined SdFontCatalogue list (builtins first).
+    // For the builtin fallback path, clamp to the builtin range.
+    size_t idx = _settings.storyFontIndex;
+    if (idx >= kBuiltinFontCount) idx = 0;  // clamp SD-only index to default
+    applyBuiltin(idx);
   };
 
-  // 1. Override or no hint → user setting.
+  // ── 1. Override or no hint → user setting ─────────────────────────────
   if (_settings.overrideStoryFont || meta.fontNameLen == 0) {
     applyUserSetting();
     return;
   }
 
-  char stem[15] = {};
-  if (!meta.getFontStem(stem, sizeof(stem))) {
+  char stem[16] = {};
+  meta.getFontStem(stem, sizeof(stem));
+  if (!stem[0]) {
     applyUserSetting();
     return;
   }
 
-  // 2. SD card font (trailing dot in stored name).
-  if (meta.fontIsExternal()) {
-    // Build candidate paths.
-    char sidecarPath[128] = {};
-    char sharedPath[96]   = {};
-    snprintf(sidecarPath, sizeof(sidecarPath), "/eenk/%s/%s.epdfont", storyBase, stem);
-    snprintf(sharedPath,  sizeof(sharedPath),  "/fonts/%s.epdfont", stem);
-
-    const char* candidates[] = { sidecarPath, sharedPath };
-    for (const char* fpath : candidates) {
-      if (!storyBase[0] && fpath == sidecarPath) continue; // skip sidecar if no base name
-      auto* sf = new StreamingEpdFont();
-      if (sf->load(fpath)) {
-        _streamingFont = sf;
-        // Wrap the streaming font's EpdFontData in a regular EpdFont+EpdFontFamily.
-        // Static storage initialised with ui_12 as a safe placeholder; overwritten each call.
-        static EpdFont       s_sdR(&ui_12);
-        static EpdFontFamily s_sdFamily(&s_sdR);
-        s_sdR    = EpdFont(sf->getData());
-        s_sdFamily = EpdFontFamily(&s_sdR);
-        if (renderer) renderer->insertFont(FONT_NARRATIVE, s_sdFamily);
-        printf("[InkEngine] Font: SD '%s'\n", fpath);
-        return;
-      }
-      delete sf;
-    }
-    // Both paths failed → fall through to user setting.
-    printf("[InkEngine] Font: SD '%s' not found, falling back to user setting\n", stem);
-    applyUserSetting();
-    return;
-  }
-
-  // 3. Builtin token.
+  // ── 2. Builtin token lookup (case-insensitive) ─────────────────────────
   const BuiltinFontEntry* e = findBuiltinByToken(stem);
   if (e) {
     buildFamilyFromEntry(e, s_r, s_b, s_it, s_bi, s_narrFamily);
-    if (renderer) renderer->insertFont(FONT_NARRATIVE, s_narrFamily);
-    printf("[InkEngine] Font: token '%s'\n", stem);
+    if (renderer) {
+      renderer->removeStreamingFont(FONT_NARRATIVE);
+      renderer->insertFont(FONT_NARRATIVE, s_narrFamily);
+    }
+    printf("[InkEngine] Font: builtin token '%s'\n", stem);
     return;
   }
 
-  // Token not found → user setting.
-  printf("[InkEngine] Font: unknown token '%s', falling back to builtin\n", stem);
-  applyBuiltin(_settings.storyFontIndex);
+  // ── 3. SD card font family (sidecar first, then shared) ───────────────
+  char sidecarDir[128] = {};
+  if (storyBase && storyBase[0]) {
+    snprintf(sidecarDir, sizeof(sidecarDir), "/eenk/%s", storyBase);
+  }
+
+  // Build null-terminated dir list (skip empty sidecar if no story base)
+  const char* dirs[3];
+  int ndirs = 0;
+  if (sidecarDir[0]) dirs[ndirs++] = sidecarDir;
+  dirs[ndirs++] = "/fonts";
+  dirs[ndirs]   = nullptr;
+
+  _streamingFamily = new StreamingEpdFontFamily();
+  if (_streamingFamily->load(stem, dirs)) {
+    // Register all loaded variants with the renderer
+    if (renderer) {
+      // Build a placeholder EpdFontFamily pointing to the regular slot's metrics
+      // so the renderer's text-width code has valid EpdFontData to consult.
+      static EpdFont       s_sdR(&ui_12);
+      static EpdFontFamily s_sdFamily(&s_sdR);
+      s_sdR    = EpdFont(_streamingFamily->getData(EpdFontFamily::REGULAR));
+      s_sdFamily = EpdFontFamily(&s_sdR);
+      renderer->insertFont(FONT_NARRATIVE, s_sdFamily);
+
+      // Register each loaded variant in the renderer's streaming map
+      renderer->removeStreamingFont(FONT_NARRATIVE);
+      for (int i = 0; i < 4; ++i) {
+        auto st = static_cast<EpdFontFamily::Style>(i);
+        if (_streamingFamily->slot(st)) {
+          renderer->setStreamingFont(FONT_NARRATIVE, st, _streamingFamily->slot(st));
+        }
+      }
+    }
+    printf("[InkEngine] Font: SD family '%s'\n", stem);
+    return;
+  }
+
+  // SD not found
+  delete _streamingFamily;
+  _streamingFamily = nullptr;
+  printf("[InkEngine] Font: SD family '%s' not found, falling back to user setting\n", stem);
+  applyUserSetting();
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 void InkEngine::update() {
