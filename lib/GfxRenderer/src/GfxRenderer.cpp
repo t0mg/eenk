@@ -1162,9 +1162,15 @@ void GfxRenderer::renderChar(const EpdFontFamily& fontFamily, const uint32_t cp,
   const uint8_t* bitmap = nullptr;
   auto streamingIt = _streamingFonts.find(fontId);
   if (streamingIt != _streamingFonts.end()) {
-    int idx = EpdFontFamily::externalStyleIndex(style);
-    StreamingEpdFont* sf = streamingIt->second[idx];
-    if (!sf) sf = streamingIt->second[EpdFontFamily::REGULAR];
+    const auto& slots = streamingIt->second;
+    // Fallback chain: BOLD_ITALIC→BOLD→REGULAR, ITALIC→REGULAR, BOLD→REGULAR
+    StreamingEpdFont* sf = slots[EpdFontFamily::externalStyleIndex(style)];
+    if (!sf && style == EpdFontFamily::BOLD_ITALIC)
+      sf = slots[EpdFontFamily::BOLD];
+    if (!sf && (style == EpdFontFamily::ITALIC || style == EpdFontFamily::BOLD_ITALIC))
+      sf = slots[EpdFontFamily::REGULAR];
+    if (!sf)
+      sf = slots[EpdFontFamily::REGULAR];
     if (sf) {
       bitmap = sf->getGlyphBitmap(glyph);
     }

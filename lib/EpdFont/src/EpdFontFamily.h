@@ -4,11 +4,11 @@
 class EpdFontFamily {
  public:
   enum Style : uint8_t { REGULAR = 0, BOLD = 1, ITALIC = 2, BOLD_ITALIC = 3 };
-  // External/streaming fonts only have Regular + Bold; map other styles down
+  // External/streaming fonts support all four styles (or fall back to the nearest available).
   static constexpr int externalStyleIndex(Style style) {
-    return (style == BOLD || style == BOLD_ITALIC) ? BOLD : REGULAR;
+    return static_cast<int>(style);  // REGULAR=0, BOLD=1, ITALIC=2, BOLD_ITALIC=3
   }
-  static constexpr int kExternalStyleCount = 2;  // REGULAR + BOLD
+  static constexpr int kExternalStyleCount = 4;  // REGULAR + BOLD + ITALIC + BOLD_ITALIC
 
   explicit EpdFontFamily(const EpdFont* regular, const EpdFont* bold = nullptr, const EpdFont* italic = nullptr,
                          const EpdFont* boldItalic = nullptr)

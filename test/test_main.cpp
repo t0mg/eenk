@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 #ifdef PLATFORM_NATIVE
-#include "hal/sdl/mock/LittleFS.h"
+#include "hal/sdl/mock/FS.h"
 #endif
 
 #ifdef PLATFORM_NATIVE
@@ -21,6 +21,10 @@
 #include <builtinFonts/reader_medium_bold_2b.h>
 #include <builtinFonts/reader_medium_italic_2b.h>
 #include "InkRichTextParser.h"
+#include "StreamingEpdFontFamily.h"
+#include "StreamingEpdFont.h"
+#include "os/SdFontCatalogue.h"
+#include <cstdio>
 #endif
 
 #include "ScriptDetector.h"
@@ -340,6 +344,202 @@ void test_fonts_screenshot(void) {
     saveBMP("test/golden/test_fonts.bmp", display.eink.getFrameBuffer(), display.getWidth(), display.getHeight());
     TEST_ASSERT_EQUAL(1, 1);
 }
+
+// ── StreamingEpdFontFamily tests ───────────────────────────────────────────
+
+// Writes a minimal valid .epdfont file (zero glyphs/intervals/bitmap) for testing.
+// Layout matches EpdFontLoader::FileHeader + FileMetrics exactly.
+static bool writeDummyEpdfont(const char* path, bool is2bit = false) {
+    FILE* f = fopen(path, "wb");
+    if (!f) return false;
+
+    // FileHeader: magic(4) version(2) flags(2) reserved(8) = 16 bytes
+    uint32_t magic   = 0x46445045u;  // 'E','P','D','F' little-endian
+    uint16_t version = 1;
+    uint16_t flags   = is2bit ? 0x0001u : 0x0000u;
+    uint8_t  reserved[8] = {0};
+
+    fwrite(&magic,   1, 4, f);
+    fwrite(&version, 1, 2, f);
+    fwrite(&flags,   1, 2, f);
+    fwrite(reserved, 1, 8, f);
+
+    // FileMetrics: advanceY(1) padding(1) ascender(int16) descender(int16)
+    //              intervalCount(uint32) glyphCount(uint32) bitmapSize(uint32) = 14 bytes
+    uint8_t  advanceY   = 16;
+    uint8_t  padding    = 0;
+    int16_t  ascender   = 12;
+    int16_t  descender  = -4;
+    uint32_t intervalCount = 0;
+    uint32_t glyphCount    = 0;
+    uint32_t bitmapSize    = 0;
+
+    fwrite(&advanceY,      1, 1, f);
+    fwrite(&padding,       1, 1, f);
+    fwrite(&ascender,      1, 2, f);
+    fwrite(&descender,     1, 2, f);
+    fwrite(&intervalCount, 1, 4, f);
+    fwrite(&glyphCount,    1, 4, f);
+    fwrite(&bitmapSize,    1, 4, f);
+
+    fclose(f);
+    return true;
+}
+
+
+void test_streaming_epd_font_family_load_plain(void) {
+    // Single file <stem>.epdfont should be treated as the regular variant
+    const char* path = "/tmp/test_font.epdfont";
+    TEST_ASSERT_TRUE(writeDummyEpdfont(path));
+
+    StreamingEpdFontFamily fam;
+    const char* dirs[] = { "/tmp", nullptr };
+    TEST_ASSERT_TRUE(fam.load("test_font", dirs));
+    TEST_ASSERT_TRUE(fam.isLoaded());
+    TEST_ASSERT_TRUE(fam.hasStyle(EpdFontFamily::REGULAR));
+    TEST_ASSERT_FALSE(fam.hasStyle(EpdFontFamily::BOLD));
+    TEST_ASSERT_FALSE(fam.hasStyle(EpdFontFamily::ITALIC));
+    TEST_ASSERT_FALSE(fam.hasStyle(EpdFontFamily::BOLD_ITALIC));
+    TEST_ASSERT_NOT_NULL(fam.getData(EpdFontFamily::REGULAR));
+    remove(path);
+}
+
+void test_streaming_epd_font_family_load_regular_suffix(void) {
+    // <stem>-regular.epdfont should be preferred over <stem>.epdfont
+    const char* path  = "/tmp/myfont-regular.epdfont";
+    const char* plain = "/tmp/myfont.epdfont";
+    TEST_ASSERT_TRUE(writeDummyEpdfont(path));
+    TEST_ASSERT_TRUE(writeDummyEpdfont(plain));
+
+    StreamingEpdFontFamily fam;
+    const char* dirs[] = { "/tmp", nullptr };
+    TEST_ASSERT_TRUE(fam.load("myfont", dirs));
+    TEST_ASSERT_TRUE(fam.isLoaded());
+    remove(path);
+    remove(plain);
+}
+
+void test_streaming_epd_font_family_fallback_chain(void) {
+    // Only regular loaded: BOLD/ITALIC/BOLD_ITALIC should resolve to REGULAR
+    const char* path = "/tmp/fbtest-regular.epdfont";
+    TEST_ASSERT_TRUE(writeDummyEpdfont(path));
+
+    StreamingEpdFontFamily fam;
+    const char* dirs[] = { "/tmp", nullptr };
+    TEST_ASSERT_TRUE(fam.load("fbtest", dirs));
+
+    // resolveSlot must always return the regular slot when no variants exist
+    StreamingEpdFont* reg = fam.resolveSlot(EpdFontFamily::REGULAR);
+    StreamingEpdFont* bold = fam.resolveSlot(EpdFontFamily::BOLD);
+    StreamingEpdFont* italic = fam.resolveSlot(EpdFontFamily::ITALIC);
+    StreamingEpdFont* boldItalic = fam.resolveSlot(EpdFontFamily::BOLD_ITALIC);
+
+    TEST_ASSERT_NOT_NULL(reg);
+    TEST_ASSERT_EQUAL_PTR(reg, bold);       // BOLD falls back to REGULAR
+    TEST_ASSERT_EQUAL_PTR(reg, italic);     // ITALIC falls back to REGULAR
+    TEST_ASSERT_EQUAL_PTR(reg, boldItalic); // BOLD_ITALIC falls back to REGULAR
+    remove(path);
+}
+
+void test_streaming_epd_font_family_all_styles(void) {
+    // All four variants present: each resolveSlot should return its own slot
+    const char* rpath  = "/tmp/full-regular.epdfont";
+    const char* bpath  = "/tmp/full-bold.epdfont";
+    const char* ipath  = "/tmp/full-italic.epdfont";
+    const char* bipath = "/tmp/full-bolditalic.epdfont";
+    TEST_ASSERT_TRUE(writeDummyEpdfont(rpath));
+    TEST_ASSERT_TRUE(writeDummyEpdfont(bpath));
+    TEST_ASSERT_TRUE(writeDummyEpdfont(ipath));
+    TEST_ASSERT_TRUE(writeDummyEpdfont(bipath));
+
+    StreamingEpdFontFamily fam;
+    const char* dirs[] = { "/tmp", nullptr };
+    TEST_ASSERT_TRUE(fam.load("full", dirs));
+    TEST_ASSERT_TRUE(fam.hasStyle(EpdFontFamily::REGULAR));
+    TEST_ASSERT_TRUE(fam.hasStyle(EpdFontFamily::BOLD));
+    TEST_ASSERT_TRUE(fam.hasStyle(EpdFontFamily::ITALIC));
+    TEST_ASSERT_TRUE(fam.hasStyle(EpdFontFamily::BOLD_ITALIC));
+
+    StreamingEpdFont* reg  = fam.slot(EpdFontFamily::REGULAR);
+    StreamingEpdFont* bold = fam.slot(EpdFontFamily::BOLD);
+    StreamingEpdFont* ital = fam.slot(EpdFontFamily::ITALIC);
+    StreamingEpdFont* bi   = fam.slot(EpdFontFamily::BOLD_ITALIC);
+    TEST_ASSERT_NOT_NULL(reg);
+    TEST_ASSERT_NOT_NULL(bold);
+    TEST_ASSERT_NOT_NULL(ital);
+    TEST_ASSERT_NOT_NULL(bi);
+    // Each resolves to its own distinct instance
+    TEST_ASSERT_EQUAL_PTR(reg,  fam.resolveSlot(EpdFontFamily::REGULAR));
+    TEST_ASSERT_EQUAL_PTR(bold, fam.resolveSlot(EpdFontFamily::BOLD));
+    TEST_ASSERT_EQUAL_PTR(ital, fam.resolveSlot(EpdFontFamily::ITALIC));
+    TEST_ASSERT_EQUAL_PTR(bi,   fam.resolveSlot(EpdFontFamily::BOLD_ITALIC));
+    remove(rpath); remove(bpath); remove(ipath); remove(bipath);
+}
+
+void test_streaming_epd_font_family_missing_regular_fails(void) {
+    // No files at all — load() must fail
+    StreamingEpdFontFamily fam;
+    const char* dirs[] = { "/tmp/nonexistent_dir", nullptr };
+    TEST_ASSERT_FALSE(fam.load("ghost", dirs));
+    TEST_ASSERT_FALSE(fam.isLoaded());
+}
+
+void test_streaming_epd_font_family_bold_italic_fallback_order(void) {
+    // BOLD_ITALIC missing, BOLD present: BOLD_ITALIC should resolve to BOLD
+    const char* rpath = "/tmp/partial-regular.epdfont";
+    const char* bpath = "/tmp/partial-bold.epdfont";
+    TEST_ASSERT_TRUE(writeDummyEpdfont(rpath));
+    TEST_ASSERT_TRUE(writeDummyEpdfont(bpath));
+
+    StreamingEpdFontFamily fam;
+    const char* dirs[] = { "/tmp", nullptr };
+    TEST_ASSERT_TRUE(fam.load("partial", dirs));
+    TEST_ASSERT_TRUE(fam.hasStyle(EpdFontFamily::BOLD));
+    TEST_ASSERT_FALSE(fam.hasStyle(EpdFontFamily::BOLD_ITALIC));
+
+    StreamingEpdFont* bold = fam.slot(EpdFontFamily::BOLD);
+    StreamingEpdFont* bi   = fam.resolveSlot(EpdFontFamily::BOLD_ITALIC);
+    TEST_ASSERT_EQUAL_PTR(bold, bi);  // BOLD_ITALIC → BOLD
+    remove(rpath); remove(bpath);
+}
+
+void test_sd_font_catalogue_family_detection(void) {
+    // Write a font family into the fonts/ directory so SdFontCatalogue::scan() picks it up.
+    // Verify that only the family root appears (no -bold/-italic sub-entries).
+    const char* rpath  = "fonts/tstsans-regular.epdfont";
+    const char* bpath  = "fonts/tstsans-bold.epdfont";
+    const char* ipath  = "fonts/tstsans-italic.epdfont";
+    TEST_ASSERT_TRUE(writeDummyEpdfont(rpath));
+    TEST_ASSERT_TRUE(writeDummyEpdfont(bpath));
+    TEST_ASSERT_TRUE(writeDummyEpdfont(ipath));
+
+    SdFontCatalogue cat;
+    cat.scan();
+
+    size_t count = cat.getCount();
+    TEST_ASSERT_GREATER_THAN(0, count);
+
+    // Find the tstsans entry — should appear exactly once (as "Tstsans")
+    int foundCount = 0;
+    const FontEntry* entries = cat.getEntries();
+    for (size_t i = 0; i < count; i++) {
+        const char* name = entries[i].displayName;
+        // The root family entry should exist; variant files should NOT
+        if (strstr(name, "Tstsans") || strstr(name, "tstsans")) {
+            foundCount++;
+        }
+        // No entry's displayName should contain "-bold" or "-italic"
+        TEST_ASSERT_NULL(strstr(name, "-bold"));
+        TEST_ASSERT_NULL(strstr(name, "-italic"));
+    }
+    // tstsans-regular.epdfont should produce exactly one entry ("Tstsans")
+    TEST_ASSERT_EQUAL_INT(1, foundCount);
+
+    // Cleanup
+    remove(rpath);
+    remove(bpath);
+    remove(ipath);
+}
 #endif
 
 int main(int argc, char **argv) {
@@ -352,6 +552,14 @@ int main(int argc, char **argv) {
     RUN_TEST(test_game_library_screenshot);
     RUN_TEST(test_settings_view_screenshot);
     RUN_TEST(test_fonts_screenshot);
+    // StreamingEpdFontFamily unit tests
+    RUN_TEST(test_streaming_epd_font_family_load_plain);
+    RUN_TEST(test_streaming_epd_font_family_load_regular_suffix);
+    RUN_TEST(test_streaming_epd_font_family_fallback_chain);
+    RUN_TEST(test_streaming_epd_font_family_all_styles);
+    RUN_TEST(test_streaming_epd_font_family_missing_regular_fails);
+    RUN_TEST(test_streaming_epd_font_family_bold_italic_fallback_order);
+    RUN_TEST(test_sd_font_catalogue_family_detection);
 #endif
     UNITY_END();
     return 0;
