@@ -82,6 +82,16 @@ void SdFontCatalogue::scan() {
 
     // 1. Add built-in fonts
     for (size_t i = 0; i < kBuiltinFontCount && _count < MAX_FONTS; i++) {
+        // Skip aliases: if the regular font pointer matches a previously added entry, it's an alias
+        bool isAlias = false;
+        for (size_t j = 0; j < i; j++) {
+            if (kBuiltinFonts[i].regular == kBuiltinFonts[j].regular) {
+                isAlias = true;
+                break;
+            }
+        }
+        if (isAlias) continue;
+
         FontEntry& e = _entries[_count++];
         strncpy(e.displayName, kBuiltinFonts[i].displayName, sizeof(e.displayName) - 1);
         e.stem[0]  = '\0';
