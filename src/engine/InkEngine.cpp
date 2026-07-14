@@ -450,7 +450,8 @@ void InkEngine::update() {
 // ─────────────────────────────────────────────────────────────────────────────
 void InkEngine::tickRunningText() {
   GfxRenderer *renderer = _display.getRenderer();
-  int narrativeWidth = _display.getWidth() - 48; // 2 * marginX
+  int marginX = g_marginPx;
+  int narrativeWidth = _display.getWidth() - (2 * marginX);
   int newLinesCount = 0;
 
   auto pushLine = [&](const std::string &str) {
