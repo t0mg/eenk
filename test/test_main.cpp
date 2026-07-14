@@ -1,5 +1,15 @@
 #include <unity.h>
 #include <stdio.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <map>
+
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
 
 #ifdef PLATFORM_NATIVE
 #include "hal/sdl/mock/FS.h"
@@ -506,6 +516,11 @@ void test_streaming_epd_font_family_bold_italic_fallback_order(void) {
 void test_sd_font_catalogue_family_detection(void) {
     // Write a font family into the fonts/ directory so SdFontCatalogue::scan() picks it up.
     // Verify that only the family root appears (no -bold/-italic sub-entries).
+#ifdef _WIN32
+    _mkdir("fonts");
+#else
+    mkdir("fonts", 0777);
+#endif
     const char* rpath  = "fonts/tstsans-regular.epdfont";
     const char* bpath  = "fonts/tstsans-bold.epdfont";
     const char* ipath  = "fonts/tstsans-italic.epdfont";
