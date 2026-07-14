@@ -30,6 +30,9 @@
 #include <builtinFonts/reader_medium_2b.h>
 #include <builtinFonts/reader_medium_bold_2b.h>
 #include <builtinFonts/reader_medium_italic_2b.h>
+#include <builtinFonts/reader_2b.h>
+#include <builtinFonts/reader_bold_2b.h>
+#include <builtinFonts/reader_italic_2b.h>
 #include "InkRichTextParser.h"
 #include "StreamingEpdFontFamily.h"
 #include "StreamingEpdFont.h"
@@ -152,6 +155,11 @@ public:
     EpdFont readerBold;
     EpdFont readerItalic;
     EpdFontFamily readerFamily;
+    
+    EpdFont readerSmall;
+    EpdFont readerSmallBold;
+    EpdFont readerSmallItalic;
+    EpdFontFamily readerFamilySmall;
 
     TestDisplay() : 
         renderer(eink), 
@@ -164,7 +172,11 @@ public:
         readerNormal(&reader_medium_2b),
         readerBold(&reader_medium_bold_2b),
         readerItalic(&reader_medium_italic_2b),
-        readerFamily(&readerNormal, &readerBold, &readerItalic)
+        readerFamily(&readerNormal, &readerBold, &readerItalic),
+        readerSmall(&reader_2b),
+        readerSmallBold(&reader_bold_2b),
+        readerSmallItalic(&reader_italic_2b),
+        readerFamilySmall(&readerSmall, &readerSmallBold, &readerSmallItalic)
     {
         renderer.begin();
         renderer.setOrientation(GfxRenderer::PortraitInverted);
@@ -184,6 +196,7 @@ public:
         
         // Test Fonts
         renderer.insertFont(50, readerFamily);
+        renderer.insertFont(60, readerFamilySmall);
     }
     void clear() override { eink.clearScreen(0xFF); }
     void present() override {}
@@ -310,6 +323,15 @@ void test_fonts_screenshot(void) {
     
     display.renderer.drawText(50, 20, y, "Reader M Bold: The quick brown fox jumps", true, EpdFontFamily::BOLD);
     y += display.renderer.getLineHeight(50) + 20;
+
+    display.renderer.drawText(60, 20, y, "Reader S Normal: The quick brown fox jumps", true, EpdFontFamily::REGULAR);
+    y += display.renderer.getLineHeight(60) + 10;
+    
+    display.renderer.drawText(60, 20, y, "Reader S Italic: The quick brown fox jumps", true, EpdFontFamily::ITALIC);
+    y += display.renderer.getLineHeight(60) + 10;
+    
+    display.renderer.drawText(60, 20, y, "Reader S Bold: The quick brown fox jumps", true, EpdFontFamily::BOLD);
+    y += display.renderer.getLineHeight(60) + 20;
 
     auto runs1 = InkRichTextParser::parse("Rich HTML: <i>Italic</i>, <b>Bold</b>, <b><i>Both</i></b>!");
     FILE* f = fopen("test_runs.txt", "w");
