@@ -356,9 +356,15 @@ void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* stor
     if (_streamingFamily->load(stemName, dirs)) {
       if (renderer) {
         static EpdFont       s_sdR(&ui_12);
+        static EpdFont       s_sdB(&ui_12);
+        static EpdFont       s_sdI(&ui_12);
+        static EpdFont       s_sdBI(&ui_12);
         static EpdFontFamily s_sdFamily(&s_sdR);
         s_sdR = EpdFont(_streamingFamily->getData(EpdFontFamily::REGULAR));
-        s_sdFamily = EpdFontFamily(&s_sdR);
+        s_sdB = EpdFont(_streamingFamily->getData(EpdFontFamily::BOLD));
+        s_sdI = EpdFont(_streamingFamily->getData(EpdFontFamily::ITALIC));
+        s_sdBI = EpdFont(_streamingFamily->getData(EpdFontFamily::BOLD_ITALIC));
+        s_sdFamily = EpdFontFamily(&s_sdR, &s_sdB, &s_sdI, &s_sdBI);
         renderer->insertFont(FONT_NARRATIVE, s_sdFamily);
 
         renderer->removeStreamingFont(FONT_NARRATIVE);
