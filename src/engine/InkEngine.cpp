@@ -11,6 +11,7 @@
 #include "GfxRenderer.h"
 #include "InkRichTextParser.h"
 #include "os/AppSettings.h"
+#include "ui/SystemUI.h"
 #include <cctype>
 #include <cstring>
 #include <cstdio>
@@ -49,6 +50,7 @@
 //
 // Index 0: sans-medium (16pt) — DEFAULT
 // Index 1: sans-small  (14pt)
+#include "os/SdFontCatalogue.h"
 #include <BuiltinFonts.h>
 extern const BuiltinFontEntry kBuiltinFonts[] = {
     // ── Sans-serif (Reader family) ───────────────────────────────────────────
@@ -338,12 +340,59 @@ void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* stor
     printf("[InkEngine] Font: builtin '%s'\n", e->token);
   };
 
+  // ── Build SD dirs ───────────────────────────────────────────────────────
+  char sidecarDir[128] = {};
+  if (storyBase && storyBase[0]) {
+    snprintf(sidecarDir, sizeof(sidecarDir), "/eenk/%s", storyBase);
+  }
+
+  const char* dirs[3];
+  int ndirs = 0;
+  if (sidecarDir[0]) dirs[ndirs++] = sidecarDir;
+  dirs[ndirs++] = "/fonts";
+  dirs[ndirs]   = nullptr;
+
+  auto applySdFont = [&](const char* stemName) {
+    _streamingFamily = new StreamingEpdFontFamily();
+    if (_streamingFamily->load(stemName, dirs)) {
+      if (renderer) {
+        static EpdFont       s_sdR(&ui_12);
+        static EpdFontFamily s_sdFamily(&s_sdR);
+        s_sdR = EpdFont(_streamingFamily->getData(EpdFontFamily::REGULAR));
+        s_sdFamily = EpdFontFamily(&s_sdR);
+        renderer->insertFont(FONT_NARRATIVE, s_sdFamily);
+
+        renderer->removeStreamingFont(FONT_NARRATIVE);
+        for (int i = 0; i < 4; ++i) {
+          auto st = static_cast<EpdFontFamily::Style>(i);
+          if (_streamingFamily->slot(st)) {
+            renderer->setStreamingFont(FONT_NARRATIVE, st, _streamingFamily->slot(st));
+          }
+        }
+      }
+      printf("[InkEngine] Font: SD family '%s'\n", stemName);
+      return true;
+    }
+    delete _streamingFamily;
+    _streamingFamily = nullptr;
+    return false;
+  };
+
   auto applyUserSetting = [&]() {
-    // storyFontIndex indexes the combined SdFontCatalogue list (builtins first).
-    // For the builtin fallback path, clamp to the builtin range.
+    SdFontCatalogue cat;
+    cat.scan();
     size_t idx = _settings.storyFontIndex;
-    if (idx >= kBuiltinFontCount) idx = 0;  // clamp SD-only index to default
-    applyBuiltin(idx);
+    if (idx >= cat.getCount()) idx = 0;  // fallback to default if missing
+    
+    const FontEntry& entry = cat.getEntries()[idx];
+    if (entry.builtinIndex != 255) {
+      applyBuiltin(entry.builtinIndex);
+    } else {
+      if (!applySdFont(entry.stem)) {
+        printf("[InkEngine] Font: SD setting '%s' failed, falling back to default\n", entry.stem);
+        applyBuiltin(0);
+      }
+    }
   };
 
   // ── 1. Override or no hint → user setting ─────────────────────────────
@@ -362,56 +411,16 @@ void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* stor
   // ── 2. Builtin token lookup (case-insensitive) ─────────────────────────
   const BuiltinFontEntry* e = findBuiltinByToken(stem);
   if (e) {
-    buildFamilyFromEntry(e, s_r, s_b, s_it, s_bi, s_narrFamily);
-    if (renderer) {
-      renderer->removeStreamingFont(FONT_NARRATIVE);
-      renderer->insertFont(FONT_NARRATIVE, s_narrFamily);
-    }
-    printf("[InkEngine] Font: builtin token '%s'\n", stem);
+    applyBuiltin(e - kBuiltinFonts);
     return;
   }
 
-  // ── 3. SD card font family (sidecar first, then shared) ───────────────
-  char sidecarDir[128] = {};
-  if (storyBase && storyBase[0]) {
-    snprintf(sidecarDir, sizeof(sidecarDir), "/eenk/%s", storyBase);
-  }
-
-  // Build null-terminated dir list (skip empty sidecar if no story base)
-  const char* dirs[3];
-  int ndirs = 0;
-  if (sidecarDir[0]) dirs[ndirs++] = sidecarDir;
-  dirs[ndirs++] = "/fonts";
-  dirs[ndirs]   = nullptr;
-
-  _streamingFamily = new StreamingEpdFontFamily();
-  if (_streamingFamily->load(stem, dirs)) {
-    // Register all loaded variants with the renderer
-    if (renderer) {
-      // Build a placeholder EpdFontFamily pointing to the regular slot's metrics
-      // so the renderer's text-width code has valid EpdFontData to consult.
-      static EpdFont       s_sdR(&ui_12);
-      static EpdFontFamily s_sdFamily(&s_sdR);
-      s_sdR    = EpdFont(_streamingFamily->getData(EpdFontFamily::REGULAR));
-      s_sdFamily = EpdFontFamily(&s_sdR);
-      renderer->insertFont(FONT_NARRATIVE, s_sdFamily);
-
-      // Register each loaded variant in the renderer's streaming map
-      renderer->removeStreamingFont(FONT_NARRATIVE);
-      for (int i = 0; i < 4; ++i) {
-        auto st = static_cast<EpdFontFamily::Style>(i);
-        if (_streamingFamily->slot(st)) {
-          renderer->setStreamingFont(FONT_NARRATIVE, st, _streamingFamily->slot(st));
-        }
-      }
-    }
-    printf("[InkEngine] Font: SD family '%s'\n", stem);
+  // ── 3. SD card font family ─────────────────────────────────────────────
+  if (applySdFont(stem)) {
     return;
   }
 
-  // SD not found
-  delete _streamingFamily;
-  _streamingFamily = nullptr;
+  // ── 4. Fallback to user setting ────────────────────────────────────────
   printf("[InkEngine] Font: SD family '%s' not found, falling back to user setting\n", stem);
   applyUserSetting();
 }
@@ -614,11 +623,16 @@ void InkEngine::tickWaitingInput() {
 
   switch (ev) {
   case ButtonEvent::UP:
-    if (_selectedChoice > 0)
+    if (_selectedChoice > 0) {
       --_selectedChoice;
-    else if (_numChoices > 0)
-      _selectedChoice = _numChoices - 1;
-    redraw();
+      redraw();
+    } else {
+      int scrollAmount = _display.getHeight() / 4;
+      _scrollY -= scrollAmount;
+      if (_scrollY < 0)
+        _scrollY = 0;
+      redraw();
+    }
     break;
   case ButtonEvent::DOWN:
     if (_selectedChoice < _numChoices - 1)
@@ -654,7 +668,23 @@ void InkEngine::tickWaitingInput() {
     break;
   }
   case ButtonEvent::CONFIRM:
-    if (_numChoices > 0) {
+    if (!choicesVisible) {
+      int scrollAmount = _display.getHeight() / 4;
+      _scrollY += scrollAmount;
+
+      GfxRenderer *renderer = _display.getRenderer();
+      if (renderer && _numChoices > 0) {
+        int marginY = g_marginPx;
+        int choiceHeight = getChoicesHeight(renderer);
+        if (_scrollY > _maxScrollY - choiceHeight - marginY) {
+          _scrollY = _maxScrollY;
+        }
+      }
+
+      if (_scrollY > _maxScrollY)
+        _scrollY = _maxScrollY;
+      redraw();
+    } else if (_numChoices > 0) {
       for (auto &l : _wrappedLines)
         l.isOld = true;
       _runner->choose(static_cast<std::size_t>(_selectedChoice));
@@ -662,11 +692,17 @@ void InkEngine::tickWaitingInput() {
     }
     break;
   case ButtonEvent::BACK:
-  case ButtonEvent::QUIT:
-    // Exit to menu: save state, then signal done so main loop reboots to MENU.
-    _shouldSleep = false;
-    _state = State::DONE;
+  case ButtonEvent::QUIT: {
+    SystemUI ui(_display);
+    if (ui.showConfirmDialog(_input, "Exit Story", "Return to the menu?")) {
+      // Exit to menu: save state, then signal done so main loop reboots to MENU.
+      _shouldSleep = false;
+      _state = State::DONE;
+    } else {
+      redraw();
+    }
     break;
+  }
   case ButtonEvent::SLEEP:
     _shouldSleep = true;
     break;
