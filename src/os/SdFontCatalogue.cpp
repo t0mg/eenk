@@ -120,7 +120,7 @@ void SdFontCatalogue::scan() {
                     strncpy(e.displayName, displayName, sizeof(e.displayName) - 1);
                     strncpy(e.stem, stem,        sizeof(e.stem) - 1);
                     strncpy(e.path, "/fonts",    sizeof(e.path) - 1);
-                    e.builtinIndex = 0;
+                    e.builtinIndex = 255;
                 }
             }
             f = dir.openNextFile();
@@ -144,7 +144,7 @@ void SdFontCatalogue::scan() {
             strncpy(e.displayName, displayName, sizeof(e.displayName) - 1);
             strncpy(e.stem, stem,     sizeof(e.stem) - 1);
             strncpy(e.path, "fonts",  sizeof(e.path) - 1);
-            e.builtinIndex = 0;
+            e.builtinIndex = 255;
         }
         closedir(dp);
     }
