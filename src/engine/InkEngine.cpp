@@ -50,7 +50,6 @@
 //
 // Index 0: sans-medium (16pt) — DEFAULT
 // Index 1: sans-small  (14pt)
-#include "os/SdFontCatalogue.h"
 #include <BuiltinFonts.h>
 extern const BuiltinFontEntry kBuiltinFonts[] = {
     // ── Sans-serif (Reader family) ───────────────────────────────────────────
@@ -379,20 +378,20 @@ void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* stor
   };
 
   auto applyUserSetting = [&]() {
-    SdFontCatalogue cat;
-    cat.scan();
-    size_t idx = _settings.storyFontIndex;
-    if (idx >= cat.getCount()) idx = 0;  // fallback to default if missing
+    const char* fontName = _settings.storyFont;
     
-    const FontEntry& entry = cat.getEntries()[idx];
-    if (entry.builtinIndex != 255) {
-      applyBuiltin(entry.builtinIndex);
-    } else {
-      if (!applySdFont(entry.stem)) {
-        printf("[InkEngine] Font: SD setting '%s' failed, falling back to default\n", entry.stem);
-        applyBuiltin(0);
-      }
+    const BuiltinFontEntry* e = findBuiltinByToken(fontName);
+    if (e) {
+      applyBuiltin(e - kBuiltinFonts);
+      return;
     }
+    
+    if (applySdFont(fontName)) {
+      return;
+    }
+
+    printf("[InkEngine] Font: Setting '%s' failed, falling back to default\n", fontName);
+    applyBuiltin(0);
   };
 
   // ── 1. Override or no hint → user setting ─────────────────────────────

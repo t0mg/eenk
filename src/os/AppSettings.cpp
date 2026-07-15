@@ -10,6 +10,7 @@
 //
 // On PLATFORM_NATIVE all NVS calls are omitted; load() returns defaults().
 #include "AppSettings.h"
+#include <cstring>
 
 // ─── Static option tables ─────────────────────────────────────────────────────
 
@@ -42,7 +43,8 @@ const uint8_t AppSettings::REFRESH_OPTIONS[] = {5, 10, 15, 20};
 
 AppSettings AppSettings::defaults() {
     AppSettings s;
-    s.storyFontIndex   = 0;    // "Sans M" (sans-medium, index 0)
+    strncpy(s.storyFont, "sans-medium", sizeof(s.storyFont));
+    s.storyFont[sizeof(s.storyFont) - 1] = '\0';
     s.choiceFontIndex  = 2;    // "UI 12"
     s.marginPx         = 16;
     s.sleepTimeoutSec  = 120;
@@ -59,7 +61,7 @@ AppSettings AppSettings::defaults() {
 #include <Preferences.h>
 
 static constexpr char kNvsNamespace[]    = "settings";
-static constexpr char kKeyStoryFont[]    = "sfont";
+static constexpr char kKeyStoryFontStr[] = "sfont_str";
 static constexpr char kKeyChoiceFont[]   = "cfont";
 static constexpr char kKeyMargin[]       = "margin";
 static constexpr char kKeySleep[]        = "sleep";
@@ -77,7 +79,9 @@ AppSettings AppSettings::load() {
         return s;  // NVS unavailable — return defaults
     }
 
-    s.storyFontIndex   = prefs.getUChar(kKeyStoryFont, s.storyFontIndex);
+    String sf = prefs.getString(kKeyStoryFontStr, s.storyFont);
+    strncpy(s.storyFont, sf.c_str(), sizeof(s.storyFont) - 1);
+    s.storyFont[sizeof(s.storyFont) - 1] = '\0';
     s.choiceFontIndex  = prefs.getUChar(kKeyChoiceFont, s.choiceFontIndex);
     s.marginPx         = prefs.getUChar(kKeyMargin, s.marginPx);
     s.sleepTimeoutSec  = prefs.getUShort(kKeySleep, s.sleepTimeoutSec);
@@ -102,7 +106,7 @@ void AppSettings::save() const {
     Preferences prefs;
     prefs.begin(kNvsNamespace, false);
     
-    prefs.putUChar(kKeyStoryFont, storyFontIndex);
+    prefs.putString(kKeyStoryFontStr, storyFont);
     prefs.putUChar(kKeyChoiceFont, choiceFontIndex);
     prefs.putUChar(kKeyMargin,     marginPx);
     prefs.putUShort(kKeySleep,     sleepTimeoutSec);

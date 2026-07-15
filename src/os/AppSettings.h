@@ -5,7 +5,7 @@
 #include <cstdint>
 
 struct AppSettings {
-    uint8_t  storyFontIndex;    // index into SdFontCatalogue combined list (builtins first, then SD)
+    char     storyFont[32];     // token (builtin) or stem (SD font), e.g. "sans-medium"
     uint8_t  choiceFontIndex;   // 0..CHOICE_FONT_COUNT-1
     uint8_t  marginPx;          // pixels: 8, 16, 24, 32
     uint16_t sleepTimeoutSec;   // 0=never, 60, 120, 300

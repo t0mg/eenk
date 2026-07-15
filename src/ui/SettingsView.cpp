@@ -11,6 +11,7 @@
 //   Status bar:  y=0..31  (HeaderWidget::HEIGHT = 32)
 //   List items:  y=32..751 (48px per row) height: ROW_H = 60 px
 #include "SettingsView.h"
+#include <cstring>
 #include "BatteryWidget.h"
 #include "SystemUI.h"
 #include "os/BootManager.h"
@@ -146,10 +147,14 @@ void SettingsView::run() {
   }
 
   _fontCatalogue.scan();
-  _currentFontIndex = _settings.storyFontIndex;
-  // Clamp to valid range (guards against catalogue shrinking between boots)
-  if (_currentFontIndex >= (int)_fontCatalogue.getCount()) {
-      _currentFontIndex = 0;
+  _currentFontIndex = 0;
+  for (size_t i = 0; i < _fontCatalogue.getCount(); ++i) {
+      const FontEntry& e = _fontCatalogue.getEntries()[i];
+      const char* id = (e.builtinIndex != 255) ? kBuiltinFonts[e.builtinIndex].token : e.stem;
+      if (strcmp(_settings.storyFont, id) == 0) {
+          _currentFontIndex = (int)i;
+          break;
+      }
   }
 
   _pageIndex = 0;
@@ -601,7 +606,10 @@ void SettingsView::handleReadingInput(ButtonEvent ev) {
     case 0:
       if (_fontCatalogue.getCount() > 0) {
           _currentFontIndex = (_currentFontIndex - 1 + _fontCatalogue.getCount()) % _fontCatalogue.getCount();
-          _settings.storyFontIndex = (uint8_t)_currentFontIndex;
+          const FontEntry& e = _fontCatalogue.getEntries()[_currentFontIndex];
+          const char* id = (e.builtinIndex != 255) ? kBuiltinFonts[e.builtinIndex].token : e.stem;
+          strncpy(_settings.storyFont, id, sizeof(_settings.storyFont));
+          _settings.storyFont[sizeof(_settings.storyFont)-1] = '\0';
       }
       break;
     case 1:
@@ -656,7 +664,10 @@ void SettingsView::handleReadingInput(ButtonEvent ev) {
     case 0:
       if (_fontCatalogue.getCount() > 0) {
           _currentFontIndex = (_currentFontIndex + 1) % _fontCatalogue.getCount();
-          _settings.storyFontIndex = (uint8_t)_currentFontIndex;
+          const FontEntry& e = _fontCatalogue.getEntries()[_currentFontIndex];
+          const char* id = (e.builtinIndex != 255) ? kBuiltinFonts[e.builtinIndex].token : e.stem;
+          strncpy(_settings.storyFont, id, sizeof(_settings.storyFont));
+          _settings.storyFont[sizeof(_settings.storyFont)-1] = '\0';
       }
       break;
     case 1:
