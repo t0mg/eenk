@@ -1,4 +1,4 @@
-// EENK — BuiltinFonts
+// eenk — BuiltinFonts
 // Canonical table of built-in typefaces.
 //
 // Each entry maps a token name (used in @font: hints and settings) to

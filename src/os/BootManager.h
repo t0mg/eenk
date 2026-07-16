@@ -1,4 +1,4 @@
-// EENK — BootManager
+// eenk — BootManager
 // Persists the boot mode (MENU vs INK_RUNTIME) and the story path to load
 // in NVS namespace "boot". On PLATFORM_NATIVE all operations are stubs.
 #pragma once

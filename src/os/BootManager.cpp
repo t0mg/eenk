@@ -1,4 +1,4 @@
-// EENK — BootManager implementation
+// eenk — BootManager implementation
 //
 // Boot mode and story path are stored in NVS namespace "boot".
 // To mirror Papyrix behavior, on a cold boot (power-on, external reset button)
@@ -23,7 +23,7 @@
  * We strictly use NVS (Preferences API) to persist the BootMode and story path.
  *
  * It is tempting to use RTC memory (e.g. RTC_NOINIT_ATTR) to avoid flash wear,
- * however the EENK hardware utilizes a latching power circuit to maximize
+ * however the eenk hardware utilizes a latching power circuit to maximize
  * battery life. When the device sleeps on battery, it physically cuts power to
  * the ESP32, which completely zeroes out the RTC memory domain. Waking it up
  * triggers a cold power-on reset (esp_reset_reason == 1), NOT a deep sleep

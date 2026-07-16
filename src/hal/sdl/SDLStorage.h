@@ -5,7 +5,7 @@
 #include <cstddef>
 
 /**
- * EENK — SDLStorage
+ * eenk — SDLStorage
  *
  * Native desktop implementation of IStorage using std::fopen / std::fread.
  * readFileBinary() allocates with new[] — always call freeBuffer() when done.

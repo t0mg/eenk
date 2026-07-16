@@ -1,4 +1,4 @@
-// EENK — StoryMetadata
+// eenk — StoryMetadata
 // 128-byte header prepended to ink .bin files.
 // Allows the GameLibrary to display rich metadata (title, author) without
 // loading the full story into memory.
@@ -6,14 +6,14 @@
 #include <cstdint>
 #include <cstring>
 
-// EENK binary header prepended to ink .bin files.
+// eenk binary header prepended to ink .bin files.
 // Total size: 128 bytes.
 struct StoryMetadata {
-    static constexpr uint32_t MAGIC   = 0x4B4E4545; // "EENK" little-endian
+    static constexpr uint32_t MAGIC   = 0x6B6E6565; // "eenk" little-endian
     static constexpr uint16_t VERSION = 1;
     static constexpr size_t   SIZE    = 128;
 
-    uint32_t magic;          // 0x4B4E4545                          offset   0
+    uint32_t magic;          // 0x6B6E6565                          offset   0
     uint16_t version;        // 1                                   offset   4
     uint16_t headerSize;     // sizeof this struct = 128            offset   6
     char     title[64];      // null-terminated UTF-8 title         offset   8
@@ -53,7 +53,7 @@ struct StoryMetadata {
         return out->magic == MAGIC && out->version == VERSION;
     }
 
-    // Check if a buffer starts with a valid EENK header without copying.
+    // Check if a buffer starts with a valid eenk header without copying.
     static bool hasHeader(const uint8_t* buf, size_t bufLen) {
         if (bufLen < 8) return false;
         uint32_t m; memcpy(&m, buf, 4);

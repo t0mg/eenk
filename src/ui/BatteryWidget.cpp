@@ -1,4 +1,4 @@
-// EENK — BatteryWidget implementation
+// eenk — BatteryWidget implementation
 // Renders a compact battery icon + percentage label using GfxRenderer.
 //
 // Icon geometry (all coords relative to the (x, y) origin passed to draw()):

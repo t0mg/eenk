@@ -1,4 +1,4 @@
-// EENK — BatteryWidget
+// eenk — BatteryWidget
 // Renders a compact battery icon and percentage label in a status-bar strip.
 // Uses GfxRenderer primitives (drawRect / fillRect / drawText).
 //

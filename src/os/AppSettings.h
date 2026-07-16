@@ -1,4 +1,4 @@
-// EENK — AppSettings
+// eenk — AppSettings
 // User-configurable preferences persisted in NVS namespace "settings".
 // On PLATFORM_NATIVE, load() returns defaults() and save() is a no-op.
 #pragma once

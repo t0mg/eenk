@@ -1,4 +1,4 @@
-// EENK — GameLibrary
+// eenk — GameLibrary
 // Scrollable story browser shown in MENU boot mode.
 // Scans /eenk/ on the SD card for .bin files, displays title/author/size,
 // and lets the user select a story to launch or navigate to settings.
@@ -43,7 +43,7 @@ protected:
         uint32_t sizeBytes;         // File size in bytes
         bool     hasSave;           // Has a save in /.eenk_saves/<filename>.bin.save
         bool     isCurrentlyLoaded; // Path matches NVS boot.story_path
-        bool     hasMetadata;       // Whether EENK header was found
+        bool     hasMetadata;       // Whether eenk header was found
     };
 
     static constexpr int MAX_STORIES   = 32;

@@ -1,4 +1,4 @@
-// EENK — SettingsView implementation
+// eenk — SettingsView implementation
 //
 // Font ID allocations (must not clash with InkEngine 0/1, SystemUI 10/11,
 // BatteryWidget 20):

@@ -1,6 +1,6 @@
-# EENK — Interactive Fiction Firmware for Xteink X4
+# eenk — Interactive Fiction Firmware for Xteink X4
 
-Welcome to **EENK**, a custom firmware designed to run **Ink** interactive fiction stories on the Xteink X4 e-ink device, utilizing the [inkcpp](https://github.com/t0mg/inkcpp) C++ runtime.
+Welcome to **eenk**, a custom firmware designed to run **Ink** interactive fiction stories on the Xteink X4 e-ink device, utilizing the [inkcpp](https://github.com/t0mg/inkcpp) C++ runtime.
 
 This project supports two primary build configurations managed via PlatformIO:
 - **`native`**: A desktop simulation of the runtime, using an 800x480 SDL2 graphical window to simulate the e-ink display for testing.
@@ -10,7 +10,7 @@ This project supports two primary build configurations managed via PlatformIO:
 
 ## 1. Project Architecture
 
-The EENK ecosystem relies on two repositories working together through git submodules:
+The eenk ecosystem relies on two repositories working together through git submodules:
 
 - **`eenk` (This repository)**: The core C++ firmware and SDL simulation runtime. It handles rendering to the e-ink display (or SDL window) and executing the compiled Ink binary using the `inkcpp` runtime.
 - **`eenky` (IDE)**: The Electron-based editor and toolchain. It provides the UI to write Ink stories, compile them to JSON and then to `.bin`, run the SDL simulator from `eenk`, and finally flash the compiled firmware to the device via Web Serial.
@@ -22,7 +22,7 @@ The EENK ecosystem relies on two repositories working together through git submo
 
 ## 2. Desktop Simulation (`native` configuration)
 
-The native configuration compiles a host executable that runs the compiled story interactively in an 800x480 SDL2 graphical window, rendering text with a bundled CP437 font to perfectly simulate the e-ink experience. This executable is used as the simulation backend for the EENKY IDE.
+The native configuration compiles a host executable that runs the compiled story interactively in an 800x480 SDL2 graphical window, rendering text with a bundled CP437 font to perfectly simulate the e-ink experience. This executable is used as the simulation backend for the eenky IDE.
 
 ### Building the Native Target
 Ensure that the MinGW compiler suite (`g++`) is in your PATH. If you use MSYS2, the compiler path is typically `C:\msys64\mingw64\bin`.
@@ -64,7 +64,7 @@ pio run -e esp32c3
 
 This compiles the firmware and runs the `merge_firmware.py` post-build script to produce the merged binary ready for web flashing:
 - `.pio/build/esp32c3/firmware.bin` (The app partition)
-- **`.pio/build/esp32c3/firmware-factory.bin`** (The merged bootloader + partition table + app, used by ESP Web Tools in the EENKY IDE)
+- **`.pio/build/esp32c3/firmware-factory.bin`** (The merged bootloader + partition table + app, used by ESP Web Tools in the eenky IDE)
 
 ### Flashing the Firmware (CLI)
 You can flash the device directly from PlatformIO:
@@ -72,4 +72,4 @@ You can flash the device directly from PlatformIO:
 pio run -e esp32c3 -t upload
 ```
 
-Alternatively, you can flash using the **Flash** tab within the EENKY IDE, which uses ESP Web Tools to push `firmware-factory.bin` over USB.
+Alternatively, you can flash using the **Flash** tab within the eenky IDE, which uses ESP Web Tools to push `firmware-factory.bin` over USB.

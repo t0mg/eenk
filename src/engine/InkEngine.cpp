@@ -60,8 +60,8 @@ extern const BuiltinFontEntry kBuiltinFonts[] = {
     { "sans-small",   "Sans S",   // index 1 — 14pt
       &reader_2b,                &reader_bold_2b,          &reader_italic_2b,          nullptr },
 
-    // ── Serif (Literata) — compiled in only when EENK_HAS_LITERATA is set ────
-#ifdef EENK_HAS_LITERATA
+    // ── Serif (Literata) — compiled in only when eenk_HAS_LITERATA is set ────
+#ifdef eenk_HAS_LITERATA
     { "serif-medium", "Serif M",
       &literata_medium_2b, &literata_medium_bold_2b, &literata_medium_italic_2b, nullptr },
 
@@ -71,7 +71,7 @@ extern const BuiltinFontEntry kBuiltinFonts[] = {
 
     // ── Short aliases (resolve to medium size) ────────────────────────────────
     { "sans",  "Sans",  &reader_medium_2b, &reader_medium_bold_2b, &reader_medium_italic_2b, nullptr },
-#ifdef EENK_HAS_LITERATA
+#ifdef eenk_HAS_LITERATA
     { "serif", "Serif", &literata_medium_2b, &literata_medium_bold_2b, &literata_medium_italic_2b, nullptr },
 #endif
 };
@@ -164,7 +164,7 @@ bool InkEngine::loadStory(const char *path) {
   const unsigned char* dataToLoad = _storyBuf;
   std::size_t sizeToLoad = size;
 
-  // Parse EENK header if present.
+  // Parse eenk header if present.
   StoryMetadata meta;
   memset(&meta, 0, sizeof(meta));
   if (sizeToLoad >= 128 && StoryMetadata::hasHeader(_storyBuf, sizeToLoad)) {
@@ -232,7 +232,7 @@ bool InkEngine::loadStory(const unsigned char *data,
   const unsigned char* dataToLoad = data;
   std::size_t sizeToLoad = size;
 
-  // Parse EENK header if present.
+  // Parse eenk header if present.
   StoryMetadata meta;
   memset(&meta, 0, sizeof(meta));
   if (sizeToLoad >= 128 && StoryMetadata::hasHeader(dataToLoad, sizeToLoad)) {

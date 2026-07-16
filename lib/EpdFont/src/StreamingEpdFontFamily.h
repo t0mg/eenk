@@ -1,4 +1,4 @@
-// EENK — StreamingEpdFontFamily
+// eenk — StreamingEpdFontFamily
 // Owns up to 4 StreamingEpdFont instances for a single font family on SD card.
 //
 // File naming convention (fontconvert.py compatible):

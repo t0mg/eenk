@@ -1,7 +1,7 @@
 #pragma once
 #include <cstddef>
 /**
- * EENK — IStorage: Platform-agnostic storage interface
+ * eenk — IStorage: Platform-agnostic storage interface
  *
  * Implemented by:
  *   SDLStorage      (PLATFORM_NATIVE)  — std::fopen / std::fread

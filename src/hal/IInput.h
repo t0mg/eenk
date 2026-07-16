@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
 /**
- * EENK — IInput: Platform-agnostic input interface
+ * eenk — IInput: Platform-agnostic input interface
  *
  * Implemented by:
  *   SDLInput   (PLATFORM_NATIVE)   — keyboard mapping via SDL_PollEvent

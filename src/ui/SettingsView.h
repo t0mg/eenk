@@ -1,4 +1,4 @@
-// EENK — SettingsView
+// eenk — SettingsView
 // Multi-page settings menu for the Xteink X4 e-reader.
 //
 // Pages (4 total):

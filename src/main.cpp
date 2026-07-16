@@ -1,5 +1,5 @@
 /**
- * EENK - Interactive Fiction Runtime for Xteink X4
+ * eenk - Interactive Fiction Runtime for Xteink X4
  *
  * Milestone 1: SDL2 desktop simulation
  *   - HAL: SDLDisplay (800×480 window), SDLInput (keyboard), SDLStorage (fread)
@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
   if (argc > 1)
     storyPath = argv[1];
 
-  printf("=== EENK Interactive Fiction Runtime ===\n");
+  printf("=== eenk Interactive Fiction Runtime ===\n");
   printf("Story: %s\n\n", storyPath);
 
   // Instantiate HAL
@@ -121,7 +121,7 @@ void setup() {
 
   delay(1000);
   Serial.print("\x1B[2J\x1B[H");
-  Serial.println("=== EENK Interactive Fiction Runtime (ESP32-C3) ===");
+  Serial.println("=== eenk Interactive Fiction Runtime (ESP32-C3) ===");
   Serial.printf("Free heap before init: %u bytes\n", ESP.getFreeHeap());
 
   // ── Initialise NVS (must be first — BootManager and AppSettings both use it)
@@ -284,8 +284,8 @@ void setup() {
 
           if (flashCache->loadStoryStreaming(*sdStorage, sdStoryPath,
                                              &mappedPtr, &mappedSize)) {
-            // Require EENK metadata header
-            if (mappedSize >= 128 && memcmp(mappedPtr, "EENK", 4) == 0) {
+            // Require eenk metadata header
+            if (mappedSize >= 128 && memcmp(mappedPtr, "eenk", 4) == 0) {
               mappedPtr += 128;
               mappedSize -= 128;
 
@@ -396,7 +396,7 @@ void setup() {
     }
     Serial.printf("FATAL: %s\n", errorMessage.c_str());
 
-    systemUI->showError("EENK SYSTEM ERROR", errorMessage.c_str());
+    systemUI->showError("eenk SYSTEM ERROR", errorMessage.c_str());
 
     while (true) {
 #ifdef PLATFORM_ESP32
@@ -453,7 +453,7 @@ void saveProgress() {
       f.close();
       Serial.println("Game saved successfully!");
     } else {
-      systemUI->showError("EENK SYSTEM ERROR",
+      systemUI->showError("eenk SYSTEM ERROR",
                           "Failed to write save file to SD.");
       while (true) {
         if (input->pollInput() == ButtonEvent::SLEEP)
@@ -462,7 +462,7 @@ void saveProgress() {
       }
     }
   } else {
-    systemUI->showError("EENK SYSTEM ERROR",
+    systemUI->showError("eenk SYSTEM ERROR",
                         "Failed to create runtime snapshot.");
     while (true) {
       if (input->pollInput() == ButtonEvent::SLEEP)

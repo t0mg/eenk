@@ -63,7 +63,7 @@ void performOfflineUpdate(File& updateFile) {
 void setup() {
     Serial.begin(115200);
     delay(1000);
-    Serial.println("=== EENK OTA Updater (app1) ===");
+    Serial.println("=== eenk OTA Updater (app1) ===");
 
     display = new EspEinkDisplay();
     auto* r = display->getRenderer();

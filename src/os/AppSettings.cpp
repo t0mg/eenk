@@ -1,4 +1,4 @@
-// EENK — AppSettings implementation
+// eenk — AppSettings implementation
 // NVS namespace: "settings"
 //   key "sfont"     (uint8)  — storyFontIndex
 //   key "cfont"     (uint8)  — choiceFontIndex

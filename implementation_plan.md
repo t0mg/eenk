@@ -1,4 +1,4 @@
-# EENK — Interactive Fiction Runtime for Xteink X4
+# eenk — Interactive Fiction Runtime for Xteink X4
 
 ## Overview
 
@@ -165,7 +165,7 @@ Implemented a single `InkEngine` class (instead of separate `GameState`/`TextFor
 ---
 
 ### Milestone 3: Physical Device Bring-Up ✅ COMPLETED
-**Goal:** Migrate the Papyrix Reader display and input drivers into the EENK architecture.
+**Goal:** Migrate the Papyrix Reader display and input drivers into the eenk architecture.
 
 #### What Was Done
 
@@ -1108,7 +1108,7 @@ eenk/
 
 ```mermaid
 gantt
-    title EENK Development Timeline
+    title eenk Development Timeline
     dateFormat  YYYY-MM-DD
     axisFormat  %b %d
 

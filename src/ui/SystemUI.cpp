@@ -130,7 +130,7 @@ void SystemUI::showSleepCover(const char *msg, const char *title) {
     if (title && title[0] != '\0') {
       renderer->drawText(11, 50, 50, title);
     } else {
-      renderer->drawText(11, 50, 50, "E E N K");
+      renderer->drawText(11, 50, 50, "eenk");
     }
     renderer->drawText(10, 50, 90, msg);
 #endif

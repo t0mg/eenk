@@ -20,7 +20,7 @@ SDLDisplay::SDLDisplay()
     }
 
     _window = SDL_CreateWindow(
-        "EENK — Interactive Fiction Runtime (E-Ink Simulator)",
+        "eenk — Interactive Fiction Runtime (E-Ink Simulator)",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         WIN_W, WIN_H,
         SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE

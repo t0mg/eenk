@@ -7,7 +7,7 @@
 #include <GfxRenderer.h>
 
 /**
- * EENK — SDLDisplay
+ * eenk — SDLDisplay
  *
  * SDL2 implementation of IDisplay.
  * Creates an 480x800 software-rendered window simulating the Xteink X4 e-ink panel.

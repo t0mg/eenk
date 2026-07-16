@@ -1,4 +1,4 @@
-// EENK — GameLibrary implementation
+// eenk — GameLibrary implementation
 // Scrollable story browser: scans /eenk/ on SD, shows title/author/size,
 // launches selected story via BootManager.
 #include "GameLibrary.h"
@@ -412,7 +412,7 @@ void GameLibrary::render() {
   auto *r = _display.getRenderer();
   if (!r) {
     // Text-mode fallback: print list to stdout.
-    printf("=== EENK Game Library ===\n");
+    printf("=== eenk Game Library ===\n");
     for (int i = 0; i < _numEntries; i++) {
       printf("%s %s\n", (i == _selectedIndex) ? ">" : " ", _entries[i].title);
     }
@@ -421,7 +421,7 @@ void GameLibrary::render() {
 
   _display.clear();
   HeaderWidget header(_display, _battery);
-  header.render("EENK", FONT_BOLD);
+  header.render("eenk", FONT_BOLD);
 
   if (_numEntries == 0) {
     renderEmpty();

@@ -1,6 +1,6 @@
-// EENK — StoryMetadata implementation
+// eenk — StoryMetadata implementation
 // readFromSD reads the first 128 bytes of a .bin file from the SD card and
-// validates the EENK header magic + version.
+// validates the eenk header magic + version.
 #include "StoryMetadata.h"
 
 #ifdef PLATFORM_ESP32

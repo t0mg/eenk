@@ -5,7 +5,7 @@
 #include <SDL.h>
 
 /**
- * EENK — SDLInput
+ * eenk — SDLInput
  *
  * SDL2 implementation of IInput.
  * Pumps SDL events and maps keyboard keys to the ButtonEvent enum.

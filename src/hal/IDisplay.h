@@ -1,6 +1,6 @@
 #pragma once
 /**
- * EENK — IDisplay: Platform-agnostic display interface
+ * eenk — IDisplay: Platform-agnostic display interface
  *
  * Implemented by:
  *   SDLDisplay        (PLATFORM_NATIVE)              — SDL2 800×480 software-rendered window

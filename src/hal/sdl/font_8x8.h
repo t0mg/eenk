@@ -2,7 +2,7 @@
 #include <cstdint>
 
 /**
- * EENK — font_8x8.h
+ * eenk — font_8x8.h
  *
  * Classic IBM CP437 8×8 pixel bitmap font, covering ASCII 0x20–0x7F.
  * Each character is stored as 8 bytes (one byte per row, MSB = leftmost pixel).
