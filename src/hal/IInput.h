@@ -1,4 +1,5 @@
 #pragma once
+#include <stdint.h>
 /**
  * EENK — IInput: Platform-agnostic input interface
  *
@@ -31,4 +32,14 @@ public:
      * Returns ButtonEvent::NONE if no key/button was pressed since the last call.
      */
     virtual ButtonEvent pollInput() = 0;
+
+    /**
+     * Returns the timestamp (in millis) of the last physical button press/release.
+     */
+    virtual uint32_t getLastActivityTime() const = 0;
+
+    /**
+     * Set the inactivity timeout in seconds (0 = disabled).
+     */
+    virtual void setAutoSleepTimeout(uint16_t seconds) = 0;
 };

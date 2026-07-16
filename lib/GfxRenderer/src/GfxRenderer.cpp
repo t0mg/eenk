@@ -456,6 +456,111 @@ void GfxRenderer::fillRect(const int x, const int y, const int width, const int 
   }
 }
 
+void GfxRenderer::fillHalftoneRect(const int x, const int y, const int width, const int height, const bool state) const {
+  if (width <= 0 || height <= 0) return;
+
+  int physX, physY, physW, physH;
+  switch (orientation) {
+    case Portrait:
+      physX = y;
+      physY = einkDisplay.getDisplayHeight() - 1 - (x + width - 1);
+      physW = height;
+      physH = width;
+      break;
+    case LandscapeClockwise:
+      physX = einkDisplay.getDisplayWidth() - 1 - (x + width - 1);
+      physY = einkDisplay.getDisplayHeight() - 1 - (y + height - 1);
+      physW = width;
+      physH = height;
+      break;
+    case PortraitInverted:
+      physX = einkDisplay.getDisplayWidth() - 1 - (y + height - 1);
+      physY = x;
+      physW = height;
+      physH = width;
+      break;
+    case LandscapeCounterClockwise:
+    default:
+      physX = x;
+      physY = y;
+      physW = width;
+      physH = height;
+      break;
+  }
+
+  const int dw = static_cast<int>(einkDisplay.getDisplayWidth());
+  const int dh = static_cast<int>(einkDisplay.getDisplayHeight());
+  if (physX >= dw || physY >= dh || physX + physW <= 0 || physY + physH <= 0) return;
+
+  const int x0 = std::max(physX, 0);
+  const int y0 = std::max(physY, 0);
+  const int x1 = std::min(physX + physW - 1, dw - 1);
+  const int y1 = std::min(physY + physH - 1, dh - 1);
+
+  const int stride = einkDisplay.getDisplayWidthBytes();
+  const int byteStart = x0 / 8;
+  const int byteEnd = x1 / 8;
+
+  for (int row = y0; row <= y1; row++) {
+    uint8_t* rowPtr = &frameBuffer[row * stride];
+    // Pattern depends on row and column parity.
+    // In GfxRenderer, a pixel is set if (x + y)%2 == 1 or something.
+    // Actually drawPixel does `if ((x + y) % 2 == 0) return;` for halftone, meaning we only draw when (x+y)%2 != 0.
+    // That means we KEEP pixels black (bit=0) only if (x+y)%2 != 0.
+    // So the mask of bits to set to 0 (black) is where (x+y)%2 != 0.
+    // Wait, setting bits to 0 makes them black. Setting to 1 makes them white.
+    // But for halftone, we only WANT to paint black where (x+y)%2 != 0.
+    // We leave the other pixels ALONE!
+    // Wait, a shield should probably be a 50% checkerboard of black and WHITE? Or just black and transparent?
+    // "halftone background shield" - If it's a shield over text, it should probably alternate black and white to obscure the text completely, or just black and transparent to dim the text.
+    // The previous implementation used `setHalftone(true); fillRect(..., true); setHalftone(false);`
+    // Which means `drawPixel` was called. `fillRect` doesn't call `drawPixel`, it sets bytes.
+    // We use a 2x2 checkerboard pattern:
+    // Rows 0, 1: 0xCC (11001100)
+    // Rows 2, 3: 0x33 (00110011)
+    uint8_t pattern = ((row % 4) < 2) ? 0xCC : 0x33;
+
+    if (byteStart == byteEnd) {
+      uint8_t mask = static_cast<uint8_t>((0xFF >> (x0 & 7)) & (0xFF << (7 - (x1 & 7))));
+      if (state) {
+        rowPtr[byteStart] &= ~(mask & pattern);
+      } else {
+        rowPtr[byteStart] |= (mask & pattern);
+      }
+    } else {
+      const bool hasLeftEdge = (x0 & 7) != 0;
+      const bool hasRightEdge = (x1 & 7) != 7;
+      const uint8_t leftMask = static_cast<uint8_t>(0xFF >> (x0 & 7));
+      const uint8_t rightMask = static_cast<uint8_t>(0xFF << (7 - (x1 & 7)));
+      
+      const int fullStart = byteStart + (hasLeftEdge ? 1 : 0);
+      const int fullEnd = byteEnd - (hasRightEdge ? 1 : 0);
+
+      if (hasLeftEdge) {
+        if (state) {
+          rowPtr[byteStart] &= ~(leftMask & pattern);
+        } else {
+          rowPtr[byteStart] |= (leftMask & pattern);
+        }
+      }
+      for (int i = fullStart; i <= fullEnd; i++) {
+        if (state) {
+          rowPtr[i] &= ~pattern;
+        } else {
+          rowPtr[i] |= pattern;
+        }
+      }
+      if (hasRightEdge) {
+        if (state) {
+          rowPtr[byteEnd] &= ~(rightMask & pattern);
+        } else {
+          rowPtr[byteEnd] |= (rightMask & pattern);
+        }
+      }
+    }
+  }
+}
+
 void GfxRenderer::drawImage(const uint8_t bitmap[], const int x, const int y, const int width, const int height) const {
   // TODO: Rotate bits
   int rotatedX = 0;

@@ -43,7 +43,9 @@ int main(int argc, char *argv[]) {
 
   // Run the engine
   InkEngine engine(display, input, storage);
-  engine.applySettings(AppSettings::load());
+  AppSettings settings = AppSettings::load();
+  engine.applySettings(settings);
+  input.setAutoSleepTimeout(settings.sleepTimeoutSec);
   if (!engine.loadStory(storyPath)) {
     fprintf(stderr, "ERROR: Failed to load story: %s\n", storyPath);
     return 1;
@@ -88,6 +90,7 @@ int main(int argc, char *argv[]) {
 #include "ui/BatteryWidget.h"
 #include "ui/GameLibrary.h"
 #include "ui/SettingsView.h"
+#include "ui/StoryMetadata.h"
 #include "ui/SystemUI.h"
 #include <BatteryMonitor.h>
 #include <EpdFont.h>
@@ -171,6 +174,7 @@ void setup() {
 
   // ── Dual-boot dispatch ─────────────────────────────────────────────────────
   AppSettings settings = AppSettings::load();
+  input->setAutoSleepTimeout(settings.sleepTimeoutSec);
   BootMode mode = BootManager::getBootMode();
   Serial.printf("[Boot] mode=%d\n", (int)mode);
 
@@ -185,9 +189,11 @@ void setup() {
 
     // Menu / library loop — runs until the user launches a story (which
     // calls BootManager::setBootMode(INK_RUNTIME) and reboots).
+    bool needsFullRefresh = true;
     while (true) {
       GameLibrary *library =
           new GameLibrary(*display, *input, *batteryWidget, settings);
+      library->setNeedsFullRefresh(needsFullRefresh);
       bool goToSettings = library->run();
       delete library;
       if (goToSettings) {
@@ -196,6 +202,8 @@ void setup() {
         settingsView->run();
         delete settingsView;
         settings = AppSettings::load(); // reload after save
+        input->setAutoSleepTimeout(settings.sleepTimeoutSec); // update timeout in case it changed
+        needsFullRefresh = false; // Came from settings, avoid slow full refresh
       }
     }
     // Unreachable: GameLibrary reboots the device when a story is launched.
@@ -466,12 +474,30 @@ void saveProgress() {
 }
 
 void loop() {
+  SystemUI::checkBatteryAndShutdown(*batteryWidget, *display);
+
   if (engine && engine->shouldSleep()) {
 #ifdef PLATFORM_ESP32
     saveProgress();
+    BootManager::setBootMode(BootMode::INK_RUNTIME);
 
     Serial.println("Power off requested. Entering deep sleep...");
-    systemUI->showSleepCover();
+    
+    char titleBuf[128] = {0};
+    char savedPath[128] = {0};
+    if (BootManager::getStoryPath(savedPath, sizeof(savedPath)) && savedPath[0] != '\0') {
+      StoryMetadata meta;
+      if (StoryMetadata::readFromSD(savedPath, &meta) && meta.title[0] != '\0') {
+        snprintf(titleBuf, sizeof(titleBuf), "%s", meta.title);
+      }
+    }
+
+    if (titleBuf[0] != '\0') {
+      systemUI->showSleepCover("Sleeping...", titleBuf);
+    } else {
+      systemUI->showSleepCover();
+    }
+    
     delay(500); // Give e-ink time to finish updating
     esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN,
                                       ESP_GPIO_WAKEUP_GPIO_LOW);

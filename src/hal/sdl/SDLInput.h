@@ -36,9 +36,13 @@ public:
      * returns the first meaningful button event found (or NONE).
      */
     ButtonEvent pollInput() override;
+    uint32_t getLastActivityTime() const override { return _lastActivityMs; }
+    void setAutoSleepTimeout(uint16_t seconds) override { _timeoutSec = seconds; }
 
 private:
-    SDLDisplay* _display;
+    class SDLDisplay* _display;
+    uint32_t _lastActivityMs;
+    uint16_t _timeoutSec;
 };
 
 #endif // PLATFORM_NATIVE

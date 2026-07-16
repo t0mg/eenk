@@ -461,7 +461,11 @@ void GameLibrary::render() {
     // Feed the task watchdog — fullRefresh() blocks for ~2 s.
     yield();
 #endif
-    _display.fullRefresh();
+    if (_needsFullRefresh) {
+      _display.fullRefresh();
+    } else {
+      _display.present();
+    }
     _firstRender = false;
   } else {
     _display.present();
@@ -514,6 +518,8 @@ bool GameLibrary::run() {
   render();
 
   while (true) {
+    SystemUI::checkBatteryAndShutdown(_battery, _display);
+
     ButtonEvent ev = _input.pollInput();
     switch (ev) {
     case ButtonEvent::UP:

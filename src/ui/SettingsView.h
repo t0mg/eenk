@@ -46,18 +46,16 @@ private:
     int _currentFontIndex = 0;
     static constexpr int DISP_H = 800;
     static constexpr int ROW_H = 48;
-    static constexpr int PAGE_COUNT   = 4;
+    static constexpr int PAGE_COUNT   = 3;
 
     void renderPage();
     void renderFooter();
     void renderReadingPage();
-    void renderBehaviourPage();
     void renderInputPage();     // annotated device diagram
     void renderDangerPage();
 
     // Input handlers per page
     void handleReadingInput(ButtonEvent ev);
-    void handleBehaviourInput(ButtonEvent ev);
     void handleInputPageInput(ButtonEvent ev);
     void handleDangerInput(ButtonEvent ev);
 

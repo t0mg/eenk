@@ -1,15 +1,24 @@
 #include "SystemUI.h"
 #include "../hal/IInput.h"
 #include "FooterWidget.h"
+#include "HeaderWidget.h"
 #include <cstdio>
 
+#include "BatteryWidget.h"
 #include <GfxRenderer.h> // from Papyrix
+
+#ifdef PLATFORM_ESP32
+#include <InputManager.h>
+#include <esp_sleep.h>
+#endif
 
 #ifdef PLATFORM_ESP32
 #include <Arduino.h>
 #include <EpdFont.h>
 #include <builtinFonts/ui_12.h>
 #include <builtinFonts/ui_bold_12.h>
+
+extern BatteryWidget *batteryWidget;
 
 static EpdFont sysFontNormal(&ui_12);
 static EpdFontFamily sysFamilyNormal(&sysFontNormal);
@@ -110,7 +119,7 @@ void SystemUI::showLoading(const char *title, float progress) {
   }
 }
 
-void SystemUI::showSleepCover() {
+void SystemUI::showSleepCover(const char *msg, const char *title) {
   ensureFonts();
 
   auto renderer = _display.getRenderer();
@@ -118,11 +127,11 @@ void SystemUI::showSleepCover() {
     _display.clear();
 
 #ifdef PLATFORM_ESP32
-    const char *splash = "E E N K";
-    const char *msg = "Powered Off";
-
-    // Placed at top-left to avoid right-edge clipping
-    renderer->drawText(11, 50, 50, splash);
+    if (title && title[0] != '\0') {
+      renderer->drawText(11, 50, 50, title);
+    } else {
+      renderer->drawText(11, 50, 50, "E E N K");
+    }
     renderer->drawText(10, 50, 90, msg);
 #endif
 
@@ -155,11 +164,21 @@ bool SystemUI::showConfirmDialog(IInput &input, const char *title,
   fontBold = 0;
 #endif
 
+  // Draw halftone background overlay
+  renderer->fillHalftoneRect(0, 0, dispW, dispH, false);
+
   // Background + border.
   renderer->fillRect(dlgX, dlgY, DLG_W, DLG_H, false); // white fill
   renderer->drawRect(dlgX, dlgY, DLG_W, DLG_H, true);  // black border
   renderer->drawRect(dlgX + 1, dlgY + 1, DLG_W - 2, DLG_H - 2,
                      true); // 2 px border
+
+#ifdef PLATFORM_ESP32
+  if (batteryWidget) {
+    HeaderWidget header(_display, *batteryWidget);
+    header.render("", fontBold);
+  }
+#endif
 
   // Title (bold, centred).
   int tw = renderer->getTextWidth(fontBold, title);
@@ -167,7 +186,7 @@ bool SystemUI::showConfirmDialog(IInput &input, const char *title,
 
   // Separator
   // renderer->drawLine(dlgX, dlgY + 40, dlgX + DLG_W, dlgY + 40, true);
-  renderer->drawLine(dispW / 2, dlgY + DLG_H, dispW / 2, dispH - 48, true);
+  renderer->fillRect(dispW / 2 - 1, dlgY + DLG_H, 2, dispH - 48, true);
 
   // Message body (wrapped, max 3 lines, inner margin of 15px)
   static constexpr int marginX = 15;
@@ -204,6 +223,26 @@ bool SystemUI::showConfirmDialog(IInput &input, const char *title,
       return true;
 #ifdef PLATFORM_ESP32
     delay(16);
+#endif
+  }
+}
+
+void SystemUI::checkBatteryAndShutdown(class BatteryWidget &battery,
+                                       class IDisplay &display) {
+  battery.tick();
+  // Shutdown if battery is critically low (e.g. <= 2%) and not charging.
+  if (battery.getPercentage() <= 2 && !battery.isCharging()) {
+#ifdef PLATFORM_ESP32
+    SystemUI ui(display);
+    ui.showSleepCover("Battery Depleted");
+    // Give e-ink time to finish updating
+    delay(500);
+    esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN,
+                                      ESP_GPIO_WAKEUP_GPIO_LOW);
+    esp_deep_sleep_start();
+#else
+    printf("Native: Battery depleted, would power off.\n");
+    exit(0);
 #endif
   }
 }

@@ -28,6 +28,8 @@ public:
     // Never returns on game launch (reboots inside).
     bool run();
 
+    void setNeedsFullRefresh(bool needs) { _needsFullRefresh = needs; }
+
 protected:
     IDisplay&      _display;
     IInput&        _input;
@@ -63,6 +65,7 @@ protected:
     int        _selectedIndex = 0;
     int        _scrollOffset  = 0;
     bool       _firstRender   = true;
+    bool       _needsFullRefresh = true;
     bool       _fontsLoaded   = false;
 
     // ── Private helpers ───────────────────────────────────────────────────────

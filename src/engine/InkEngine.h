@@ -71,6 +71,7 @@ private:
     std::deque<WrappedLine> _wrappedLines;
     int _scrollY = 0;
     int _maxScrollY = 0;
+    int _refreshCount = 0;
 
     static constexpr int MAX_CHOICES = 8;
     char  _choiceText[MAX_CHOICES][128] = {};

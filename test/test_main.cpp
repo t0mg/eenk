@@ -22,6 +22,7 @@
 #include "ui/GameLibrary.h"
 #include "ui/SettingsView.h"
 #include "ui/BatteryWidget.h"
+#include "ui/FooterWidget.h"
 #include "os/AppSettings.h"
 #include "os/SdFontCatalogue.h"
 #include <builtinFonts/ui_10.h>
@@ -377,6 +378,86 @@ void test_fonts_screenshot(void) {
     TEST_ASSERT_EQUAL(1, 1);
 }
 
+void test_external_fonts_screenshot(void) {
+    TestDisplay display;
+    display.clear();
+    
+    StreamingEpdFontFamily fam;
+    const char* dirs[] = { "sd_fonts", nullptr };
+    TEST_ASSERT_TRUE(fam.load("orbitron", dirs));
+    
+    int y = 50;
+    
+    EpdFont r(fam.getData(EpdFontFamily::REGULAR));
+    EpdFont b(fam.getData(EpdFontFamily::BOLD));
+    EpdFont i(fam.getData(EpdFontFamily::ITALIC));
+    EpdFont bi(fam.getData(EpdFontFamily::BOLD_ITALIC));
+    EpdFontFamily sysFam(&r, &b, &i, &bi);
+    
+    display.renderer.insertFont(100, sysFam);
+    display.renderer.removeStreamingFont(100);
+    if (fam.hasStyle(EpdFontFamily::REGULAR))     display.renderer.setStreamingFont(100, EpdFontFamily::REGULAR,     fam.slot(EpdFontFamily::REGULAR));
+    if (fam.hasStyle(EpdFontFamily::BOLD))        display.renderer.setStreamingFont(100, EpdFontFamily::BOLD,        fam.slot(EpdFontFamily::BOLD));
+    if (fam.hasStyle(EpdFontFamily::ITALIC))      display.renderer.setStreamingFont(100, EpdFontFamily::ITALIC,      fam.slot(EpdFontFamily::ITALIC));
+    if (fam.hasStyle(EpdFontFamily::BOLD_ITALIC)) display.renderer.setStreamingFont(100, EpdFontFamily::BOLD_ITALIC, fam.slot(EpdFontFamily::BOLD_ITALIC));
+
+    display.renderer.drawText(100, 20, y, "External Font (Orbitron):", true, EpdFontFamily::REGULAR);
+    y += display.renderer.getLineHeight(100) + 10;
+    
+    if (fam.hasStyle(EpdFontFamily::BOLD)) {
+        display.renderer.drawText(100, 20, y, "Hello World from SD card!", true, EpdFontFamily::BOLD);
+    }
+    
+    saveBMP("test/golden/test_external_fonts.bmp", display.eink.getFrameBuffer(), display.getWidth(), display.getHeight());
+    TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_modal_dialog_screenshot(void) {
+    TestDisplay display;
+    MockInput input;
+    SystemUI ui(display);
+    
+    display.clear();
+    display.renderer.drawText(10, 50, 100, "Background text...");
+    
+    ui.showConfirmDialog(input, "Confirm Action", "Are you sure you want to exit the current story?");
+    
+    saveBMP("test/golden/test_modal_dialog.bmp", display.eink.getFrameBuffer(), display.getWidth(), display.getHeight());
+    TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_story_player_screenshot(void) {
+    TestDisplay display;
+    display.clear();
+    
+    int y = 50;
+    display.renderer.drawText(50, 20, y, "You wake up in a dark room.", true, EpdFontFamily::REGULAR);
+    y += display.renderer.getLineHeight(50) + 10;
+    display.renderer.drawText(50, 20, y, "The air is cold.", true, EpdFontFamily::REGULAR);
+    y += display.renderer.getLineHeight(50) + 20;
+    
+    display.renderer.drawText(50, 20, y, "What do you do?", true, EpdFontFamily::BOLD);
+    y += display.renderer.getLineHeight(50) + 30;
+    
+    int choiceFont = 10;
+    display.renderer.drawText(choiceFont, 40, y, "1. Look around", true);
+    y += display.renderer.getLineHeight(choiceFont) + 10;
+    display.renderer.fillRect(20, y - 2, 440, display.renderer.getLineHeight(choiceFont) + 4, true);
+    display.renderer.drawText(choiceFont, 40, y, "2. Go back to sleep", false);
+    y += display.renderer.getLineHeight(choiceFont) + 10;
+    display.renderer.drawText(choiceFont, 40, y, "3. Yell for help", true);
+    
+    FooterWidget footer;
+    footer.btnBack = {true, "Menu", "Power"};
+    footer.btnConfirm = {true, "Select", "Confirm"};
+    footer.btnPrev = {true, "Up", "Prev"};
+    footer.btnNext = {true, "Down", "Next"};
+    footer.render(&display.renderer, display.getWidth(), display.getHeight(), 20);
+    
+    saveBMP("test/golden/test_story_player.bmp", display.eink.getFrameBuffer(), display.getWidth(), display.getHeight());
+    TEST_ASSERT_EQUAL(1, 1);
+}
+
 // ── StreamingEpdFontFamily tests ───────────────────────────────────────────
 
 // Writes a minimal valid .epdfont file (zero glyphs/intervals/bitmap) for testing.
@@ -589,6 +670,9 @@ int main(int argc, char **argv) {
     RUN_TEST(test_game_library_screenshot);
     RUN_TEST(test_settings_view_screenshot);
     RUN_TEST(test_fonts_screenshot);
+    RUN_TEST(test_external_fonts_screenshot);
+    RUN_TEST(test_modal_dialog_screenshot);
+    RUN_TEST(test_story_player_screenshot);
     // StreamingEpdFontFamily unit tests
     RUN_TEST(test_streaming_epd_font_family_load_plain);
     RUN_TEST(test_streaming_epd_font_family_load_regular_suffix);

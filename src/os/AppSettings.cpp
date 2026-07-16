@@ -36,8 +36,8 @@ const uint8_t AppSettings::MARGIN_OPTIONS[] = {8, 16, 24, 32};
 // Discrete sleep-timeout values (seconds; 0 = never sleep).
 const uint16_t AppSettings::SLEEP_OPTIONS[] = {0, 60, 120, 300};
 
-// Full-refresh intervals (every N partial refreshes).
-const uint8_t AppSettings::REFRESH_OPTIONS[] = {5, 10, 15, 20};
+// Full-refresh intervals (every N partial refreshes). 0 = never.
+const uint8_t AppSettings::REFRESH_OPTIONS[] = {0, 5, 10, 15, 20};
 
 // ─── Factory defaults ─────────────────────────────────────────────────────────
 

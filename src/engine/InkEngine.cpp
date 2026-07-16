@@ -688,11 +688,13 @@ void InkEngine::tickWaitingInput() {
 
       if (_scrollY > _maxScrollY)
         _scrollY = _maxScrollY;
+      _refreshCount++;
       redraw();
     } else if (_numChoices > 0) {
       for (auto &l : _wrappedLines)
         l.isOld = true;
       _runner->choose(static_cast<std::size_t>(_selectedChoice));
+      _refreshCount++;
       _state = State::RUNNING_TEXT;
     }
     break;
@@ -720,19 +722,24 @@ void InkEngine::tickWaitingInput() {
 void InkEngine::tickStoryEnded() {
   ButtonEvent ev = _input.pollInput();
   if (ev == ButtonEvent::CONFIRM) {
-    _globals = _story->new_globals();
-    _runner = _story->new_runner(_globals);
-    _wrappedLines.clear();
-    _scrollY = 0;
-    _maxScrollY = 0;
-    _state = State::RUNNING_TEXT;
-  } else if (ev == ButtonEvent::LEFT) {
+    SystemUI ui(_display);
+    if (ui.showConfirmDialog(_input, "Restart Story", "Begin the story again?")) {
+      _globals = _story->new_globals();
+      _runner = _story->new_runner(_globals);
+      _wrappedLines.clear();
+      _scrollY = 0;
+      _maxScrollY = 0;
+      _state = State::RUNNING_TEXT;
+    } else {
+      redraw();
+    }
+  } else if (ev == ButtonEvent::LEFT || ev == ButtonEvent::UP) {
     int scrollAmount = _display.getHeight() / 4;
     _scrollY -= scrollAmount;
     if (_scrollY < 0)
       _scrollY = 0;
     redraw();
-  } else if (ev == ButtonEvent::RIGHT) {
+  } else if (ev == ButtonEvent::RIGHT || ev == ButtonEvent::DOWN) {
     int scrollAmount = _display.getHeight() / 4;
     _scrollY += scrollAmount;
 
@@ -748,8 +755,14 @@ void InkEngine::tickStoryEnded() {
     if (_scrollY > _maxScrollY)
       _scrollY = _maxScrollY;
     redraw();
-  } else if (ev == ButtonEvent::QUIT) {
-    _state = State::DONE;
+  } else if (ev == ButtonEvent::BACK || ev == ButtonEvent::QUIT) {
+    SystemUI ui(_display);
+    if (ui.showConfirmDialog(_input, "Exit Story", "Return to the menu?")) {
+      _shouldSleep = false;
+      _state = State::DONE;
+    } else {
+      redraw();
+    }
   } else if (ev == ButtonEvent::SLEEP) {
     _shouldSleep = true;
   }
@@ -773,7 +786,13 @@ void InkEngine::redraw() {
         _display.drawChoiceLine(i, _choiceText[i], i == _selectedChoice);
       }
     }
-    _display.present();
+    if (_settings.refreshInterval > 0 && _refreshCount >= _settings.refreshInterval) {
+      _refreshCount = 0;
+      printf("[InkEngine] fullRefresh (interval reached, %d)\n", _settings.refreshInterval);
+      _display.fullRefresh();
+    } else {
+      _display.present();
+    }
     return;
   }
 
@@ -851,5 +870,11 @@ void InkEngine::redraw() {
     }
   }
 
-  _display.present();
+  if (_settings.refreshInterval > 0 && _refreshCount >= _settings.refreshInterval) {
+    _refreshCount = 0;
+    printf("[InkEngine] fullRefresh (interval reached, %d)\n", _settings.refreshInterval);
+    _display.fullRefresh();
+  } else {
+    _display.present();
+  }
 }

@@ -99,12 +99,12 @@ void BatteryWidget::draw(int x, int y, bool inverted) {
   // but the font renders slightly lower, so we subtract 8px to align it.
   int labelY = y + (kBodyH - 10) / 2 - 8;
 
-  // Build label: "~85%" (charging) or "85%" (discharging / unknown).
-  char label[12];
+  // Build label: "+85%" (charging) or "85%" (discharging / unknown).
+  char label[32];
   if (_cachedCharging) {
-    snprintf(label, sizeof(label), "~%u%%", static_cast<unsigned>(pct));
+    snprintf(label, sizeof(label), "charging %d%%", pct);
   } else {
-    snprintf(label, sizeof(label), "%u%%", static_cast<unsigned>(pct));
+    snprintf(label, sizeof(label), "%d%%", pct);
   }
 
 #if defined(PLATFORM_ESP32) || defined(PIO_UNIT_TESTING)
