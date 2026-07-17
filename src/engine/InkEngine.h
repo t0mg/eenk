@@ -101,5 +101,5 @@ private:
     int  getChoicesHeight(class GfxRenderer* renderer) const;
 
     // FontResolver: parse header hint, select and apply the narrative font family.
-    void _resolveAndApplyFont(const StoryMetadata& meta, const char* storyBase);
+    void _resolveAndApplyFont(const StoryMetadata& meta, const char* storyBase, const char* storyDir = nullptr);
 };

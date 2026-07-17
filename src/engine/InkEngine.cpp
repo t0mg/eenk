@@ -189,13 +189,26 @@ bool InkEngine::loadStory(const char *path) {
   // Derive story base name from path for sidecar font lookup.
   char storyBase[64] = {};
   const char* lastSlash = strrchr(path, '/');
+#ifdef _WIN32
+  const char* lastBackslash = strrchr(path, '\\');
+  if (lastBackslash > lastSlash) lastSlash = lastBackslash;
+#endif
   const char* fname = lastSlash ? lastSlash + 1 : path;
   strncpy(storyBase, fname, sizeof(storyBase) - 1);
   // strip .bin extension
   char* dot = strrchr(storyBase, '.');
   if (dot) *dot = '\0';
+  
+  char storyDir[512] = {};
+  if (lastSlash) {
+    size_t dirLen = lastSlash - path;
+    if (dirLen < sizeof(storyDir)) {
+      strncpy(storyDir, path, dirLen);
+      storyDir[dirLen] = '\0';
+    }
+  }
 
-  _resolveAndApplyFont(meta, storyBase);
+  _resolveAndApplyFont(meta, storyBase, storyDir);
 
   _wrappedLines.clear();
   _scrollY    = 0;
@@ -313,7 +326,7 @@ bool InkEngine::loadSnapshot(const unsigned char *data, std::size_t length) {
 // FontResolver implementation
 // ─────────────────────────────────────────────────────────────────────────────
 
-void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* storyBase) {
+void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* storyBase, const char* storyDir) {
   // Clean up any previously active SD font family.
   if (_streamingFamily) {
     delete _streamingFamily;
@@ -340,10 +353,16 @@ void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* stor
   };
 
   // ── Build SD dirs ───────────────────────────────────────────────────────
-  char sidecarDir[128] = {};
+  char sidecarDir[512] = {};
+#ifdef PLATFORM_NATIVE
+  if (storyDir && storyDir[0]) {
+    snprintf(sidecarDir, sizeof(sidecarDir), "%s", storyDir);
+  }
+#else
   if (storyBase && storyBase[0]) {
     snprintf(sidecarDir, sizeof(sidecarDir), "/eenk/%s", storyBase);
   }
+#endif
 
   const char* dirs[3];
   int ndirs = 0;
