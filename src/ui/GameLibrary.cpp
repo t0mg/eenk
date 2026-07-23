@@ -95,6 +95,59 @@ void GameLibrary::titleFromFilename(const char *filename, char *outTitle,
   }
 }
 
+// ─── titleFromPath()
+// ──────────────────────────────────────────────────────────────
+
+void GameLibrary::titleFromPath(const char *storyPath, char *outTitle,
+                                size_t outLen) {
+  if (outLen == 0 || !storyPath || !storyPath[0])
+    return;
+
+  const char *lastSlash = strrchr(storyPath, '/');
+#ifdef _WIN32
+  const char *lastBackslash = strrchr(storyPath, '\\');
+  if (lastBackslash > lastSlash)
+    lastSlash = lastBackslash;
+#endif
+
+  const char *filename = lastSlash ? lastSlash + 1 : storyPath;
+
+  // Extract stem name
+  char stem[128] = {};
+  strncpy(stem, filename, sizeof(stem) - 1);
+  char *dot = strrchr(stem, '.');
+  if (dot)
+    *dot = '\0';
+
+  // Check if stem is generic (main, index, story)
+  bool isGeneric = (strcasecmp(stem, "main") == 0 ||
+                    strcasecmp(stem, "index") == 0 ||
+                    strcasecmp(stem, "story") == 0);
+
+  if (isGeneric && lastSlash && lastSlash > storyPath) {
+    const char *prevSlash = lastSlash - 1;
+    while (prevSlash > storyPath && *prevSlash != '/' && *prevSlash != '\\') {
+      prevSlash--;
+    }
+    const char *parentStart =
+        (*prevSlash == '/' || *prevSlash == '\\') ? prevSlash + 1 : prevSlash;
+    size_t parentLen = lastSlash - parentStart;
+    if (parentLen > 0 && parentLen < outLen) {
+      strncpy(outTitle, parentStart, parentLen);
+      outTitle[parentLen] = '\0';
+
+      for (size_t i = 0; i < parentLen; i++) {
+        if (outTitle[i] == '_' || outTitle[i] == '-')
+          outTitle[i] = ' ';
+      }
+      outTitle[0] = (char)toupper((unsigned char)outTitle[0]);
+      return;
+    }
+  }
+
+  titleFromFilename(filename, outTitle, outLen);
+}
+
 // ─── formatSize()
 // ─────────────────────────────────────────────────────────────
 
@@ -140,97 +193,136 @@ void GameLibrary::scanSD() {
   BootManager::getStoryPath(currentPath, sizeof(currentPath));
 
 #ifdef PLATFORM_ESP32
-  // ── ESP32: read from SD card ──────────────────────────────────────────────
-  File dir = SD.open("/eenk");
-  if (!dir || !dir.isDirectory())
-    return;
+  // ── ESP32: read recursively from SD card ─────────────────────────────────
+  auto scanDirRecursive = [&](auto self, const char *dirPath, int depth) -> void {
+    if (depth > 2 || _numEntries >= MAX_STORIES)
+      return;
 
-  // Feed the watchdog — SD.open + metadata reads can block for a while.
-  yield();
-  File f = dir.openNextFile();
-  while (f && _numEntries < MAX_STORIES) {
-    if (!f.isDirectory()) {
-      String name = f.name();
-      if (name.endsWith(".bin") || name.endsWith(".BIN")) {
-        StoryEntry &e = _entries[_numEntries];
+    File dir = SD.open(dirPath);
+    if (!dir || !dir.isDirectory())
+      return;
 
-        // Build full path: "/eenk/<name>"
-        snprintf(e.path, sizeof(e.path), "/eenk/%s", name.c_str());
-        e.sizeBytes = (uint32_t)f.size();
+    yield();
+    File f = dir.openNextFile();
+    while (f && _numEntries < MAX_STORIES) {
+      String nameStr = f.name();
+      const char *rawName = nameStr.c_str();
 
-        // Try to read StoryMetadata header.
-        StoryMetadata meta;
-        if (StoryMetadata::readFromSD(e.path, &meta)) {
-          e.hasMetadata = true;
-          strncpy(e.title, meta.title, sizeof(e.title) - 1);
-          strncpy(e.author, meta.author, sizeof(e.author) - 1);
-          e.title[sizeof(e.title) - 1] = '\0';
-          e.author[sizeof(e.author) - 1] = '\0';
-          // If the metadata title is empty, fall back to filename.
-          if (e.title[0] == '\0') {
-            titleFromFilename(name.c_str(), e.title, sizeof(e.title));
+      const char *lastSlash = strrchr(rawName, '/');
+      const char *baseName = lastSlash ? lastSlash + 1 : rawName;
+
+      if (f.isDirectory()) {
+        if (baseName[0] != '.' && strcasecmp(baseName, "fonts") != 0 &&
+            strcasecmp(baseName, "system") != 0 &&
+            strcasecmp(baseName, ".eenk_saves") != 0) {
+          char subPath[256];
+          if (rawName[0] == '/') {
+            snprintf(subPath, sizeof(subPath), "%s", rawName);
+          } else {
+            snprintf(subPath, sizeof(subPath), "%s/%s", dirPath, baseName);
           }
-        } else {
-          e.hasMetadata = false;
-          strncpy(e.title, "Error: Invalid Story File", sizeof(e.title) - 1);
-          e.title[sizeof(e.title) - 1] = '\0';
+          self(self, subPath, depth + 1);
         }
+      } else {
+        if (nameStr.endsWith(".bin") || nameStr.endsWith(".BIN")) {
+          StoryEntry &e = _entries[_numEntries];
 
-        // Check for a save file at /.eenk_saves/<name>.save
-        char savePath[160];
-        snprintf(savePath, sizeof(savePath), "/.eenk_saves/%s.save",
-                 name.c_str());
-        e.hasSave = SD.exists(savePath);
+          if (rawName[0] == '/') {
+            snprintf(e.path, sizeof(e.path), "%s", rawName);
+          } else {
+            snprintf(e.path, sizeof(e.path), "%s/%s", dirPath, baseName);
+          }
+          e.sizeBytes = (uint32_t)f.size();
 
-        // Mark if this is the currently-active story.
-        e.isCurrentlyLoaded =
-            (currentPath[0] != '\0' && strcmp(e.path, currentPath) == 0);
+          StoryMetadata meta;
+          if (StoryMetadata::readFromSD(e.path, &meta)) {
+            e.hasMetadata = true;
+            strncpy(e.title, meta.title, sizeof(e.title) - 1);
+            strncpy(e.author, meta.author, sizeof(e.author) - 1);
+            e.title[sizeof(e.title) - 1] = '\0';
+            e.author[sizeof(e.author) - 1] = '\0';
 
-        _numEntries++;
+            if (e.title[0] == '\0') {
+              titleFromPath(e.path, e.title, sizeof(e.title));
+            }
+          } else {
+            e.hasMetadata = false;
+            titleFromPath(e.path, e.title, sizeof(e.title));
+          }
+
+          char savePath[256];
+          StoryMetadata::getSavePath(e.path, savePath, sizeof(savePath));
+          e.hasSave = SD.exists(savePath);
+
+          e.isCurrentlyLoaded =
+              (currentPath[0] != '\0' && strcmp(e.path, currentPath) == 0);
+
+          _numEntries++;
+        }
       }
+      f = dir.openNextFile();
     }
-    f = dir.openNextFile();
-  }
-  dir.close();
+    dir.close();
+  };
+
+  scanDirRecursive(scanDirRecursive, "/eenk/stories", 0);
 
 #else
-  // ── Native: scan local stories/ directory ────────────────────────────────
-  DIR *dp = opendir("stories");
-  if (!dp)
-    return;
+  // ── Native: scan local stories/ directory recursively ────────────────────
+  auto scanNativeDirRecursive = [&](auto self, const char *dirPath, int depth) -> void {
+    if (depth > 2 || _numEntries >= MAX_STORIES)
+      return;
 
-  struct dirent *ent;
-  while ((ent = readdir(dp)) != nullptr && _numEntries < MAX_STORIES) {
-    const char *name = ent->d_name;
-    size_t nlen = strlen(name);
-    if (nlen < 5)
-      continue;
-    const char *ext = name + nlen - 4;
-    bool isBin =
-        (ext[0] == '.' && (ext[1] == 'b' || ext[1] == 'B') &&
-         (ext[2] == 'i' || ext[2] == 'I') && (ext[3] == 'n' || ext[3] == 'N'));
-    if (!isBin)
-      continue;
+    DIR *dp = opendir(dirPath);
+    if (!dp)
+      return;
 
-    StoryEntry &e = _entries[_numEntries];
-    snprintf(e.path, sizeof(e.path), "stories/%s", name);
+    struct dirent *ent;
+    while ((ent = readdir(dp)) != nullptr && _numEntries < MAX_STORIES) {
+      const char *name = ent->d_name;
+      if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0 || name[0] == '.')
+        continue;
 
-    // File size via stat
-    struct stat st;
-    if (stat(e.path, &st) == 0) {
-      e.sizeBytes = (uint32_t)st.st_size;
+      char fullPath[256];
+      snprintf(fullPath, sizeof(fullPath), "%s/%s", dirPath, name);
+
+      struct stat st;
+      if (stat(fullPath, &st) != 0)
+        continue;
+
+      if (S_ISDIR(st.st_mode)) {
+        if (strcasecmp(name, "fonts") != 0 && strcasecmp(name, "system") != 0 &&
+            strcasecmp(name, ".eenk_saves") != 0) {
+          self(self, fullPath, depth + 1);
+        }
+      } else if (S_ISREG(st.st_mode)) {
+        size_t nlen = strlen(name);
+        if (nlen >= 4) {
+          const char *ext = name + nlen - 4;
+          if (ext[0] == '.' && (ext[1] == 'b' || ext[1] == 'B') &&
+              (ext[2] == 'i' || ext[2] == 'I') &&
+              (ext[3] == 'n' || ext[3] == 'N')) {
+            StoryEntry &e = _entries[_numEntries];
+            strncpy(e.path, fullPath, sizeof(e.path) - 1);
+            e.sizeBytes = (uint32_t)st.st_size;
+            e.hasMetadata = false;
+            titleFromPath(e.path, e.title, sizeof(e.title));
+            e.author[0] = '\0';
+
+            char savePath[256];
+            StoryMetadata::getSavePath(e.path, savePath, sizeof(savePath));
+            e.hasSave = false; // native stub
+            e.isCurrentlyLoaded = false;
+
+            _numEntries++;
+          }
+        }
+      }
     }
+    closedir(dp);
+  };
 
-    // StoryMetadata not available on native (readFromSD is a stub).
-    e.hasMetadata = false;
-    titleFromFilename(name, e.title, sizeof(e.title));
-    e.author[0] = '\0';
-    e.hasSave = false;
-    e.isCurrentlyLoaded = false;
-
-    _numEntries++;
-  }
-  closedir(dp);
+  scanNativeDirRecursive(scanNativeDirRecursive, "stories", 0);
 #endif
 
   sortEntries();

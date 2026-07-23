@@ -65,6 +65,9 @@ struct StoryMetadata {
     // path: SD card path like "/eenk/story.bin"
     // Returns true on success.
     static bool readFromSD(const char* path, StoryMetadata* out);
+
+    // Generate a collision-free save file path under /.eenk_saves/
+    static void getSavePath(const char* storyPath, char* outSavePath, size_t maxLen);
 };
 
 static_assert(sizeof(StoryMetadata) == StoryMetadata::SIZE,

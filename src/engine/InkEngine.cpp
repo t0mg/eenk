@@ -239,7 +239,8 @@ void InkEngine::applySettings(const AppSettings& settings) {
 
 #ifndef PLATFORM_NATIVE
 bool InkEngine::loadStory(const unsigned char *data,
-                          std::size_t size) {
+                          std::size_t size,
+                          const char *storyPath) {
   // NOTE: _storyBuf is NOT set — we don't own this memory (it's mmap'd)
 
   const unsigned char* dataToLoad = data;
@@ -265,9 +266,29 @@ bool InkEngine::loadStory(const unsigned char *data,
 
   printf("[InkEngine] Story loaded from memory — %zu bytes\n", size);
 
-  // On ESP32 the story path is not available here; storyBase is left empty
-  // so sidecar lookup is skipped and only /fonts/ is tried.
-  _resolveAndApplyFont(meta, "");
+  // Derive story base name and story directory from storyPath for sidecar font lookup.
+  char storyBase[64] = {};
+  char storyDir[512] = {};
+  if (storyPath && storyPath[0]) {
+    const char* lastSlash = strrchr(storyPath, '/');
+#ifdef _WIN32
+    const char* lastBackslash = strrchr(storyPath, '\\');
+    if (lastBackslash > lastSlash) lastSlash = lastBackslash;
+#endif
+    if (lastSlash) {
+      size_t dirLen = lastSlash - storyPath;
+      if (dirLen < sizeof(storyDir)) {
+        strncpy(storyDir, storyPath, dirLen);
+        storyDir[dirLen] = '\0';
+      }
+    }
+    const char* fname = lastSlash ? lastSlash + 1 : storyPath;
+    strncpy(storyBase, fname, sizeof(storyBase) - 1);
+    char* dot = strrchr(storyBase, '.');
+    if (dot) *dot = '\0';
+  }
+
+  _resolveAndApplyFont(meta, storyBase, storyDir);
 
   _wrappedLines.clear();
   _scrollY    = 0;
@@ -352,21 +373,25 @@ void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* stor
     printf("[InkEngine] Font: builtin '%s'\n", e->token);
   };
 
-  // ── Build SD dirs ───────────────────────────────────────────────────────
-  char sidecarDir[512] = {};
-#ifdef PLATFORM_NATIVE
-  if (storyDir && storyDir[0]) {
-    snprintf(sidecarDir, sizeof(sidecarDir), "%s", storyDir);
-  }
-#else
-  if (storyBase && storyBase[0]) {
-    snprintf(sidecarDir, sizeof(sidecarDir), "/eenk/%s", storyBase);
-  }
-#endif
+  // ── Build search dirs ──────────────────────────────────────────────────
+  char sidecarDir1[512] = {};
+  char sidecarDir2[512] = {};
 
-  const char* dirs[3];
+  if (storyDir && storyDir[0]) {
+    snprintf(sidecarDir1, sizeof(sidecarDir1), "%s", storyDir);
+  }
+  if (storyBase && storyBase[0]) {
+#ifdef PLATFORM_NATIVE
+    snprintf(sidecarDir2, sizeof(sidecarDir2), "stories/%s", storyBase);
+#else
+    snprintf(sidecarDir2, sizeof(sidecarDir2), "/eenk/stories/%s", storyBase);
+#endif
+  }
+
+  const char* dirs[4];
   int ndirs = 0;
-  if (sidecarDir[0]) dirs[ndirs++] = sidecarDir;
+  if (sidecarDir1[0]) dirs[ndirs++] = sidecarDir1;
+  if (sidecarDir2[0] && strcmp(sidecarDir2, sidecarDir1) != 0) dirs[ndirs++] = sidecarDir2;
   dirs[ndirs++] = "/fonts";
   dirs[ndirs]   = nullptr;
 
@@ -719,6 +744,10 @@ void InkEngine::tickWaitingInput() {
     break;
   case ButtonEvent::BACK:
   case ButtonEvent::QUIT: {
+#ifdef PLATFORM_NATIVE
+    _shouldSleep = false;
+    _state = State::DONE;
+#else
     SystemUI ui(_display);
     if (ui.showConfirmDialog(_input, "Exit Story", "Return to the menu?")) {
       // Exit to menu: save state, then signal done so main loop reboots to MENU.
@@ -727,6 +756,7 @@ void InkEngine::tickWaitingInput() {
     } else {
       redraw();
     }
+#endif
     break;
   }
   case ButtonEvent::SLEEP:
@@ -775,6 +805,10 @@ void InkEngine::tickStoryEnded() {
       _scrollY = _maxScrollY;
     redraw();
   } else if (ev == ButtonEvent::BACK || ev == ButtonEvent::QUIT) {
+#ifdef PLATFORM_NATIVE
+    _shouldSleep = false;
+    _state = State::DONE;
+#else
     SystemUI ui(_display);
     if (ui.showConfirmDialog(_input, "Exit Story", "Return to the menu?")) {
       _shouldSleep = false;
@@ -782,6 +816,7 @@ void InkEngine::tickStoryEnded() {
     } else {
       redraw();
     }
+#endif
   } else if (ev == ButtonEvent::SLEEP) {
     _shouldSleep = true;
   }

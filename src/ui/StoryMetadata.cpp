@@ -2,6 +2,8 @@
 // readFromSD reads the first 128 bytes of a .bin file from the SD card and
 // validates the eenk header magic + version.
 #include "StoryMetadata.h"
+#include <cstdio>
+#include <cstring>
 
 #ifdef PLATFORM_ESP32
 #include <SD.h>
@@ -22,3 +24,27 @@ bool StoryMetadata::readFromSD(const char* /*path*/, StoryMetadata* /*out*/) {
     return false;
 }
 #endif
+
+void StoryMetadata::getSavePath(const char* storyPath, char* outSavePath, size_t maxLen) {
+    if (!storyPath || !storyPath[0] || !outSavePath || maxLen == 0) return;
+
+    const char* rel = storyPath;
+    if (strncmp(rel, "/sd", 3) == 0) rel += 3;
+    if (strncmp(rel, "/eenk/stories", 13) == 0) rel += 13;
+    else if (strncmp(rel, "/eenk", 5) == 0) rel += 5;
+    else if (strncmp(rel, "stories", 7) == 0) rel += 7;
+    while (*rel == '/' || *rel == '\\') rel++;
+
+    char sanitized[128] = {};
+    size_t i = 0;
+    for (; rel[i] != '\0' && i < sizeof(sanitized) - 1; ++i) {
+        if (rel[i] == '/' || rel[i] == '\\') {
+            sanitized[i] = '_';
+        } else {
+            sanitized[i] = rel[i];
+        }
+    }
+    sanitized[i] = '\0';
+
+    snprintf(outSavePath, maxLen, "/.eenk_saves/%s.save", sanitized);
+}

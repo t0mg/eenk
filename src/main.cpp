@@ -236,9 +236,9 @@ void setup() {
         strcpy(pathCopy, savedPath);
         sdStoryPath = pathCopy;
 
-        const char* slash = strrchr(savedPath, '/');
-        const char* filename = slash ? slash + 1 : savedPath;
-        saveFilePath = String("/.eenk_saves/") + filename + ".save";
+        char saveBuf[256] = {};
+        StoryMetadata::getSavePath(savedPath, saveBuf, sizeof(saveBuf));
+        saveFilePath = String(saveBuf);
       } else {
         errorMessage = String("Selected story not found: ") + savedPath;
       }
@@ -286,13 +286,10 @@ void setup() {
                                              &mappedPtr, &mappedSize)) {
             // Require eenk metadata header
             if (mappedSize >= 128 && memcmp(mappedPtr, "eenk", 4) == 0) {
-              mappedPtr += 128;
-              mappedSize -= 128;
-
               storage = sdStorage;
               engine = new InkEngine(*display, *input, *storage);
               engine->applySettings(AppSettings::load());
-              storyLoaded = engine->loadStory(mappedPtr, mappedSize);
+              storyLoaded = engine->loadStory(mappedPtr, mappedSize, sdStoryPath);
               currentStoryHash = flashCache->getHash();
             } else {
               errorMessage =
@@ -383,7 +380,7 @@ void setup() {
         }
       }
     } else {
-      errorMessage = "No .bin stories found in /eenk/ folder";
+      errorMessage = "No .bin stories found in /eenk/stories/ folder";
     }
   } else {
     errorMessage = "No SD card detected or mount failed";
@@ -394,6 +391,7 @@ void setup() {
     if (errorMessage.length() == 0) {
       errorMessage = "No story available.";
     }
+    errorMessage += "\n\nPress CONFIRM or BACK to reboot to the menu.";
     Serial.printf("FATAL: %s\n", errorMessage.c_str());
 
     systemUI->showError("eenk SYSTEM ERROR", errorMessage.c_str());
@@ -407,6 +405,11 @@ void setup() {
         esp_deep_sleep_enable_gpio_wakeup(
             1ULL << InputManager::POWER_BUTTON_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
         esp_deep_sleep_start();
+      } else if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::BACK || ev == ButtonEvent::QUIT) {
+        Serial.println("Rebooting to MENU requested by user...");
+        BootManager::setBootMode(BootMode::MENU);
+        delay(500);
+        BootManager::reboot();
       }
 #endif
       delay(100);
@@ -454,19 +457,33 @@ void saveProgress() {
       Serial.println("Game saved successfully!");
     } else {
       systemUI->showError("eenk SYSTEM ERROR",
-                          "Failed to write save file to SD.");
+                          "Failed to write save file to SD.\n\nPress CONFIRM or BACK to reboot to the menu.");
       while (true) {
-        if (input->pollInput() == ButtonEvent::SLEEP)
+        ButtonEvent ev = input->pollInput();
+        if (ev == ButtonEvent::SLEEP) {
           break;
+        } else if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::BACK || ev == ButtonEvent::QUIT) {
+          Serial.println("Rebooting to MENU requested by user...");
+          BootManager::setBootMode(BootMode::MENU);
+          delay(500);
+          BootManager::reboot();
+        }
         delay(10);
       }
     }
   } else {
     systemUI->showError("eenk SYSTEM ERROR",
-                        "Failed to create runtime snapshot.");
+                        "Failed to create runtime snapshot.\n\nPress CONFIRM or BACK to reboot to the menu.");
     while (true) {
-      if (input->pollInput() == ButtonEvent::SLEEP)
+      ButtonEvent ev = input->pollInput();
+      if (ev == ButtonEvent::SLEEP) {
         break;
+      } else if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::BACK || ev == ButtonEvent::QUIT) {
+        Serial.println("Rebooting to MENU requested by user...");
+        BootManager::setBootMode(BootMode::MENU);
+        delay(500);
+        BootManager::reboot();
+      }
       delay(10);
     }
   }

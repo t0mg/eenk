@@ -83,6 +83,9 @@ protected:
     // underscores and hyphens with spaces, capitalise first letter.
     static void titleFromFilename(const char* filename, char* outTitle, size_t outLen);
 
+    // Derive title from full path: if filename is generic (main.bin), use parent directory name.
+    static void titleFromPath(const char* storyPath, char* outTitle, size_t outLen);
+
     // Format a byte count as a compact human-readable string: "3 KB", "1.2 MB".
     static void formatSize(uint32_t bytes, char* out, size_t outLen);
 

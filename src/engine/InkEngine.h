@@ -32,7 +32,7 @@ public:
 #ifdef PLATFORM_NATIVE
     bool loadStory(const char* path);
 #else
-    bool loadStory(const unsigned char* data, std::size_t size);
+    bool loadStory(const unsigned char* data, std::size_t size, const char* storyPath = nullptr);
 #endif
     
     // Save/Load system
