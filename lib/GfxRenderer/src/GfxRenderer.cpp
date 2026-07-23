@@ -1250,12 +1250,31 @@ void GfxRenderer::renderChar(const EpdFontFamily& fontFamily, const uint32_t cp,
   const int is2Bit = fontFamily.getData(style)->is2Bit;
   const uint32_t offset = glyph->dataOffset;
   
-  const EpdFont* fontUsed = fontFamily.getFont(style);
+  const EpdFontData* usedData = fontFamily.getData(style);
+  if (!usedData && style == EpdFontFamily::REGULAR) {
+    usedData = fontFamily.getData(EpdFontFamily::REGULAR); // Fallback safely
+  }
+
+  const EpdFontData* regData = fontFamily.getData(EpdFontFamily::REGULAR);
+  const EpdFontData* boldData = fontFamily.getData(EpdFontFamily::BOLD);
+  const EpdFontData* italicData = fontFamily.getData(EpdFontFamily::ITALIC);
+
   bool synthesizeItalic = false;
-  if (style == EpdFontFamily::BOLD_ITALIC && fontUsed == fontFamily.getFont(EpdFontFamily::BOLD)) {
+  bool synthesizeBold = false;
+
+  if (style == EpdFontFamily::ITALIC && usedData == regData) {
     synthesizeItalic = true;
-  } else if (style == EpdFontFamily::ITALIC && fontUsed == fontFamily.getFont(EpdFontFamily::REGULAR)) {
-    synthesizeItalic = true;
+  } else if (style == EpdFontFamily::BOLD && usedData == regData) {
+    synthesizeBold = true;
+  } else if (style == EpdFontFamily::BOLD_ITALIC) {
+    if (usedData == regData) {
+      synthesizeItalic = true;
+      synthesizeBold = true;
+    } else if (usedData == boldData) {
+      synthesizeItalic = true;
+    } else if (usedData == italicData) {
+      synthesizeBold = true;
+    }
   }
   
   const uint8_t width = glyph->width;
@@ -1307,9 +1326,18 @@ void GfxRenderer::renderChar(const EpdFontFamily& fontFamily, const uint32_t cp,
         for (int gx = gxStart; gx < gxEnd; gx++) {
           bool st;
           if (!extractFontPixel(bitmap, gy * width + gx, is2Bit, renderMode, pixelState, st)) continue;
+          
+          if (!st && !drawHalftone && !synthesizeBold) continue;
+
           const int sX = logLeft + gx + skewX;
           if (sX >= 0 && sX < screenW) {
             orientedWriteFB(frameBuffer, stride, sX, sY, orientation, panelW, panelH, st, drawHalftone);
+          }
+          if (synthesizeBold && st) {
+            const int sXBold = sX + 1;
+            if (sXBold >= 0 && sXBold < screenW) {
+              orientedWriteFB(frameBuffer, stride, sXBold, sY, orientation, panelW, panelH, st, drawHalftone);
+            }
           }
         }
       }
