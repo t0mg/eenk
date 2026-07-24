@@ -22,7 +22,7 @@ Once upon a time...
 
 ## Fonts in eenk
 
-By default, eenk uses the user's preferred font setting from the device menu. However, you can force a specific font for your story by using the `@font:` metadata tag.
+By default, eenk uses the user's preferred font setting from the device menu. However, you can force a specific font for your story by using the `@font` metadata tag.
 
 The runtime will attempt to resolve your requested font stem in the following order:
 
@@ -34,12 +34,17 @@ The device comes with several built-in fonts that you can request directly by th
 - `serif-large`: A larger variant of the serif font.
 
 ### 2. Custom SD Card Fonts
-If the token doesn't match a built-in font, the engine will look for custom `.otf` or `.ttf` font files on your SD card. The engine searches two locations in order:
-- **Story Sidecar Folder**: A folder next to your story with the same name. E.g., if your story is `/eenk/mystory.bin`, it looks in `/eenk/mystory/my-custom-font.otf`.
-- **Global Fonts Folder**: A shared folder on the root of the SD card: `/fonts/my-custom-font.otf`.
+If the token doesn't match a built-in font, the engine will look for custom `.epdfont` font files on your SD card. The engine searches two locations in order:
+- **Story Folder**: Next to your story file. E.g., if your story is `/eenk/mystory/mystory.bin`, it looks in `/eenk/mystory/my-custom-font.epdfont`.
+- **Global Font Folder**: A shared folder on the root of the SD card: `/fonts/my-custom-font.epdfont`.
 
-### 3. Fallback
-If the requested font stem cannot be found in any of the above locations, eenk will gracefully fall back to the user's device default setting.
+### 3. Variants for Custom Fonts
+Font variants may also be provided by adding a suffix to the font stem. If the story contains bold text, the engine will look for `my-custom-font-bold.epdfont`. Supported suffixes are `-bold`, `-italic`, `-bolditalic`.
+
+If the engine cannot find those variants, synthetic variants are generated from the base font as a fallback (but these are lower quality).
+
+### 4. Fallback
+If the requested font stem cannot be found in any of the above locations, eenk will gracefully fall back to the user's device default setting, or the builtin font.
 
 ## Building with eenky
 
@@ -47,7 +52,7 @@ eenky is the desktop companion application that compiles your `.ink` files into 
 
 1. Open your Ink project folder in eenky.
 2. Click the **Compile** button in the toolbar.
-3. eenky will automatically extract your metadata headers, compile the ink script, and generate a `.bin` file in the same directory.
+3. eenky will automatically extract your metadata headers, compile the ink script, and generate a `.bin` file in the same directory. It will also convert the source `.ttf` fonts to `.epdfont` files and place them in the same directory as the `.bin` file.
 
 ## Transferring to the SD Card
 
@@ -55,6 +60,6 @@ To play your compiled story on the hardware device:
 
 1. Remove the SD card from your device and plug it into your computer.
 2. Ensure there is an `eenk` folder on the root of the SD card.
-3. Copy the compiled `.bin` file into the `/eenk/` directory.
-4. If you have custom fonts or media sidecars, place them in `/eenk/your_story_name/` (where `your_story_name` matches your `.bin` filename without the extension) or in `/fonts/`.
+3. Copy the compiled `.bin` file into the `/eenk/` directory, or in a subfolder in this directory (useful if there are additional files such as fonts).
+4. If you have custom fonts or media sidecars, place them next to our story file, or in the `/fonts/` folder.
 5. Eject the SD card, put it back in the device, and turn it on. Your story will appear in the library!
