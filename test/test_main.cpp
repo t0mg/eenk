@@ -212,6 +212,8 @@ public:
     ButtonEvent pollInput() override {
         return ButtonEvent::QUIT; // Forces UI run() loops to exit immediately after one render
     }
+    uint32_t getLastActivityTime() const override { return 0; }
+    void setAutoSleepTimeout(uint16_t seconds) override {}
 };
 
 void test_system_ui_screenshot(void) {
