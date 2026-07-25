@@ -92,6 +92,7 @@ int main(int argc, char *argv[]) {
 #include "ui/SettingsView.h"
 #include "ui/StoryMetadata.h"
 #include "ui/SystemUI.h"
+#include "serial/SerialFileServer.h"
 #include <BatteryMonitor.h>
 #include <EpdFont.h>
 #include <builtinFonts/ui_12.h>
@@ -150,9 +151,7 @@ void setup() {
           Serial.println("[Boot] /firmware.bin found on SD. Forcing updater mode.");
           updaterMode = true;
         }
-        SD.end();
       }
-      SPI.end();
     }
 
     if (updaterMode) {
@@ -190,10 +189,24 @@ void setup() {
     // Menu / library loop — runs until the user launches a story (which
     // calls BootManager::setBootMode(INK_RUNTIME) and reboots).
     bool needsFullRefresh = true;
+    
+    SerialFileServer serialServer;
+    serialServer.onConnect = [&]() {
+      GfxRenderer *r = display->getRenderer();
+      if (r) {
+        r->fillRect(0, 0, display->getWidth(), display->getHeight(), false);
+        r->drawText(31, 30, display->getHeight() / 2, "USB Connected", true);
+        display->present();
+      }
+    };
+
     while (true) {
       GameLibrary *library =
           new GameLibrary(*display, *input, *batteryWidget, settings);
       library->setNeedsFullRefresh(needsFullRefresh);
+      library->setBackgroundTask([&serialServer]() {
+          return serialServer.poll();
+      });
       bool goToSettings = library->run();
       delete library;
       if (goToSettings) {
@@ -380,7 +393,7 @@ void setup() {
         }
       }
     } else {
-      errorMessage = "No .bin stories found in /eenk/stories/ folder";
+      errorMessage = "No .bin stories found in /stories/ folder";
     }
   } else {
     errorMessage = "No SD card detected or mount failed";

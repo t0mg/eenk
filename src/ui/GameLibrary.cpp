@@ -120,9 +120,9 @@ void GameLibrary::titleFromPath(const char *storyPath, char *outTitle,
     *dot = '\0';
 
   // Check if stem is generic (main, index, story)
-  bool isGeneric = (strcasecmp(stem, "main") == 0 ||
-                    strcasecmp(stem, "index") == 0 ||
-                    strcasecmp(stem, "story") == 0);
+  bool isGeneric =
+      (strcasecmp(stem, "main") == 0 || strcasecmp(stem, "index") == 0 ||
+       strcasecmp(stem, "story") == 0);
 
   if (isGeneric && lastSlash && lastSlash > storyPath) {
     const char *prevSlash = lastSlash - 1;
@@ -194,7 +194,8 @@ void GameLibrary::scanSD() {
 
 #ifdef PLATFORM_ESP32
   // ── ESP32: read recursively from SD card ─────────────────────────────────
-  auto scanDirRecursive = [&](auto self, const char *dirPath, int depth) -> void {
+  auto scanDirRecursive = [&](auto self, const char *dirPath,
+                              int depth) -> void {
     if (depth > 2 || _numEntries >= MAX_STORIES)
       return;
 
@@ -265,11 +266,12 @@ void GameLibrary::scanSD() {
     dir.close();
   };
 
-  scanDirRecursive(scanDirRecursive, "/eenk/stories", 0);
+  scanDirRecursive(scanDirRecursive, "/stories", 0);
 
 #else
   // ── Native: scan local stories/ directory recursively ────────────────────
-  auto scanNativeDirRecursive = [&](auto self, const char *dirPath, int depth) -> void {
+  auto scanNativeDirRecursive = [&](auto self, const char *dirPath,
+                                    int depth) -> void {
     if (depth > 2 || _numEntries >= MAX_STORIES)
       return;
 
@@ -466,7 +468,7 @@ void GameLibrary::renderEmpty() {
 #if defined(PLATFORM_ESP32) || defined(PIO_UNIT_TESTING)
   static const char *kLine1 = "No stories found.";
   static const char *kLine2 = "Copy .bin files to";
-  static const char *kLine3 = "/eenk/ on the SD card.";
+  static const char *kLine3 = "/stories/ on the SD card.";
 
   int lineH = r->getLineHeight(FONT_NORMAL);
   int totalH = lineH * 3 + 8;
@@ -610,6 +612,11 @@ bool GameLibrary::run() {
   render();
 
   while (true) {
+    if (_backgroundTask && _backgroundTask()) {
+      scanSD();
+      render();
+    }
+
     SystemUI::checkBatteryAndShutdown(_battery, _display);
 
     ButtonEvent ev = _input.pollInput();

@@ -12,6 +12,7 @@
 #include "os/AppSettings.h"
 #include <cstdint>
 #include <cstddef>
+#include <functional>
 #include "FooterWidget.h"
 #include "HeaderWidget.h"
 
@@ -29,6 +30,7 @@ public:
     bool run();
 
     void setNeedsFullRefresh(bool needs) { _needsFullRefresh = needs; }
+    void setBackgroundTask(std::function<bool()> task) { _backgroundTask = task; }
 
 protected:
     IDisplay&      _display;
@@ -67,6 +69,7 @@ protected:
     bool       _firstRender   = true;
     bool       _needsFullRefresh = true;
     bool       _fontsLoaded   = false;
+    std::function<bool()> _backgroundTask = nullptr;
 
     // ── Private helpers ───────────────────────────────────────────────────────
 

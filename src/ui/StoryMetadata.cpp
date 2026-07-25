@@ -30,7 +30,7 @@ void StoryMetadata::getSavePath(const char* storyPath, char* outSavePath, size_t
 
     const char* rel = storyPath;
     if (strncmp(rel, "/sd", 3) == 0) rel += 3;
-    if (strncmp(rel, "/eenk/stories", 13) == 0) rel += 13;
+    if (strncmp(rel, "/stories", 8) == 0) rel += 8;
     else if (strncmp(rel, "/eenk", 5) == 0) rel += 5;
     else if (strncmp(rel, "stories", 7) == 0) rel += 7;
     while (*rel == '/' || *rel == '\\') rel++;

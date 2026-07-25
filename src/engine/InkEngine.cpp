@@ -382,9 +382,10 @@ void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* stor
   }
   if (storyBase && storyBase[0]) {
 #ifdef PLATFORM_NATIVE
+    snprintf(sidecarDir1, sizeof(sidecarDir1), "stories/%s/", storyBase);
     snprintf(sidecarDir2, sizeof(sidecarDir2), "stories/%s", storyBase);
 #else
-    snprintf(sidecarDir2, sizeof(sidecarDir2), "/eenk/stories/%s", storyBase);
+    snprintf(sidecarDir2, sizeof(sidecarDir2), "/stories/%s", storyBase);
 #endif
   }
 

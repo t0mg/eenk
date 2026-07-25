@@ -1326,14 +1326,11 @@ void GfxRenderer::renderChar(const EpdFontFamily& fontFamily, const uint32_t cp,
         for (int gx = gxStart; gx < gxEnd; gx++) {
           bool st;
           if (!extractFontPixel(bitmap, gy * width + gx, is2Bit, renderMode, pixelState, st)) continue;
-          
-          if (!st && !drawHalftone && !synthesizeBold) continue;
-
           const int sX = logLeft + gx + skewX;
           if (sX >= 0 && sX < screenW) {
             orientedWriteFB(frameBuffer, stride, sX, sY, orientation, panelW, panelH, st, drawHalftone);
           }
-          if (synthesizeBold && st) {
+          if (synthesizeBold) {
             const int sXBold = sX + 1;
             if (sXBold >= 0 && sXBold < screenW) {
               orientedWriteFB(frameBuffer, stride, sXBold, sY, orientation, panelW, panelH, st, drawHalftone);
