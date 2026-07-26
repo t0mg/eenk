@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
 #include "os/AppSettings.h"
 #include "os/BootManager.h"
 #include "ui/BatteryWidget.h"
-#include "ui/GameLibrary.h"
+#include "ui/Library.h"
 #include "ui/SettingsView.h"
 #include "ui/StoryMetadata.h"
 #include "ui/SystemUI.h"
@@ -178,7 +178,7 @@ void setup() {
   Serial.printf("[Boot] mode=%d\n", (int)mode);
 
   if (mode == BootMode::MENU) {
-    // Mount the SD card so GameLibrary can scan for stories.
+    // Mount the SD card so Library can scan for stories.
     sdStorage = new EspSdStorage();
     if (!sdStorage->begin()) {
       Serial.println("[Boot] MENU: SD mount failed — library will show empty.");
@@ -192,6 +192,7 @@ void setup() {
     
     SerialFileServer serialServer;
     serialServer.onConnect = [&]() {
+      if (input) input->setAutoSleepTimeout(0); // Disable autosleep during USB sync
       GfxRenderer *r = display->getRenderer();
       if (r) {
         r->fillRect(0, 0, display->getWidth(), display->getHeight(), false);
@@ -201,8 +202,8 @@ void setup() {
     };
 
     while (true) {
-      GameLibrary *library =
-          new GameLibrary(*display, *input, *batteryWidget, settings);
+      Library *library =
+          new Library(*display, *input, *batteryWidget, settings);
       library->setNeedsFullRefresh(needsFullRefresh);
       library->setBackgroundTask([&serialServer]() {
           return serialServer.poll();
@@ -219,7 +220,7 @@ void setup() {
         needsFullRefresh = false; // Came from settings, avoid slow full refresh
       }
     }
-    // Unreachable: GameLibrary reboots the device when a story is launched.
+    // Unreachable: Library reboots the device when a story is launched.
   }
 
   // ── INK_RUNTIME — load and run the story selected in the library ──────────

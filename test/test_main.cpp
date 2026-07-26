@@ -19,7 +19,7 @@
 #include "hal/sdl/mock/EInkDisplay.h"
 #include "GfxRenderer.h"
 #include "ui/SystemUI.h"
-#include "ui/GameLibrary.h"
+#include "ui/Library.h"
 #include "ui/SettingsView.h"
 #include "ui/BatteryWidget.h"
 #include "ui/FooterWidget.h"
@@ -188,7 +188,7 @@ public:
         renderer.insertFont(11, sysFamilyBold);
         // BatteryWidget
         renderer.insertFont(20, sysFamilySmall);
-        // GameLibrary
+        // Library
         renderer.insertFont(30, sysFamilyNormal);
         renderer.insertFont(31, sysFamilyBold);
         renderer.insertFont(32, sysFamilySmall);
@@ -238,10 +238,10 @@ void test_battery_widget_screenshot(void) {
     TEST_ASSERT_EQUAL(1, 1);
 }
 
-class TestGameLibrary : public GameLibrary {
+class TestLibrary : public Library {
 public:
-    TestGameLibrary(IDisplay& display, IInput& input, BatteryWidget& battery, AppSettings& settings)
-        : GameLibrary(display, input, battery, settings) {}
+    TestLibrary(IDisplay& display, IInput& input, BatteryWidget& battery, AppSettings& settings)
+        : Library(display, input, battery, settings) {}
 
 protected:
     void scanSD() override {
@@ -275,17 +275,17 @@ protected:
     }
 };
 
-void test_game_library_screenshot(void) {
+void test_library_screenshot(void) {
     TestDisplay display;
     MockInput input;
     BatteryMonitor battery;
     BatteryWidget widget(display.renderer, battery);
     AppSettings settings = AppSettings::defaults();
     
-    TestGameLibrary library(display, input, widget, settings);
+    TestLibrary library(display, input, widget, settings);
     library.run();
 
-    saveBMP("test/golden/test_game_library.bmp", display.eink.getFrameBuffer(), display.getWidth(), display.getHeight());
+    saveBMP("test/golden/test_library.bmp", display.eink.getFrameBuffer(), display.getWidth(), display.getHeight());
     TEST_ASSERT_EQUAL(1, 1);
 }
 
@@ -669,7 +669,7 @@ int main(int argc, char **argv) {
     RUN_TEST(test_sd_font_catalogue);
     RUN_TEST(test_system_ui_screenshot);
     RUN_TEST(test_battery_widget_screenshot);
-    RUN_TEST(test_game_library_screenshot);
+    RUN_TEST(test_library_screenshot);
     RUN_TEST(test_settings_view_screenshot);
     RUN_TEST(test_fonts_screenshot);
     RUN_TEST(test_external_fonts_screenshot);

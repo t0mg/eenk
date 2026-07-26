@@ -40,7 +40,6 @@ private:
 
     static constexpr int CHUNK_SIZE = 4096;
     static constexpr int CMD_TIMEOUT_MS = 10000;
-    static constexpr int IDLE_TIMEOUT_MS = 30000;
     static constexpr const char* PROTOCOL_VERSION = "1";
     static constexpr const char* SYNC_MAGIC = "EENK_SYNC";
 };

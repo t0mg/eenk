@@ -1,18 +1,11 @@
 // eenk — SettingsView
-// Multi-page settings menu for the Xteink X4 e-reader.
-//
-// Pages (4 total):
-//   0  Reading    — story font, choice font, margin, partial-refresh interval
-//   1  Behaviour  — sleep/save timeout, full-refresh interval
-//   2  Input      — annotated button-mapping diagram (cycles with LEFT/RIGHT)
-//   3  Danger Zone — delete save, delete story, format SD
+// Single-panel settings menu for the Xteink X4 e-reader.
 //
 // Navigation:
-//   UP / DOWN      — move between items on the current page
-//   LEFT / RIGHT   — change the selected item's value (or navigate pages
-//                    when _itemIndex == 0 and at the edge)
-//   BACK           — go to previous page, or exit (page 0)
-//   CONFIRM        — used for dangerous actions
+//   UP / DOWN      — move between items
+//   LEFT / RIGHT   — change the selected item's value
+//   CONFIRM        — toggle setting / actuate selected action
+//   BACK / QUIT    — exit settings
 #pragma once
 #include "hal/IDisplay.h"
 #include "hal/IInput.h"
@@ -29,7 +22,7 @@ public:
                  BatteryWidget& battery, AppSettings& settings);
     ~SettingsView();
 
-    // Run the settings UI loop. Blocks until the user exits (BACK on page 0).
+    // Run the settings UI loop. Blocks until the user exits (BACK/QUIT).
     // Saves settings before returning.
     void run();
 
@@ -39,38 +32,21 @@ private:
     BatteryWidget& _battery;
     AppSettings&   _settings;
 
-    int  _pageIndex = 0;   // 0=Reading, 1=Behaviour, 2=Input, 3=Danger Zone
-    int  _itemIndex = 0;   // selected row within page
+    int  _itemIndex = 0;   // selected row
     bool _dirty     = false;
     SdFontCatalogue _fontCatalogue;
     int _currentFontIndex = 0;
     static constexpr int DISP_H = 800;
-    static constexpr int ROW_H = 48;
-    static constexpr int PAGE_COUNT   = 3;
 
     void renderPage();
     void renderFooter();
-    void renderReadingPage();
-    void renderInputPage();     // annotated device diagram
-    void renderDangerPage();
-
-    // Input handlers per page
-    void handleReadingInput(ButtonEvent ev);
-    void handleInputPageInput(ButtonEvent ev);
-    void handleDangerInput(ButtonEvent ev);
+    void handleInput(ButtonEvent ev);
 
     // Shared helper: draw a settings row
     // label: left-side label, value: right-side current value string
     // selected: highlight this row
     void drawSettingsRow(int y, const char* label, const char* value, bool selected);
 
-    // Annotated device-body diagram for the Input Mapping page.
-    // layoutIndex selects which action labels to show.
-    void drawDeviceDiagram(int x, int y, int width, int height, int layoutIndex);
-
     // Danger zone actions
-    void deleteSave();
-    void deleteStory();
     void formatSD();
 };
-

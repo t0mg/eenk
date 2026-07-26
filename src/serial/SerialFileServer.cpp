@@ -47,7 +47,6 @@ bool SerialFileServer::poll() {
 void SerialFileServer::runCommandLoop() {
     Serial.println("[SerialFileServer] Entering command mode");
     char line[512];
-    uint32_t lastActive = millis();
 
     while (true) {
         if (!Serial.available()) {
@@ -58,8 +57,6 @@ void SerialFileServer::runCommandLoop() {
         if (!readLine(line, sizeof(line), CMD_TIMEOUT_MS)) {
             continue;
         }
-
-        lastActive = millis();
 
         // Parse command: find first space
         char* space = strchr(line, ' ');

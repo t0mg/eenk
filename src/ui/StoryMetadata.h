@@ -1,6 +1,6 @@
 // eenk — StoryMetadata
 // 128-byte header prepended to ink .bin files.
-// Allows the GameLibrary to display rich metadata (title, author) without
+// Allows the Library to display rich metadata (title, author) without
 // loading the full story into memory.
 #pragma once
 #include <cstdint>

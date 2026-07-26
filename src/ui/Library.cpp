@@ -1,7 +1,7 @@
-// eenk — GameLibrary implementation
+// eenk — Library implementation
 // Scrollable story browser: scans /eenk/ on SD, shows title/author/size,
 // launches selected story via BootManager.
-#include "GameLibrary.h"
+#include "Library.h"
 #include "BatteryWidget.h"
 #include "StoryMetadata.h"
 #include "SystemUI.h"
@@ -41,15 +41,15 @@ static EpdFontFamily s_glFamilySmall(&s_glSmall);
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-GameLibrary::GameLibrary(IDisplay &display, IInput &input,
-                         BatteryWidget &battery, AppSettings &settings)
+Library::Library(IDisplay &display, IInput &input,
+                 BatteryWidget &battery, AppSettings &settings)
     : _display(display), _input(input), _battery(battery), _settings(settings) {
 }
 
 // ─── ensureFonts()
 // ────────────────────────────────────────────────────────────
 
-void GameLibrary::ensureFonts() {
+void Library::ensureFonts() {
   if (_fontsLoaded)
     return;
 #ifdef PLATFORM_ESP32
@@ -66,8 +66,8 @@ void GameLibrary::ensureFonts() {
 // ─── titleFromFilename()
 // ──────────────────────────────────────────────────────
 
-void GameLibrary::titleFromFilename(const char *filename, char *outTitle,
-                                    size_t outLen) {
+void Library::titleFromFilename(const char *filename, char *outTitle,
+                                size_t outLen) {
   if (outLen == 0)
     return;
 
@@ -98,8 +98,8 @@ void GameLibrary::titleFromFilename(const char *filename, char *outTitle,
 // ─── titleFromPath()
 // ──────────────────────────────────────────────────────────────
 
-void GameLibrary::titleFromPath(const char *storyPath, char *outTitle,
-                                size_t outLen) {
+void Library::titleFromPath(const char *storyPath, char *outTitle,
+                            size_t outLen) {
   if (outLen == 0 || !storyPath || !storyPath[0])
     return;
 
@@ -151,7 +151,7 @@ void GameLibrary::titleFromPath(const char *storyPath, char *outTitle,
 // ─── formatSize()
 // ─────────────────────────────────────────────────────────────
 
-void GameLibrary::formatSize(uint32_t bytes, char *out, size_t outLen) {
+void Library::formatSize(uint32_t bytes, char *out, size_t outLen) {
   if (bytes >= 1024u * 1024u) {
     // Show as X.X MB
     uint32_t mb10 = (bytes * 10u) / (1024u * 1024u);
@@ -165,10 +165,22 @@ void GameLibrary::formatSize(uint32_t bytes, char *out, size_t outLen) {
   }
 }
 
+// ─── focusLoadedStory() ──────────────────────────────────────────────────────
+
+void Library::focusLoadedStory() {
+  for (int i = 0; i < _numEntries; i++) {
+    if (_entries[i].isCurrentlyLoaded) {
+      _selectedIndex = i;
+      clampScroll();
+      break;
+    }
+  }
+}
+
 // ─── sortEntries()
 // ────────────────────────────────────────────────────────────
 
-void GameLibrary::sortEntries() {
+void Library::sortEntries() {
   // Insertion sort — n ≤ MAX_STORIES (32), so this is fine.
   for (int i = 1; i < _numEntries; i++) {
     StoryEntry key = _entries[i];
@@ -184,7 +196,7 @@ void GameLibrary::sortEntries() {
 // ─── scanSD()
 // ─────────────────────────────────────────────────────────────────
 
-void GameLibrary::scanSD() {
+void Library::scanSD() {
   _numEntries = 0;
   memset(_entries, 0, sizeof(_entries));
 
@@ -328,12 +340,13 @@ void GameLibrary::scanSD() {
 #endif
 
   sortEntries();
+  focusLoadedStory();
 }
 
 // ─── clampScroll()
 // ────────────────────────────────────────────────────────────
 
-void GameLibrary::clampScroll() {
+void Library::clampScroll() {
   // Ensure selected is within [0, _numEntries).
   if (_selectedIndex < 0)
     _selectedIndex = 0;
@@ -356,7 +369,7 @@ void GameLibrary::clampScroll() {
 // ─── renderEntry()
 // ────────────────────────────────────────────────────────────
 
-void GameLibrary::renderEntry(int index, int yPos, bool selected) {
+void Library::renderEntry(int index, int yPos, bool selected) {
   auto *r = _display.getRenderer();
   if (!r)
     return;
@@ -460,7 +473,7 @@ void GameLibrary::renderEntry(int index, int yPos, bool selected) {
 // ─── renderEmpty()
 // ────────────────────────────────────────────────────────────
 
-void GameLibrary::renderEmpty() {
+void Library::renderEmpty() {
   auto *r = _display.getRenderer();
   if (!r)
     return;
@@ -485,7 +498,7 @@ void GameLibrary::renderEmpty() {
 // ─── renderFooter()
 // ──────────────────────────────────────────────────────────────────────────────
 
-void GameLibrary::renderFooter() {
+void Library::renderFooter() {
   auto *r = _display.getRenderer();
   if (!r)
     return;
@@ -502,11 +515,11 @@ void GameLibrary::renderFooter() {
 // ─── render()
 // ─────────────────────────────────────────────────────────────────
 
-void GameLibrary::render() {
+void Library::render() {
   auto *r = _display.getRenderer();
   if (!r) {
     // Text-mode fallback: print list to stdout.
-    printf("=== eenk Game Library ===\n");
+    printf("=== eenk Library ===\n");
     for (int i = 0; i < _numEntries; i++) {
       printf("%s %s\n", (i == _selectedIndex) ? ">" : " ", _entries[i].title);
     }
@@ -569,7 +582,7 @@ void GameLibrary::render() {
 // ─── launchStory()
 // ────────────────────────────────────────────────────────────
 
-void GameLibrary::launchStory(int index) {
+void Library::launchStory(int index) {
   if (index < 0 || index >= _numEntries)
     return;
 
@@ -606,14 +619,16 @@ void GameLibrary::launchStory(int index) {
 // ─── run()
 // ────────────────────────────────────────────────────────────────────
 
-bool GameLibrary::run() {
+bool Library::run() {
   ensureFonts();
   scanSD();
+  focusLoadedStory();
   render();
 
   while (true) {
     if (_backgroundTask && _backgroundTask()) {
       scanSD();
+      focusLoadedStory();
       render();
     }
 
@@ -681,3 +696,4 @@ bool GameLibrary::run() {
     }
   }
 }
+

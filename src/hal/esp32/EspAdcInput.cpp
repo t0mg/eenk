@@ -15,7 +15,7 @@ ButtonEvent EspAdcInput::pollInput()
 
     ButtonEvent ev = ButtonEvent::NONE;
 
-    if (_input.isPressed(InputManager::BTN_POWER) && _input.getHeldTime() > 2000) {
+    if (_input.isPressed(InputManager::BTN_POWER) && _input.getHeldTime() > 1000) {
         // Wait for the user to release the button so we don't immediately wake up!
         while (digitalRead(InputManager::POWER_BUTTON_PIN) == LOW) {
             delay(10);

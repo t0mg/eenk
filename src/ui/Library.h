@@ -1,4 +1,4 @@
-// eenk — GameLibrary
+// eenk — Library
 // Scrollable story browser shown in MENU boot mode.
 // Scans /eenk/ on the SD card for .bin files, displays title/author/size,
 // and lets the user select a story to launch or navigate to settings.
@@ -18,12 +18,12 @@
 
 class BatteryWidget;
 
-class GameLibrary {
+class Library {
 public:
-    GameLibrary(IDisplay& display, IInput& input, BatteryWidget& battery, AppSettings& settings);
-    virtual ~GameLibrary() = default;
+    Library(IDisplay& display, IInput& input, BatteryWidget& battery, AppSettings& settings);
+    virtual ~Library() = default;
 
-    // Run the game library loop. Blocks until the user selects a game
+    // Run the story library loop. Blocks until the user selects a game
     // (which sets BootManager and reboots) or presses RIGHT/BACK to go to settings.
     // Returns false if user pressed RIGHT or BACK (wants settings).
     // Never returns on game launch (reboots inside).
@@ -78,6 +78,9 @@ protected:
 
     // Populate _entries[] by scanning the SD card (or local stories/ dir on native).
     virtual void scanSD();
+
+    // Focus the currently loaded story (if any) in the list and scroll it into view.
+    void focusLoadedStory();
 
     // Sort _entries[0.._numEntries) alphabetically by title (insertion sort — n≤32).
     void sortEntries();
