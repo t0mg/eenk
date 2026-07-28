@@ -1112,6 +1112,70 @@ void GfxRenderer::drawButtonHints(const int fontId, const char* btn1, const char
   }
 }
 
+void GfxRenderer::fillRoundRect(int x, int y, int w, int h, int radius, bool state) const {
+  if (w <= 0 || h <= 0) return;
+  int r = std::min(radius, std::min(w / 2, h / 2));
+  if (r <= 0) {
+    fillRect(x, y, w, h, state);
+    return;
+  }
+
+  std::vector<int> insets(r, r);
+  int cx = r - 1;
+  int cy = 0;
+  int dx = 1;
+  int dy = 1;
+  int err = dx - (r * 2);
+
+  while (cx >= cy) {
+    if (r - 1 - cy >= 0) insets[r - 1 - cy] = std::min(insets[r - 1 - cy], r - 1 - cx);
+    if (r - 1 - cx >= 0) insets[r - 1 - cx] = std::min(insets[r - 1 - cx], r - 1 - cy);
+
+    if (err <= 0) {
+      cy++;
+      err += dy;
+      dy += 2;
+    }
+    if (err > 0) {
+      cx--;
+      dx += 2;
+      err += dx - (r * 2);
+    }
+  }
+
+  for (int j = 0; j < r; j++) {
+    int inset = insets[j];
+    fillRect(x + inset, y + j, w - 2 * inset, 1, state);
+    fillRect(x + inset, y + h - 1 - j, w - 2 * inset, 1, state);
+  }
+  if (h > 2 * r) {
+    fillRect(x, y + r, w, h - 2 * r, state);
+  }
+}
+
+void GfxRenderer::drawShadowBox(int x, int y, int w, int h, int borderW, int shadowOff, bool centerCompensate) const {
+  if (centerCompensate) {
+    x -= shadowOff / 2;
+    y -= shadowOff / 2;
+  }
+  fillRect(x + shadowOff, y + shadowOff, w, h, true);
+  fillRect(x, y, w, h, false);
+  for (int i = 0; i < borderW; i++) {
+    drawRect(x + i, y + i, w - 2 * i, h - 2 * i, true);
+  }
+}
+
+int GfxRenderer::drawPill(int fontId, int x, int y, const char* label, int paddingX, int pillH, int radius, bool inverted) const {
+  int textW = getTextWidth(fontId, label);
+  int pillW = textW + 2 * paddingX + 2 * radius;
+  fillRoundRect(x, y, pillW, pillH, radius, inverted);
+  int textX = x + radius + paddingX;
+  int fontH = getLineHeight(fontId);
+  int textY = y + (pillH - fontH) / 2;
+  drawText(fontId, textX, textY, label, !inverted);
+  return pillW;
+}
+
 uint8_t* GfxRenderer::getFrameBuffer() const { return frameBuffer; }
 
 size_t GfxRenderer::getBufferSize() const { return einkDisplay.getBufferSize(); }

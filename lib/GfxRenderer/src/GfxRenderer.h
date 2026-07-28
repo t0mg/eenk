@@ -206,6 +206,9 @@ class GfxRenderer {
   void fillHalftoneRect(int x, int y, int width, int height, bool state = true) const;
   void drawImage(const uint8_t bitmap[], int x, int y, int width, int height) const;
   void drawBitmap(const Bitmap& bitmap, int x, int y, int maxWidth, int maxHeight) const;
+  void fillRoundRect(int x, int y, int w, int h, int radius, bool state = true) const;
+  void drawShadowBox(int x, int y, int w, int h, int borderW, int shadowOff, bool centerCompensate = false) const;
+  int drawPill(int fontId, int x, int y, const char* label, int paddingX, int pillH, int radius, bool inverted = true) const;
 
   // Text
   int getTextWidth(int fontId, const char* text, EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;

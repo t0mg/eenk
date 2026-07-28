@@ -1,17 +1,20 @@
-// eenk — SettingsView implementation
+// eenk — SettingsView implementation (neubrutalist)
 //
 // Font ID allocations (must not clash with InkEngine 0/1, SystemUI 10/11,
 // BatteryWidget 20):
+//   NeuStyle::FONT_HEADING (12)  Syne Bold 16pt — headings and actions
 //   30  ui_12       (normal body text in settings rows)
-//   31  ui_bold_12  (bold labels, status bar, page headers)
+//   31  ui_bold_12  (bold labels)
 //   32  small14     (diagram labels)
 //   33  ui_10       (small supplementary text)
 //
 // Display geometry (480 × 800 portrait):
-//   Status bar:  y=0..31  (HeaderWidget::HEIGHT = 32)
-//   List items:  y=32..751 (48px per row) height: ROW_H = 60 px
+//   Status bar:  y=0..39  (HeaderWidget::HEIGHT = 40)
+//   List items:  y=40..  (ROW_H = 60 px each)
 #include "SettingsView.h"
+#include "NeuStyle.h"
 #include <cstring>
+#include <cctype>
 #include "BatteryWidget.h"
 #include "SystemUI.h"
 #include "os/BootManager.h"
@@ -32,6 +35,7 @@
 #include <builtinFonts/ui_10.h>
 #include <builtinFonts/ui_12.h>
 #include <builtinFonts/ui_bold_12.h>
+#include <builtinFonts/syne_bold_10.h>
 #include <esp_sleep.h>
 
 static EpdFont s_font12(&ui_12);
@@ -45,6 +49,9 @@ static EpdFontFamily s_famSmall14(&s_fontSmall14);
 
 static EpdFont s_font10(&ui_10);
 static EpdFontFamily s_fam10(&s_font10);
+
+static EpdFont s_fontHeading(&syne_bold_10);
+static EpdFontFamily s_famHeading(&s_fontHeading);
 #else
 #include <GfxRenderer.h>
 #endif
@@ -53,11 +60,22 @@ static constexpr int kFontNormal = 30;
 static constexpr int kFontBold = 31;
 static constexpr int kFontDiagram = 32;
 static constexpr int kFontSmall = 33;
+static constexpr int kFontHeading = NeuStyle::FONT_HEADING;
 
-static constexpr int ROW_H = 60;
-static constexpr int LEFT_MARGIN = 8;
+static constexpr int ROW_H = NeuStyle::ROW_H;
+static constexpr int LEFT_MARGIN = NeuStyle::MARGIN_X;
 static constexpr int DISP_W = 480;
 static constexpr int DISP_H = 800;
+
+// Card inset from screen edges for bordered rows
+static constexpr int CARD_INSET_X = 24;
+static constexpr int CARD_INSET_Y = 6;
+static constexpr int CARD_W = DISP_W - 2 * CARD_INSET_X;
+
+// Helper: uppercase a string in-place
+static void toUpper(char* s) {
+    for (; *s; s++) *s = toupper((unsigned char)*s);
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -111,6 +129,7 @@ void SettingsView::run() {
     r->insertFont(kFontBold, s_famBold12);
     r->insertFont(kFontDiagram, s_famSmall14);
     r->insertFont(kFontSmall, s_fam10);
+    r->insertFont(kFontHeading, s_famHeading);
 #endif
   }
 
@@ -188,9 +207,9 @@ void SettingsView::renderPage() {
   _display.clear();
 
   HeaderWidget header(_display, _battery);
-  header.render("Settings", kFontBold);
+  header.render("Settings", kFontHeading);
 
-  int y = HeaderWidget::HEIGHT;
+  int y = HeaderWidget::HEIGHT + CARD_INSET_Y;
 
   // Row 0: Story Font
   {
@@ -254,44 +273,68 @@ void SettingsView::renderFooter() {
     return;
 
   FooterWidget footer;
-  footer.btnBack = {true, "Exit", "Back"};
+  footer.btnBack = {true, "BACK", "Back", false};
   bool isActionRow = (_itemIndex == 5 || _itemIndex == 6 || _itemIndex == 7);
-  footer.btnConfirm = {isActionRow, isActionRow ? "Select" : "", "Confirm"};
-  footer.btnPrev = {true, "Up", "Prev"};
-  footer.btnNext = {true, "Down", "Next"};
+  footer.btnConfirm = {isActionRow, isActionRow ? "CHANGE" : "", "Confirm", isActionRow};
+  footer.btnPrev = {true, "UP", "Prev", false};
+  footer.btnNext = {true, "DOWN", "Next", false};
 
-  footer.render(r, DISP_W, DISP_H, kFontSmall);
+  footer.render(r, DISP_W, DISP_H);
 }
 
 // ─── drawSettingsRow() ────────────────────────────────────────────────────────
 
 void SettingsView::drawSettingsRow(int y, const char *label, const char *value,
-                                   bool selected) {
+                                    bool selected) {
   auto *r = _display.getRenderer();
   if (!r)
     return;
 
-  if (selected) {
-    r->fillRect(0, y, DISP_W, ROW_H, true);
+  // Draw bordered card for this row
+  int cardX = CARD_INSET_X;
+  int cardY = y;
+  int cardH = ROW_H - CARD_INSET_Y;
+
+  // Card outline (BORDER_W thick)
+  for (int i = 0; i < NeuStyle::BORDER_W; i++) {
+    r->drawRect(cardX + i, cardY + i, CARD_W - 2 * i, cardH - 2 * i, true);
   }
-  bool ink = !selected; // selected row: white text on black
 
-  // Label on the left.
-  int textY = y + (ROW_H - 12) / 2; // vertically centre within row
-  r->drawText(kFontBold, LEFT_MARGIN + 8, textY, label, ink);
+  // Interior is white
+  r->fillRect(cardX + NeuStyle::BORDER_W, cardY + NeuStyle::BORDER_W,
+              CARD_W - 2 * NeuStyle::BORDER_W, cardH - 2 * NeuStyle::BORDER_W, false);
 
-  // Value right-aligned.
+  // Heading line height and vertical centering
+  int headingH = r->getLineHeight(kFontHeading);
+  int bodyH = r->getLineHeight(kFontNormal);
+
+  // Label: uppercase heading font
+  char upperLabel[64];
+  strncpy(upperLabel, label, sizeof(upperLabel) - 1);
+  upperLabel[sizeof(upperLabel) - 1] = '\0';
+  toUpper(upperLabel);
+
+  int labelY = cardY + (cardH - headingH) / 2;
+  int labelX = cardX + NeuStyle::BORDER_W + LEFT_MARGIN;
+
+  if (selected) {
+    // Selected: render label as a pill
+    int pillY = cardY + (cardH - NeuStyle::PILL_H) / 2;
+    r->drawPill(kFontHeading, labelX, pillY, upperLabel,
+               NeuStyle::PILL_PADDING_X, NeuStyle::PILL_H, NeuStyle::PILL_RADIUS, true);
+  } else {
+    // Normal: plain heading text
+    r->drawText(kFontHeading, labelX, labelY, upperLabel, true);
+  }
+
+  // Value right-aligned within card
   if (value && value[0] != '\0') {
     int textW = r->getTextWidth(kFontNormal, value);
-    int valueX = DISP_W - textW - 16;
-    if (valueX < LEFT_MARGIN + 120)
-      valueX = LEFT_MARGIN + 120;
-    r->drawText(kFontNormal, valueX, textY, value, ink);
-  }
-
-  // Separator line at the bottom of the row
-  if (!selected) {
-    r->drawLine(0, y + ROW_H - 1, DISP_W, y + ROW_H - 1, true);
+    int valueX = cardX + CARD_W - NeuStyle::BORDER_W - LEFT_MARGIN - textW;
+    int valueMinX = labelX + 120;
+    if (valueX < valueMinX) valueX = valueMinX;
+    int valueY = cardY + (cardH - bodyH) / 2;
+    r->drawText(kFontNormal, valueX, valueY, value, true);
   }
 }
 

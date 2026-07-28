@@ -11,6 +11,7 @@
 #include <cctype>
 #include <cstdio>
 #include <cstring>
+#include "NeuStyle.h"
 
 #ifdef PLATFORM_ESP32
 #include <Arduino.h>
@@ -22,6 +23,7 @@
 #include <builtinFonts/ui_10.h>
 #include <builtinFonts/ui_12.h>
 #include <builtinFonts/ui_bold_12.h>
+#include <builtinFonts/syne_bold_10.h>
 #include <esp_sleep.h>
 
 static EpdFont s_glNormal(&ui_12);
@@ -32,6 +34,9 @@ static EpdFontFamily s_glFamilyBold(&s_glBold);
 
 static EpdFont s_glSmall(&ui_10);
 static EpdFontFamily s_glFamilySmall(&s_glSmall);
+
+static EpdFont s_glHeading(&syne_bold_10);
+static EpdFontFamily s_glFamilyHeading(&s_glHeading);
 
 #else
 // ── Native / SDL simulation ────────────────────────────────────────────────
@@ -58,6 +63,7 @@ void Library::ensureFonts() {
     r->insertFont(FONT_NORMAL, s_glFamilyNormal);
     r->insertFont(FONT_BOLD, s_glFamilyBold);
     r->insertFont(FONT_SMALL, s_glFamilySmall);
+    r->insertFont(NeuStyle::FONT_HEADING, s_glFamilyHeading);
   }
 #endif
   _fontsLoaded = true;
@@ -504,12 +510,12 @@ void Library::renderFooter() {
     return;
 
   FooterWidget footer;
-  footer.btnBack = {true, "Settings", "Back"};
-  footer.btnConfirm = {true, "Open", "Confirm"};
-  footer.btnPrev = {true, "Scroll", "Prev"};
-  footer.btnNext = {true, "Scroll", "Next"};
+  footer.btnBack = {true, "SETTINGS", "Back", false};
+  footer.btnConfirm = {true, "OPEN", "Confirm", true}; // Pill
+  footer.btnPrev = {true, "UP", "Prev", false};
+  footer.btnNext = {true, "DOWN", "Next", false};
 
-  footer.render(r, DISPLAY_W, DISPLAY_H, FONT_SMALL);
+  footer.render(r, DISPLAY_W, DISPLAY_H);
 }
 
 // ─── render()
@@ -528,7 +534,7 @@ void Library::render() {
 
   _display.clear();
   HeaderWidget header(_display, _battery);
-  header.render("eenk", FONT_BOLD);
+  header.render("eenk", NeuStyle::FONT_HEADING);
 
   if (_numEntries == 0) {
     renderEmpty();

@@ -9,7 +9,9 @@
 #include "BatteryWidget.h"
 #include <GfxRenderer.h> // from Papyrix
 
+#include "NeuStyle.h"
 #include <EpdFont.h>
+#include <builtinFonts/syne_bold_10.h>
 #include <builtinFonts/ui_12.h>
 #include <builtinFonts/ui_bold_12.h>
 
@@ -25,6 +27,9 @@ static EpdFontFamily sysFamilyNormal(&sysFontNormal);
 static EpdFont sysFontBold(&ui_bold_12);
 static EpdFontFamily sysFamilyBold(&sysFontBold);
 
+static EpdFont sysFontHeading(&syne_bold_10);
+static EpdFontFamily sysFamilyHeading(&sysFontHeading);
+
 SystemUI::SystemUI(IDisplay &display) : _display(display) {}
 
 SystemUI::~SystemUI() {}
@@ -39,6 +44,9 @@ void SystemUI::ensureFonts() {
     // InkEngine's 0 and 1)
     renderer->insertFont(10, sysFamilyNormal);
     renderer->insertFont(11, sysFamilyBold);
+    renderer->insertFont(NeuStyle::FONT_HEADING, sysFamilyHeading);
+    renderer->insertFont(NeuStyle::FONT_SMALL,
+                         sysFamilyNormal); // reuse ui_12 as small for now
   }
 
   _fontsLoaded = true;
@@ -147,57 +155,119 @@ bool SystemUI::showConfirmDialog(IInput &input, const char *title,
   const int dispW = _display.getWidth();
   const int dispH = _display.getHeight();
 
-  static constexpr int DLG_W = 300;
-  static constexpr int DLG_H = 150;
+  static constexpr int DLG_W = NeuStyle::DIALOG_W;
+  int fontHeading = NeuStyle::FONT_HEADING;
+  int fontBody = NeuStyle::FONT_BODY;
+
+  static constexpr int marginX = 20;
+  int maxTextW = DLG_W - 2 * marginX;
+
+  bool hasTitle = (title && title[0] != '\0');
+  int headingLineH = hasTitle ? renderer->getLineHeight(fontHeading) : 0;
+  int msgLineH = renderer->getLineHeight(fontBody);
+
+  // Auto-wrap message text
+  std::vector<std::string> wrappedLines;
+  if (message && message[0] != '\0') {
+    std::string msgStr(message);
+    size_t start = 0;
+    size_t end = msgStr.find('\n');
+    while (end != std::string::npos) {
+      std::string para = msgStr.substr(start, end - start);
+      if (!para.empty()) {
+        auto lines = renderer->wrapTextWithHyphenation(fontBody, para.c_str(),
+                                                       maxTextW, 20);
+        wrappedLines.insert(wrappedLines.end(), lines.begin(), lines.end());
+      } else {
+        wrappedLines.push_back("");
+      }
+      start = end + 1;
+      end = msgStr.find('\n', start);
+    }
+    std::string para = msgStr.substr(start);
+    if (!para.empty()) {
+      auto lines = renderer->wrapTextWithHyphenation(fontBody, para.c_str(),
+                                                     maxTextW, 20);
+      wrappedLines.insert(wrappedLines.end(), lines.begin(), lines.end());
+    }
+  }
+
+  // Title bar height (black rect with white text)
+  int titleBarH = hasTitle ? (headingLineH + 32) : 0;
+
+  static constexpr int paddingTop = 20;
+  static constexpr int titleGap = 14;
+  static constexpr int paddingBottom = 20;
+
+  int numMsgLines = static_cast<int>(wrappedLines.size());
+  int msgTotalH = numMsgLines * msgLineH;
+  // Content starts after the title bar overlap
+  int contentH = (hasTitle ? titleBarH + titleGap - paddingTop : 0) + msgTotalH;
+  int DLG_H = paddingTop + contentH + paddingBottom;
+
   int dlgX = (dispW - DLG_W) / 2;
   int dlgY = (dispH - DLG_H) / 2;
 
-  int fontNormal = 10;
-  int fontBold = 11;
+  // Adjust dialog Y to account for title bar overlapping the top
+  if (hasTitle) {
+    dlgY += titleBarH / 2;
+  }
 
   // Draw halftone background overlay
   renderer->fillHalftoneRect(0, 0, dispW, dispH, false);
 
-  // Background + border.
-  renderer->fillRect(dlgX, dlgY, DLG_W, DLG_H, false); // white fill
-  renderer->drawRect(dlgX, dlgY, DLG_W, DLG_H, true);  // black border
-  renderer->drawRect(dlgX + 1, dlgY + 1, DLG_W - 2, DLG_H - 2,
-                     true); // 2 px border
+  // Shadow box: 6px border, 20px offset shadow
+  renderer->drawShadowBox(dlgX, dlgY, DLG_W, DLG_H, NeuStyle::BORDER_W,
+                          NeuStyle::SHADOW_OFFSET);
 
 #ifdef PLATFORM_ESP32
   if (batteryWidget) {
     HeaderWidget header(_display, *batteryWidget);
-    header.render("", fontBold);
+    header.render("", fontHeading);
   }
 #endif
 
-  // Title (bold, centred).
-  int tw = renderer->getTextWidth(fontBold, title);
-  renderer->drawText(fontBold, dlgX + (DLG_W - tw) / 2, dlgY + 14, title, true);
+  // Title bar: solid black rectangle overlapping the dialog top border
+  int currY = dlgY + paddingTop;
+  if (hasTitle) {
+    int titleBarY = dlgY;
+    // Black rectangle spanning the dialog width, centered
+    renderer->fillRect(dlgX, titleBarY, DLG_W, titleBarH, true);
+    // White text centered in the black bar
+    // Convert title to uppercase
+    std::string upperTitle(title);
+    for (auto &c : upperTitle)
+      c = toupper(c);
+    int tw = renderer->getTextWidth(fontHeading, upperTitle.c_str());
+    int titleTextY = titleBarY + (titleBarH - headingLineH) / 2;
+    renderer->drawText(fontHeading, dlgX + (DLG_W - tw) / 2, titleTextY,
+                       upperTitle.c_str(), false);
+    currY = dlgY + titleBarH + titleGap;
+  }
 
-  // Separator
-  // renderer->drawLine(dlgX, dlgY + 40, dlgX + DLG_W, dlgY + 40, true);
-  renderer->fillRect(dispW / 2 - 1, dlgY + DLG_H, 2, dispH - 48, true);
+  // Vertical separator line below dialog down to footer
+  int lineH = (dispH - NeuStyle::FOOTER_H) - (dlgY + DLG_H);
+  if (lineH > 0) {
+    const int sep_W = NeuStyle::SHADOW_OFFSET + NeuStyle::BORDER_W;
+    renderer->fillRect(dispW / 2 - sep_W / 2, dlgY + DLG_H, sep_W, lineH, true);
+  }
 
-  // Message body (wrapped, max 3 lines, inner margin of 15px)
-  static constexpr int marginX = 15;
-  int maxTextW = DLG_W - 2 * marginX;
-  auto wrappedLines =
-      renderer->wrapTextWithHyphenation(fontNormal, message, maxTextW, 3);
-
-  int msgY = dlgY + 54;
+  // Message body (wrapped, left-aligned)
   for (const auto &line : wrappedLines) {
-    renderer->drawText(fontNormal, dlgX + marginX, msgY, line.c_str(), true);
-    msgY += renderer->getLineHeight(fontNormal);
+    if (!line.empty()) {
+      int lineX = dlgX + marginX;
+      renderer->drawText(fontBody, lineX, currY, line.c_str(), true);
+    }
+    currY += msgLineH;
   }
 
   // Render footer using FooterWidget
   FooterWidget footer;
-  footer.btnBack = {true, "Cancel", "Back"};
-  footer.btnConfirm = {false, "", ""};
-  footer.btnPrev = {false, "", ""};
-  footer.btnNext = {true, "Confirm", "Confirm"};
-  footer.render(renderer, dispW, dispH, fontNormal);
+  footer.btnBack = {true, "CANCEL", "Back", false};
+  footer.btnConfirm = {false, "", "", false};
+  footer.btnPrev = {false, "", "", false};
+  footer.btnNext = {true, "CONFIRM", "Confirm", true}; // isPill = true
+  footer.render(renderer, dispW, dispH);
 
   _display.present();
 

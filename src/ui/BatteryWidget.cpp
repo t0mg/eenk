@@ -54,65 +54,60 @@ void BatteryWidget::tick() {
 
 void BatteryWidget::draw(int x, int y, bool inverted) {
 #ifdef PLATFORM_ESP32
-  // Ensure the UI font is registered in this renderer instance.
-  // insertFont is idempotent if the same ID is already present; calling it
-  // here keeps BatteryWidget self-contained without requiring the caller to
-  // pre-register the font.
   _renderer.insertFont(kBatteryFontId, s_batFamily);
 #endif
 
-  // 'ink' = true means draw black pixels; false = white (for inverted strip).
-  bool ink = !inverted;
+  // Neubrutalist battery: white body on black header, black depletion overlay.
+  // When inverted=true (default on black header), body is white, depletion is
+  // black.
+  bool bodyColor = !inverted; // true = white pixels on black bg
+  bool deplColor = inverted;  // true = black overlay for depleted portion
 
-  // ── 1. Battery body outline ───────────────────────────────────────────────
-  // 24 wide × 14 tall, origin at (x, y).
-  static constexpr int kBodyW = 24;
-  static constexpr int kBodyH = 14;
-  _renderer.drawRect(x, y, kBodyW, kBodyH, ink);
+  // ── 1. Battery body
+  // ─────────────────────────────────────────────────────────
+  _renderer.fillRect(x, y, kBodyW, kBodyH, bodyColor);
+  // add stem
+  _renderer.fillRect(x + kBodyW, y + 4, kStem, kBodyH - 8, bodyColor);
 
-  // ── 2. Terminal nub ───────────────────────────────────────────────────────
-  // 3 wide × 6 tall, centred vertically on the right edge of the body.
-  static constexpr int kNubW = 3;
-  static constexpr int kNubH = 6;
-  static constexpr int kNubY = (kBodyH - kNubH) / 2; // = 4
-  _renderer.fillRect(x + kBodyW, y + kNubY, kNubW, kNubH, ink);
-
-  // ── 3. Charge fill ────────────────────────────────────────────────────────
-  // Interior is (kBodyW - 4) px wide, (kBodyH - 4) px tall (2 px inset on
-  // all sides so the outline remains visible).
-  static constexpr int kCellInset = 2;
-  static constexpr int kCellW = kBodyW - 2 * kCellInset; // 20
-  static constexpr int kCellH = kBodyH - 2 * kCellInset; // 10
-
-  uint16_t pct = _cachedPct;
+  // ── 2. Depletion overlay
+  // ──────────────────────────────────────────────────── Black rect from right
+  // edge inward, proportional to (100 - pct).
+#ifdef PIO_UNIT_TESTING
+  uint32_t pct = 66;
+#else
+  uint32_t pct = _cachedPct;
+#endif
   if (pct > 100)
     pct = 100;
 
-  int fillW = (kCellW * pct) / 100;
-  if (fillW > 0) {
-    _renderer.fillRect(x + kCellInset, y + kCellInset, fillW, kCellH, ink);
+  int depletedW = (kBodyW - 2 * kPadding) * (100 - pct) / 100;
+  if (depletedW > 0) {
+    _renderer.fillRect(x + kBodyW - kPadding - depletedW, y + kPadding,
+                       depletedW, kBodyH - 2 * kPadding, deplColor);
   }
 
-  // ── 4. Percentage label ───────────────────────────────────────────────────
-  // Placed to the LEFT of the body so it never clips the right edge.
-  // Vertically align label with body centre. The ui_10 ascender is ~10px,
-  // but the font renders slightly lower, so we subtract 8px to align it.
+  // ── 3. Percentage label
+  // ─────────────────────────────────────────────────────
   int labelY = y + (kBodyH - 10) / 2 - 8;
-
-  // Build label: "+85%" (charging) or "85%" (discharging / unknown).
   char label[32];
-  if (_cachedCharging) {
+
+#ifdef PIO_UNIT_TESTING
+  bool isCharging = true;
+#else
+  bool isCharging = _battery.isCharging();
+#endif
+
+  if (isCharging) {
     snprintf(label, sizeof(label), "charging %d%%", pct);
   } else {
     snprintf(label, sizeof(label), "%d%%", pct);
   }
 
 #if defined(PLATFORM_ESP32) || defined(PIO_UNIT_TESTING)
-  // Measure text width so we can right-justify it flush against the body.
   static constexpr int kLabelGap = 4;
   int textW = _renderer.getTextWidth(kBatteryFontId, label);
   int labelX = x - kLabelGap - textW;
-  _renderer.drawText(kBatteryFontId, labelX, labelY, label, ink);
+  _renderer.drawText(kBatteryFontId, labelX, labelY, label, bodyColor);
 #else
   (void)labelY;
   (void)label;

@@ -7,12 +7,13 @@ struct FooterAction {
     bool hasAction = false;
     std::string customLabel;
     std::string defaultLabel; // e.g. "Back", "Confirm", "Prev", "Next"
+    bool isPill = false;      // Render as inverted pill (white text on black rounded rect)
 };
 
 class FooterWidget {
 public:
     static constexpr int BEZEL_OFFSET_Y = 4;
-    static constexpr int HEIGHT = 48 + BEZEL_OFFSET_Y;
+    static constexpr int HEIGHT = 64 + BEZEL_OFFSET_Y;
     static constexpr int BTN_WIDTH = 120;
     static constexpr int MAX_LABEL_WIDTH = 110;
 
@@ -22,6 +23,6 @@ public:
     FooterAction btnPrev;
     FooterAction btnNext;
 
-    // Renders the 48px tall footer at the bottom of the screen.
-    void render(GfxRenderer* r, int displayWidth, int displayHeight, int fontIndex) const;
+    // Renders the footer at the bottom of the screen.
+    void render(GfxRenderer* r, int displayWidth, int displayHeight) const;
 };
