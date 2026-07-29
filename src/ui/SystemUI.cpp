@@ -206,7 +206,8 @@ bool SystemUI::showConfirmDialog(IInput &input, const char *title,
   int DLG_H = paddingTop + contentH + paddingBottom;
 
   int dlgX = (dispW - DLG_W) / 2;
-  int dlgY = (dispH - DLG_H) / 2;
+  int dlgY =
+      (dispH - FooterWidget::HEIGHT - NeuStyle::SHADOW_OFFSET - DLG_H) / 2;
 
   // Adjust dialog Y to account for title bar overlapping the top
   if (hasTitle) {
