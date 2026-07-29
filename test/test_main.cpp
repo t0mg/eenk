@@ -293,7 +293,7 @@ public:
 
 protected:
   void scanSD() override {
-    _numEntries = 4;
+    _numEntries = 8;
 
     snprintf(_entries[0].title, sizeof(_entries[0].title),
              "The Hitchhiker's Guide");
@@ -323,6 +323,30 @@ protected:
     _entries[3].sizeBytes = 250000;
     _entries[3].hasMetadata = true;
     _entries[3].hasSave = false;
+
+    snprintf(_entries[4].title, sizeof(_entries[4].title), "Spider and Web");
+    snprintf(_entries[4].author, sizeof(_entries[4].author), "Andrew Plotkin");
+    _entries[4].sizeBytes = 320000;
+    _entries[4].hasMetadata = true;
+    _entries[4].hasSave = true;
+
+    snprintf(_entries[5].title, sizeof(_entries[5].title), "Photopia");
+    snprintf(_entries[5].author, sizeof(_entries[5].author), "Adam Cadre");
+    _entries[5].sizeBytes = 150000;
+    _entries[5].hasMetadata = true;
+    _entries[5].hasSave = false;
+
+    snprintf(_entries[6].title, sizeof(_entries[6].title), "Galatea");
+    snprintf(_entries[6].author, sizeof(_entries[6].author), "Emily Short");
+    _entries[6].sizeBytes = 410000;
+    _entries[6].hasMetadata = true;
+    _entries[6].hasSave = true;
+
+    snprintf(_entries[7].title, sizeof(_entries[7].title), "80 Days");
+    snprintf(_entries[7].author, sizeof(_entries[7].author), "inkle");
+    _entries[7].sizeBytes = 5500000;
+    _entries[7].hasMetadata = true;
+    _entries[7].hasSave = false;
   }
 };
 

@@ -2,6 +2,13 @@
 
 #include <cstring>
 #include <cstdio>
+#include <cctype>
+
+#ifdef PLATFORM_ESP32
+#include <SD.h>   // SD.exists()
+#else
+#include <unistd.h>  // access()
+#endif
 
 // ── Construction / destruction ─────────────────────────────────────────────
 
@@ -28,6 +35,15 @@ StreamingEpdFont* StreamingEpdFontFamily::tryLoadFromDirs(const char* const* dir
     for (const char* const* n = candidateNames; *n != nullptr; ++n) {
       int written = snprintf(path, sizeof(path), "%s/%s", *d, *n);
       if (written <= 0 || static_cast<size_t>(written) >= sizeof(path)) continue;
+
+      // Existence pre-check: avoid the expensive (~65 ms) ESP32 VFS error log
+      // that fires every time SD.open() is called on a missing file.
+#ifdef PLATFORM_ESP32
+      if (!SD.exists(path)) continue;
+#else
+      if (access(path, F_OK) != 0) continue;
+#endif
+
       auto* sf = new StreamingEpdFont();
       if (sf->load(path)) {
         printf("[StreamingEpdFontFamily] Loaded: %s\n", path);

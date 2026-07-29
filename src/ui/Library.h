@@ -49,9 +49,9 @@ protected:
     };
 
     static constexpr int MAX_STORIES   = 32;
-    static constexpr int ITEM_H        = 64;   // px per story list entry
+    static constexpr int ITEM_H        = 94;   // px per story list entry
     // floor((800 - STATUS_BAR_H - FooterWidget::HEIGHT) / ITEM_H)
-    static constexpr int VISIBLE_ITEMS = 11;
+    static constexpr int VISIBLE_ITEMS = 7;
     static constexpr int DISPLAY_W     = 480;
     static constexpr int DISPLAY_H     = 800;
     static constexpr int ITEM_MARGIN_X = 12;   // left/right text margin within an entry

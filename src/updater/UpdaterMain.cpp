@@ -8,17 +8,106 @@
 #include <GfxRenderer.h>
 #include <EpdFont.h>
 #include <builtinFonts/ui_12.h>
+#include <cstring>
 
 EspEinkDisplay* display = nullptr;
 
 static EpdFont s_font12(&ui_12);
 static EpdFontFamily s_fam12(&s_font12);
 
+static constexpr int kUpdaterFontId   = 0;
+static constexpr int kUpdaterMarginX  = 16;
+static constexpr int kUpdaterMarginY  = 20;
+static constexpr int kUpdaterDispW    = 480;   // portrait logical width
+static constexpr int kUpdaterLineH    = 20;    // approximate line height for ui_12
+
+// Render a message string on the display, honouring '\n' and wrapping long
+// lines at the right margin. Keeps the updater partition lean — no heap
+// allocation, no GfxRenderer wrap helpers.
 void drawMessage(const char* msg) {
     if (!display) return;
     auto* r = display->getRenderer();
+    r->insertFont(kUpdaterFontId, s_fam12);
     display->clear();
-    r->drawText(0, 10, 100, msg, true); // true = black text
+
+    int y = kUpdaterMarginY;
+    const int maxWidth = kUpdaterDispW - 2 * kUpdaterMarginX;
+    const int spaceW = r->getSpaceWidth(kUpdaterFontId);
+
+    const char* p = msg;
+    while (*p) {
+        // Find end of this paragraph (next '\n' or end of string)
+        const char* nl = p;
+        while (*nl && *nl != '\n') ++nl;
+
+        // Wrap the paragraph text
+        const char* paraStart = p;
+        while (paraStart < nl) {
+            // Find how many words fit in this line
+            const char* lineEnd = paraStart;
+            const char* wordStart = paraStart;
+            int currentW = 0;
+
+            while (wordStart < nl) {
+                // Find end of current word
+                const char* wordEnd = wordStart;
+                while (wordEnd < nl && *wordEnd != ' ') ++wordEnd;
+
+                // Measure word
+                char wordBuf[64];
+                size_t wordLen = wordEnd - wordStart;
+                if (wordLen >= sizeof(wordBuf)) wordLen = sizeof(wordBuf) - 1;
+                memcpy(wordBuf, wordStart, wordLen);
+                wordBuf[wordLen] = '\0';
+                
+                int wordW = r->getTextWidth(kUpdaterFontId, wordBuf);
+                
+                if (currentW + wordW > maxWidth && currentW > 0) {
+                    // Word doesn't fit and it's not the first word, break line here
+                    break;
+                }
+                
+                // Add word to current line
+                currentW += wordW + spaceW;
+                lineEnd = wordEnd;
+                
+                // Skip spaces
+                wordStart = wordEnd;
+                while (wordStart < nl && *wordStart == ' ') ++wordStart;
+            }
+
+            if (lineEnd == paraStart) {
+                // Word is longer than maxWidth, force break it or skip
+                lineEnd = paraStart;
+                while (lineEnd < nl && *lineEnd != ' ') ++lineEnd;
+            }
+
+            // Draw the line
+            char lineBuf[128];
+            size_t lineLen = lineEnd - paraStart;
+            if (lineLen >= sizeof(lineBuf)) lineLen = sizeof(lineBuf) - 1;
+            memcpy(lineBuf, paraStart, lineLen);
+            lineBuf[lineLen] = '\0';
+
+            if (lineLen > 0) {
+                r->drawText(kUpdaterFontId, kUpdaterMarginX, y, lineBuf, true);
+            }
+            y += kUpdaterLineH;
+
+            // Advance to next line in paragraph
+            paraStart = lineEnd;
+            while (paraStart < nl && *paraStart == ' ') ++paraStart;
+        }
+
+        if (p == nl) {
+            // Empty line (just '\n')
+            y += kUpdaterLineH;
+        }
+
+        // Advance past the newline (if any)
+        p = *nl ? nl + 1 : nl;
+    }
+
     display->present();
     Serial.println(msg);
 }
@@ -66,8 +155,6 @@ void setup() {
     Serial.println("=== eenk OTA Updater (app1) ===");
 
     display = new EspEinkDisplay();
-    auto* r = display->getRenderer();
-    r->insertFont(0, s_fam12);
     
     drawMessage("OTA Updater Started...\nMounting SD Card...");
 

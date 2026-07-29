@@ -3,15 +3,16 @@
 // launches selected story via BootManager.
 #include "Library.h"
 #include "BatteryWidget.h"
+#include "ListItemWidget.h"
 #include "StoryMetadata.h"
 #include "SystemUI.h"
 #include "os/BootManager.h"
 
+#include "NeuStyle.h"
 #include <GfxRenderer.h>
 #include <cctype>
 #include <cstdio>
 #include <cstring>
-#include "NeuStyle.h"
 
 #ifdef PLATFORM_ESP32
 #include <Arduino.h>
@@ -20,10 +21,10 @@
 #include <InputManager.h>
 #include <SD.h>
 #include <SPI.h>
+#include <builtinFonts/syne_bold_10.h>
 #include <builtinFonts/ui_10.h>
 #include <builtinFonts/ui_12.h>
 #include <builtinFonts/ui_bold_12.h>
-#include <builtinFonts/syne_bold_10.h>
 #include <esp_sleep.h>
 
 static EpdFont s_glNormal(&ui_12);
@@ -46,8 +47,8 @@ static EpdFontFamily s_glFamilyHeading(&s_glHeading);
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-Library::Library(IDisplay &display, IInput &input,
-                 BatteryWidget &battery, AppSettings &settings)
+Library::Library(IDisplay &display, IInput &input, BatteryWidget &battery,
+                 AppSettings &settings)
     : _display(display), _input(input), _battery(battery), _settings(settings) {
 }
 
@@ -383,91 +384,88 @@ void Library::renderEntry(int index, int yPos, bool selected) {
 #if defined(PLATFORM_ESP32) || defined(PIO_UNIT_TESTING)
   const StoryEntry &e = _entries[index];
 
-  // Background: fill row black if selected, white otherwise.
-  r->fillRect(0, yPos, DISPLAY_W, ITEM_H,
-              selected /*ink = true means black fill*/);
+  int cardX = 24;
+  int cardY = yPos + 4;
+  int cardW = DISPLAY_W - 48;
+  int cardH = ITEM_H - 8;
 
-  // Text colour: white on black (selected) or black on white (normal).
-  bool ink = !selected;
+  ListItemWidget::draw(
+      r, cardX, cardY, cardW, cardH, selected,
+      [&](int inX, int inY, int inW, int inH) {
+        bool ink = true; // Always black text on white background inside card
 
-  // Top separator line (except for the very first item — the status bar acts as
-  // separator).
-  r->drawLine(0, yPos, DISPLAY_W, yPos, true /*always black*/);
+        // ── Title
+        // ─────────────────────────────────────────────────────────────────
+        int lineH_bold = r->getLineHeight(FONT_BOLD);
+        int lineH_small = r->getLineHeight(FONT_SMALL);
 
-  // ── Title ─────────────────────────────────────────────────────────────────
-  int lineH_bold = r->getLineHeight(FONT_BOLD);
-  int lineH_small = r->getLineHeight(FONT_SMALL);
+        bool hasAuthor = (e.author[0] != '\0');
+        int textBlockH = lineH_bold + (hasAuthor ? (lineH_small + 2) : 0);
+        int textY = inY + (inH - textBlockH) / 2;
 
-  // Vertical layout within the row:
-  //   Top padding:  (ITEM_H - titleH - authorH - 4) / 2
-  // When there's no author we centre the title alone.
-  bool hasAuthor = (e.author[0] != '\0');
-  int textBlockH = lineH_bold + (hasAuthor ? (lineH_small + 2) : 0);
-  int textY = yPos + (ITEM_H - textBlockH) / 2;
+        // Build size string.
+        char sizeStr[16];
+        formatSize(e.sizeBytes, sizeStr, sizeof(sizeStr));
+        int sizeW = r->getTextWidth(FONT_SMALL, sizeStr);
 
-  // Right-side annotations (size, save indicator).
-  // Build size string.
-  char sizeStr[16];
-  formatSize(e.sizeBytes, sizeStr, sizeof(sizeStr));
-  int sizeW = r->getTextWidth(FONT_SMALL, sizeStr);
+        // Save indicator: 16x16 floppy icon if hasSave.
+        int saveW = e.hasSave ? 16 : 0;
 
-  // Save indicator: 16x16 floppy icon if hasSave.
-  int saveW = e.hasSave ? 16 : 0;
+        // Currently-loaded marker.
+        const char *loadedStr = e.isCurrentlyLoaded ? "[LOADED]" : "";
+        int loadedW =
+            e.isCurrentlyLoaded ? r->getTextWidth(FONT_SMALL, loadedStr) : 0;
 
-  // Currently-loaded marker.
-  const char *loadedStr = e.isCurrentlyLoaded ? "[LOADED]" : "";
-  int loadedW =
-      e.isCurrentlyLoaded ? r->getTextWidth(FONT_SMALL, loadedStr) : 0;
+        int annotX = inX + inW - 8 - sizeW;
 
-  // Right-hand annotation x position: leave ITEM_MARGIN_X gap from right edge.
-  int annotX = DISPLAY_W - ITEM_MARGIN_X - sizeW;
+        // Draw size at right edge.
+        r->drawText(FONT_SMALL, annotX, textY + (lineH_bold - lineH_small) / 2,
+                    sizeStr, ink);
 
-  // Draw size at right edge.
-  r->drawText(FONT_SMALL, annotX, textY + (lineH_bold - lineH_small) / 2,
-              sizeStr, ink);
-
-  // Draw save indicator (floppy icon) to the left of size.
-  if (e.hasSave) {
-    int svX = annotX - saveW - 6;
-    int svY = textY + (lineH_bold - 16) / 2;
-    static const uint8_t kFloppyIcon16[32] = {
-        0xf0, 0x6c, 0xf0, 0x6e, 0xf0, 0x6f, 0xf0, 0x6f, 0xf0, 0x0f, 0xff,
-        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc0, 0x03, 0xd9, 0x2b,
-        0xd2, 0xab, 0xcb, 0xab, 0xda, 0x93, 0xc0, 0x03, 0xff, 0xff};
-    for (int fy = 0; fy < 16; fy++) {
-      for (int fx_byte = 0; fx_byte < 2; fx_byte++) {
-        uint8_t b = kFloppyIcon16[fy * 2 + fx_byte];
-        for (int fx_bit = 0; fx_bit < 8; fx_bit++) {
-          if (b & (1 << (7 - fx_bit))) {
-            r->drawPixel(svX + fx_byte * 8 + fx_bit, svY + fy, ink);
+        // Draw save indicator
+        if (e.hasSave) {
+          int svX = annotX - saveW - 6;
+          int svY = textY + (lineH_bold - 16) / 2;
+          static const uint8_t kFloppyIcon16[32] = {
+              0xf0, 0x6c, 0xf0, 0x6e, 0xf0, 0x6f, 0xf0, 0x6f, 0xf0, 0x0f, 0xff,
+              0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc0, 0x03, 0xd9, 0x2b,
+              0xd2, 0xab, 0xcb, 0xab, 0xda, 0x93, 0xc0, 0x03, 0xff, 0xff};
+          for (int fy = 0; fy < 16; fy++) {
+            for (int fx_byte = 0; fx_byte < 2; fx_byte++) {
+              uint8_t b = kFloppyIcon16[fy * 2 + fx_byte];
+              for (int fx_bit = 0; fx_bit < 8; fx_bit++) {
+                if (b & (1 << (7 - fx_bit))) {
+                  r->drawPixel(svX + fx_byte * 8 + fx_bit, svY + fy, ink);
+                }
+              }
+            }
           }
         }
-      }
-    }
-  }
 
-  // Draw currently-loaded marker below save indicator.
-  if (e.isCurrentlyLoaded) {
-    int ldX = DISPLAY_W - ITEM_MARGIN_X - loadedW;
-    int ldY = textY + lineH_bold + 2;
-    r->drawText(FONT_SMALL, ldX, ldY, loadedStr, ink);
-  }
+        // Draw currently-loaded marker
+        if (e.isCurrentlyLoaded) {
+          int ldX = inX + inW - 8 - loadedW;
+          int ldY = textY + lineH_bold + 2;
+          r->drawText(FONT_SMALL, ldX, ldY, loadedStr, ink);
+        }
 
-  // Available width for the title (leave room for right annotations).
-  int maxTitleW = annotX - ITEM_MARGIN_X - 8 - (saveW > 0 ? saveW + 6 : 0);
+        // Available width for the title
+        int maxTitleW = annotX - inX - 8 - (saveW > 0 ? saveW + 6 : 0);
 
-  // Truncate title if too wide.
-  std::string truncTitle = r->truncatedText(FONT_BOLD, e.title, maxTitleW);
-  r->drawText(FONT_BOLD, ITEM_MARGIN_X, textY, truncTitle.c_str(), ink);
+        std::string truncTitle =
+            r->truncatedText(FONT_BOLD, e.title, maxTitleW);
+        r->drawText(FONT_BOLD, inX + 8, textY, truncTitle.c_str(), ink);
 
-  // ── Author ────────────────────────────────────────────────────────────────
-  if (hasAuthor) {
-    int authorY = textY + lineH_bold + 2;
-    int maxAuthorW = annotX - ITEM_MARGIN_X - 8;
-    std::string truncAuthor =
-        r->truncatedText(FONT_SMALL, e.author, maxAuthorW);
-    r->drawText(FONT_SMALL, ITEM_MARGIN_X, authorY, truncAuthor.c_str(), ink);
-  }
+        // ── Author
+        // ────────────────────────────────────────────────────────────────
+        if (hasAuthor) {
+          int authorY = textY + lineH_bold + 2;
+          int maxAuthorW = annotX - inX - 8;
+          std::string truncAuthor =
+              r->truncatedText(FONT_SMALL, e.author, maxAuthorW);
+          r->drawText(FONT_SMALL, inX + 8, authorY, truncAuthor.c_str(), ink);
+        }
+      });
 #else
   // Native: just print something to stdout for debugging.
   (void)index;
@@ -510,10 +508,10 @@ void Library::renderFooter() {
     return;
 
   FooterWidget footer;
-  footer.btnBack = {true, "SETTINGS", "Back", false};
+  footer.btnBack = {true, "OPTIONS", "Back", false};
   footer.btnConfirm = {true, "OPEN", "Confirm", true}; // Pill
-  footer.btnPrev = {true, "UP", "Prev", false};
-  footer.btnNext = {true, "DOWN", "Next", false};
+  footer.btnPrev = {true, "PREV", "Prev", false};
+  footer.btnNext = {true, "NEXT", "Next", false};
 
   footer.render(r, DISPLAY_W, DISPLAY_H);
 }
@@ -546,7 +544,7 @@ void Library::render() {
 
     for (int i = _scrollOffset; i < lastVisible; i++) {
       int row = i - _scrollOffset;
-      int yPos = HeaderWidget::HEIGHT + row * ITEM_H;
+      int yPos = HeaderWidget::HEIGHT + 8 + row * ITEM_H;
       renderEntry(i, yPos, i == _selectedIndex);
     }
 
@@ -643,6 +641,7 @@ bool Library::run() {
     ButtonEvent ev = _input.pollInput();
     switch (ev) {
     case ButtonEvent::UP:
+    case ButtonEvent::LEFT:
       if (_numEntries > 0) {
         _selectedIndex--;
         if (_selectedIndex < 0)
@@ -653,6 +652,7 @@ bool Library::run() {
       break;
 
     case ButtonEvent::DOWN:
+    case ButtonEvent::RIGHT:
       if (_numEntries > 0) {
         _selectedIndex++;
         if (_selectedIndex >= _numEntries)
@@ -673,11 +673,6 @@ bool Library::run() {
     case ButtonEvent::QUIT:
       // Navigate to Settings.
       return true;
-
-    case ButtonEvent::LEFT:
-    case ButtonEvent::RIGHT:
-      // Reserved: could be used for sorting/filtering in future.
-      break;
 
     case ButtonEvent::SLEEP:
 #ifdef PLATFORM_ESP32
@@ -702,4 +697,3 @@ bool Library::run() {
     }
   }
 }
-

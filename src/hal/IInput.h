@@ -9,37 +9,36 @@
  */
 
 /** All possible button events the game engine cares about. */
-enum class ButtonEvent
-{
-    NONE,      ///< No input this frame
-    UP,        ///< Navigate up / previous choice
-    DOWN,      ///< Navigate down / next choice
-    LEFT,      ///< Scroll left / page back
-    RIGHT,     ///< Scroll right / page forward
-    CONFIRM,   ///< Select / advance narrative
-    BACK,      ///< Save / exit / cancel
-    SLEEP,     ///< Device power off / sleep requested
-    QUIT,      ///< Platform quit (window close, power button)
+enum class ButtonEvent {
+  NONE,    ///< No input this frame
+  UP,      ///< Navigate up / previous choice
+  DOWN,    ///< Navigate down / next choice
+  LEFT,    ///< Scroll left / page back
+  RIGHT,   ///< Scroll right / page forward
+  CONFIRM, ///< Select / advance narrative
+  BACK,    ///< Save / exit / cancel
+  SLEEP,   ///< Device power off / sleep requested
+  QUIT,    ///< Platform quit (window close, power button)
 };
 
-class IInput
-{
+class IInput {
 public:
-    virtual ~IInput() = default;
+  virtual ~IInput() = default;
 
-    /**
-     * Non-blocking poll for the next button event.
-     * Returns ButtonEvent::NONE if no key/button was pressed since the last call.
-     */
-    virtual ButtonEvent pollInput() = 0;
+  /**
+   * Non-blocking poll for the next button event.
+   * Returns ButtonEvent::NONE if no key/button was pressed since the last call.
+   */
+  virtual ButtonEvent pollInput() = 0;
 
-    /**
-     * Returns the timestamp (in millis) of the last physical button press/release.
-     */
-    virtual uint32_t getLastActivityTime() const = 0;
+  /**
+   * Returns the timestamp (in millis) of the last physical button
+   * press/release.
+   */
+  virtual uint32_t getLastActivityTime() const = 0;
 
-    /**
-     * Set the inactivity timeout in seconds (0 = disabled).
-     */
-    virtual void setAutoSleepTimeout(uint16_t seconds) = 0;
+  /**
+   * Set the inactivity timeout in seconds (0 = disabled).
+   */
+  virtual void setAutoSleepTimeout(uint16_t seconds) = 0;
 };

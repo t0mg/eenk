@@ -397,6 +397,10 @@ void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* stor
   dirs[ndirs]   = nullptr;
 
   auto applySdFont = [&](const char* stemName) {
+    if (_streamingFamily) {
+      delete _streamingFamily;
+      _streamingFamily = nullptr;
+    }
     _streamingFamily = new StreamingEpdFontFamily();
     if (_streamingFamily->load(stemName, dirs)) {
       if (renderer) {
@@ -543,7 +547,13 @@ void InkEngine::tickRunningText() {
     }
   }
 
-  while (_wrappedLines.size() > 800) {
+#ifdef PLATFORM_ESP32
+  static constexpr size_t kMaxHistoryLines = 100;
+#else
+  static constexpr size_t kMaxHistoryLines = 800;
+#endif
+
+  while (_wrappedLines.size() > kMaxHistoryLines) {
     _wrappedLines.pop_front();
   }
 

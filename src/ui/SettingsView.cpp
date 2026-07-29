@@ -12,12 +12,13 @@
 //   Status bar:  y=0..39  (HeaderWidget::HEIGHT = 40)
 //   List items:  y=40..  (ROW_H = 60 px each)
 #include "SettingsView.h"
-#include "NeuStyle.h"
-#include <cstring>
-#include <cctype>
 #include "BatteryWidget.h"
+#include "ListItemWidget.h"
+#include "NeuStyle.h"
 #include "SystemUI.h"
 #include "os/BootManager.h"
+#include <cctype>
+#include <cstring>
 
 #include <cstdio>
 #include <cstring>
@@ -32,10 +33,10 @@
 #include <GfxRenderer.h>
 #include <InputManager.h>
 #include <builtinFonts/small14.h>
+#include <builtinFonts/syne_bold_10.h>
 #include <builtinFonts/ui_10.h>
 #include <builtinFonts/ui_12.h>
 #include <builtinFonts/ui_bold_12.h>
-#include <builtinFonts/syne_bold_10.h>
 #include <esp_sleep.h>
 
 static EpdFont s_font12(&ui_12);
@@ -69,12 +70,13 @@ static constexpr int DISP_H = 800;
 
 // Card inset from screen edges for bordered rows
 static constexpr int CARD_INSET_X = 24;
-static constexpr int CARD_INSET_Y = 6;
+static constexpr int CARD_INSET_Y = 8;
 static constexpr int CARD_W = DISP_W - 2 * CARD_INSET_X;
 
 // Helper: uppercase a string in-place
-static void toUpper(char* s) {
-    for (; *s; s++) *s = toupper((unsigned char)*s);
+static void toUpper(char *s) {
+  for (; *s; s++)
+    *s = toupper((unsigned char)*s);
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -92,7 +94,8 @@ static const char *marginName(uint8_t px) {
 
 // Map refreshInterval value (0/5/10/15/20) to a display string.
 static const char *refreshName(uint8_t n) {
-  if (n == 0) return "Off";
+  if (n == 0)
+    return "Off";
   static char buf[24];
   snprintf(buf, sizeof(buf), "Every %u updates", (unsigned)n);
   return buf;
@@ -136,12 +139,13 @@ void SettingsView::run() {
   _fontCatalogue.scan();
   _currentFontIndex = 0;
   for (size_t i = 0; i < _fontCatalogue.getCount(); ++i) {
-      const FontEntry& e = _fontCatalogue.getEntries()[i];
-      const char* id = (e.builtinIndex != 255) ? kBuiltinFonts[e.builtinIndex].token : e.stem;
-      if (strcmp(_settings.storyFont, id) == 0) {
-          _currentFontIndex = (int)i;
-          break;
-      }
+    const FontEntry &e = _fontCatalogue.getEntries()[i];
+    const char *id =
+        (e.builtinIndex != 255) ? kBuiltinFonts[e.builtinIndex].token : e.stem;
+    if (strcmp(_settings.storyFont, id) == 0) {
+      _currentFontIndex = (int)i;
+      break;
+    }
   }
 
   _itemIndex = 0;
@@ -201,13 +205,14 @@ void SettingsView::run() {
   }
 }
 
-// ─── renderPage() ─────────────────────────────────────────────────────────────
+// ─── renderPage()
+// ─────────────────────────────────────────────────────────────
 
 void SettingsView::renderPage() {
   _display.clear();
 
   HeaderWidget header(_display, _battery);
-  header.render("Settings", kFontHeading);
+  header.render("OPTIONS", kFontHeading);
 
   int y = HeaderWidget::HEIGHT + CARD_INSET_Y;
 
@@ -215,7 +220,7 @@ void SettingsView::renderPage() {
   {
     const char *val = "Default";
     if (_fontCatalogue.getCount() > 0) {
-        val = _fontCatalogue.getEntries()[_currentFontIndex].displayName;
+      val = _fontCatalogue.getEntries()[_currentFontIndex].displayName;
     }
     drawSettingsRow(y, "Story Font", val, _itemIndex == 0);
     y += ROW_H;
@@ -265,7 +270,8 @@ void SettingsView::renderPage() {
   _display.present();
 }
 
-// ─── renderFooter() ───────────────────────────────────────────────────────────
+// ─── renderFooter()
+// ───────────────────────────────────────────────────────────
 
 void SettingsView::renderFooter() {
   auto *r = _display.getRenderer();
@@ -274,35 +280,24 @@ void SettingsView::renderFooter() {
 
   FooterWidget footer;
   footer.btnBack = {true, "BACK", "Back", false};
-  bool isActionRow = (_itemIndex == 5 || _itemIndex == 6 || _itemIndex == 7);
-  footer.btnConfirm = {isActionRow, isActionRow ? "CHANGE" : "", "Confirm", isActionRow};
-  footer.btnPrev = {true, "UP", "Prev", false};
-  footer.btnNext = {true, "DOWN", "Next", false};
+  // CONFIRM always cycles or activates; label changes for action rows
+  bool isActionRow = (_itemIndex == 6 || _itemIndex == 7);
+  footer.btnConfirm = {true, isActionRow ? "DO IT" : "CHANGE", "Action",
+                       !isActionRow};
+  footer.btnPrev = {true, "PREV", "Prev", false};
+  footer.btnNext = {true, "NEXT", "Next", false};
 
   footer.render(r, DISP_W, DISP_H);
 }
 
-// ─── drawSettingsRow() ────────────────────────────────────────────────────────
+// ─── drawSettingsRow()
+// ────────────────────────────────────────────────────────
 
 void SettingsView::drawSettingsRow(int y, const char *label, const char *value,
-                                    bool selected) {
+                                   bool selected) {
   auto *r = _display.getRenderer();
   if (!r)
     return;
-
-  // Draw bordered card for this row
-  int cardX = CARD_INSET_X;
-  int cardY = y;
-  int cardH = ROW_H - CARD_INSET_Y;
-
-  // Card outline (BORDER_W thick)
-  for (int i = 0; i < NeuStyle::BORDER_W; i++) {
-    r->drawRect(cardX + i, cardY + i, CARD_W - 2 * i, cardH - 2 * i, true);
-  }
-
-  // Interior is white
-  r->fillRect(cardX + NeuStyle::BORDER_W, cardY + NeuStyle::BORDER_W,
-              CARD_W - 2 * NeuStyle::BORDER_W, cardH - 2 * NeuStyle::BORDER_W, false);
 
   // Heading line height and vertical centering
   int headingH = r->getLineHeight(kFontHeading);
@@ -314,125 +309,93 @@ void SettingsView::drawSettingsRow(int y, const char *label, const char *value,
   upperLabel[sizeof(upperLabel) - 1] = '\0';
   toUpper(upperLabel);
 
-  int labelY = cardY + (cardH - headingH) / 2;
-  int labelX = cardX + NeuStyle::BORDER_W + LEFT_MARGIN;
+  int cardX = CARD_INSET_X;
+  int cardY = y + CARD_INSET_Y / 2;
+  int cardW = CARD_W;
+  int cardH = ROW_H - CARD_INSET_Y;
 
-  if (selected) {
-    // Selected: render label as a pill
-    int pillY = cardY + (cardH - NeuStyle::PILL_H) / 2;
-    r->drawPill(kFontHeading, labelX, pillY, upperLabel,
-               NeuStyle::PILL_PADDING_X, NeuStyle::PILL_H, NeuStyle::PILL_RADIUS, true);
-  } else {
-    // Normal: plain heading text
-    r->drawText(kFontHeading, labelX, labelY, upperLabel, true);
-  }
+  ListItemWidget::draw(
+      r, cardX, cardY, cardW, cardH, selected,
+      [&](int inX, int inY, int inW, int inH) {
+        int labelY = inY + (inH - headingH) / 2;
+        int labelX = inX + LEFT_MARGIN;
 
-  // Value right-aligned within card
-  if (value && value[0] != '\0') {
-    int textW = r->getTextWidth(kFontNormal, value);
-    int valueX = cardX + CARD_W - NeuStyle::BORDER_W - LEFT_MARGIN - textW;
-    int valueMinX = labelX + 120;
-    if (valueX < valueMinX) valueX = valueMinX;
-    int valueY = cardY + (cardH - bodyH) / 2;
-    r->drawText(kFontNormal, valueX, valueY, value, true);
-  }
+        if (selected) {
+          // Selected: render label as a pill
+          int pillY = inY + (inH - NeuStyle::PILL_H) / 2;
+          r->drawPill(kFontHeading, labelX, pillY, upperLabel,
+                      NeuStyle::PILL_PADDING_X, NeuStyle::PILL_H,
+                      NeuStyle::PILL_RADIUS, true);
+        } else {
+          // Normal: plain heading text
+          r->drawText(kFontHeading, labelX, labelY, upperLabel, true);
+        }
+
+        // Value right-aligned within card
+        if (value && value[0] != '\0') {
+          int textW = r->getTextWidth(kFontNormal, value);
+          int valueX = inX + inW - LEFT_MARGIN - textW;
+          int valueMinX = labelX + 120;
+          if (valueX < valueMinX)
+            valueX = valueMinX;
+          int valueY = inY + (inH - bodyH) / 2;
+          r->drawText(kFontNormal, valueX, valueY, value, true);
+        }
+      });
 }
 
-// ─── handleInput() ────────────────────────────────────────────────────────────
+// ─── handleInput()
+// ────────────────────────────────────────────────────────────
+//
+// Input model (unified for side buttons and bottom buttons):
+//   UP / LEFT  → navigate to previous row
+//   DOWN / RIGHT → navigate to next row
+//   CONFIRM    → cycle the value of the selected row (or trigger action rows)
+//   BACK       → exit settings
+//
+// This way the side buttons (UP/DOWN) and the bottom buttons (LEFT/RIGHT) both
+// navigate, while the power/action button (CONFIRM) is the sole way to change
+// a setting value — consistent regardless of which button cluster is used.
 
 void SettingsView::handleInput(ButtonEvent ev) {
   static constexpr int kItems = 8;
 
-  switch (ev) {
-  case ButtonEvent::UP:
+  // ── Navigation (UP, DOWN, LEFT, RIGHT all move the selection) ─────────────
+  if (ev == ButtonEvent::UP || ev == ButtonEvent::LEFT) {
     _itemIndex = (_itemIndex - 1 + kItems) % kItems;
     renderPage();
-    break;
-
-  case ButtonEvent::DOWN:
+    return;
+  }
+  if (ev == ButtonEvent::DOWN || ev == ButtonEvent::RIGHT) {
     _itemIndex = (_itemIndex + 1) % kItems;
     renderPage();
-    break;
-
-  case ButtonEvent::LEFT: {
-    _dirty = true;
-    switch (_itemIndex) {
-    case 0:
-      if (_fontCatalogue.getCount() > 0) {
-        _currentFontIndex = (_currentFontIndex - 1 + _fontCatalogue.getCount()) % _fontCatalogue.getCount();
-        const FontEntry& e = _fontCatalogue.getEntries()[_currentFontIndex];
-        const char* id = (e.builtinIndex != 255) ? kBuiltinFonts[e.builtinIndex].token : e.stem;
-        strncpy(_settings.storyFont, id, sizeof(_settings.storyFont));
-        _settings.storyFont[sizeof(_settings.storyFont)-1] = '\0';
-      }
-      break;
-    case 1:
-      _settings.choiceFontIndex = (uint8_t)((_settings.choiceFontIndex - 1 +
-                                             AppSettings::CHOICE_FONT_COUNT) %
-                                            AppSettings::CHOICE_FONT_COUNT);
-      break;
-    case 2: {
-      static const uint8_t kMargins[] = {8, 16, 24, 32};
-      static const int kMCount = 4;
-      int cur = 1;
-      for (int i = 0; i < kMCount; i++) {
-        if (kMargins[i] == _settings.marginPx) {
-          cur = i;
-          break;
-        }
-      }
-      cur = (cur - 1 + kMCount) % kMCount;
-      _settings.marginPx = kMargins[cur];
-      break;
-    }
-    case 3: {
-      static const uint8_t kRefresh[] = {0, 5, 10, 15, 20};
-      static const int kRCount = 5;
-      int cur = 0;
-      for (int i = 0; i < kRCount; i++) {
-        if (kRefresh[i] == _settings.refreshInterval) {
-          cur = i;
-          break;
-        }
-      }
-      cur = (cur - 1 + kRCount) % kRCount;
-      _settings.refreshInterval = kRefresh[cur];
-      break;
-    }
-    case 4: {
-      static const uint16_t kSleep[] = {0, 60, 120, 300};
-      static const int kSCount = 4;
-      int cur = 0;
-      for (int i = 0; i < kSCount; i++) {
-        if (kSleep[i] == _settings.sleepTimeoutSec) {
-          cur = i;
-          break;
-        }
-      }
-      cur = (cur - 1 + kSCount) % kSCount;
-      _settings.sleepTimeoutSec = kSleep[cur];
-      break;
-    }
-    case 5:
-      _settings.overrideStoryFont = !_settings.overrideStoryFont;
-      break;
-    default:
-      break;
-    }
-    renderPage();
-    break;
+    return;
   }
 
-  case ButtonEvent::RIGHT: {
+  // ── CONFIRM / SLEEP: cycle value or trigger action ─────────────────────────
+  if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::SLEEP) {
+    // Action rows
+    if (_itemIndex == 6) {
+      BootManager::bootUpdater();
+      return;
+    }
+    if (_itemIndex == 7) {
+      formatSD();
+      return;
+    }
+
+    // Value rows: cycle forward
     _dirty = true;
     switch (_itemIndex) {
     case 0:
       if (_fontCatalogue.getCount() > 0) {
         _currentFontIndex = (_currentFontIndex + 1) % _fontCatalogue.getCount();
-        const FontEntry& e = _fontCatalogue.getEntries()[_currentFontIndex];
-        const char* id = (e.builtinIndex != 255) ? kBuiltinFonts[e.builtinIndex].token : e.stem;
+        const FontEntry &e = _fontCatalogue.getEntries()[_currentFontIndex];
+        const char *id = (e.builtinIndex != 255)
+                             ? kBuiltinFonts[e.builtinIndex].token
+                             : e.stem;
         strncpy(_settings.storyFont, id, sizeof(_settings.storyFont));
-        _settings.storyFont[sizeof(_settings.storyFont)-1] = '\0';
+        _settings.storyFont[sizeof(_settings.storyFont) - 1] = '\0';
       }
       break;
     case 1:
@@ -449,8 +412,7 @@ void SettingsView::handleInput(ButtonEvent ev) {
           break;
         }
       }
-      cur = (cur + 1) % kMCount;
-      _settings.marginPx = kMargins[cur];
+      _settings.marginPx = kMargins[(cur + 1) % kMCount];
       break;
     }
     case 3: {
@@ -463,8 +425,7 @@ void SettingsView::handleInput(ButtonEvent ev) {
           break;
         }
       }
-      cur = (cur + 1) % kRCount;
-      _settings.refreshInterval = kRefresh[cur];
+      _settings.refreshInterval = kRefresh[(cur + 1) % kRCount];
       break;
     }
     case 4: {
@@ -477,8 +438,7 @@ void SettingsView::handleInput(ButtonEvent ev) {
           break;
         }
       }
-      cur = (cur + 1) % kSCount;
-      _settings.sleepTimeoutSec = kSleep[cur];
+      _settings.sleepTimeoutSec = kSleep[(cur + 1) % kSCount];
       break;
     }
     case 5:
@@ -488,27 +448,12 @@ void SettingsView::handleInput(ButtonEvent ev) {
       break;
     }
     renderPage();
-    break;
-  }
-
-  case ButtonEvent::CONFIRM:
-    if (_itemIndex == 5) {
-      _settings.overrideStoryFont = !_settings.overrideStoryFont;
-      _dirty = true;
-      renderPage();
-    } else if (_itemIndex == 6) {
-      BootManager::bootUpdater();
-    } else if (_itemIndex == 7) {
-      formatSD();
-    }
-    break;
-
-  default:
-    break;
+    return;
   }
 }
 
-// ─── Danger zone actions ──────────────────────────────────────────────────────
+// ─── Danger zone actions
+// ──────────────────────────────────────────────────────
 
 void SettingsView::formatSD() {
   SystemUI ui(_display);
