@@ -26,6 +26,7 @@
 #include "ui/BatteryWidget.h"
 #include "ui/FooterWidget.h"
 #include "ui/Library.h"
+#include "ui/NeuStyle.h"
 #include "ui/SettingsView.h"
 #include "ui/SystemUI.h"
 #include <builtinFonts/reader_2b.h>
@@ -34,12 +35,12 @@
 #include <builtinFonts/reader_medium_2b.h>
 #include <builtinFonts/reader_medium_bold_2b.h>
 #include <builtinFonts/reader_medium_italic_2b.h>
+#include <builtinFonts/syne_bold_10.h>
 #include <builtinFonts/ui_10.h>
 #include <builtinFonts/ui_12.h>
 #include <builtinFonts/ui_bold_12.h>
-#include <builtinFonts/syne_bold_10.h>
-#include "ui/NeuStyle.h"
 #include <cstdio>
+
 #endif
 
 #include "ScriptDetector.h"
@@ -255,18 +256,6 @@ public:
   uint32_t getLastActivityTime() const override { return 0; }
   void setAutoSleepTimeout(uint16_t seconds) override {}
 };
-
-void test_system_ui_screenshot(void) {
-  TestDisplay display;
-  SystemUI ui(display);
-
-  display.clear();
-  ui.showError("System Failure",
-               "Just kidding, this is a unit test screenshot.");
-  saveBMP("test/golden/test_system_ui.bmp", display.eink.getFrameBuffer(),
-          display.getWidth(), display.getHeight());
-  TEST_ASSERT_EQUAL(1, 1);
-}
 
 void test_battery_widget_screenshot(void) {
   TestDisplay display;
@@ -557,6 +546,30 @@ void test_modal_dialog_long_text_screenshot(void) {
   TEST_ASSERT_EQUAL(1, 1);
 }
 
+void test_loading_widget_screenshot(void) {
+  TestDisplay display;
+  SystemUI ui(display);
+
+  ui.showLoading("Loading Story...", 0.65f);
+
+  saveBMP("test/golden/test_loading_widget.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_error_widget_screenshot(void) {
+  TestDisplay display;
+  SystemUI ui(display);
+
+  ui.showError("Failed to load story",
+               "The story file is corrupted or could not be found.\nPlease try "
+               "re-flashing the device or formatting the SD card.");
+
+  saveBMP("test/golden/test_error_widget.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
 void test_story_player_screenshot(void) {
   TestDisplay display;
   display.clear();
@@ -807,7 +820,6 @@ int main(int argc, char **argv) {
   RUN_TEST(test_script_detector);
 #ifdef PLATFORM_NATIVE
   RUN_TEST(test_sd_font_catalogue);
-  RUN_TEST(test_system_ui_screenshot);
   RUN_TEST(test_battery_widget_screenshot);
   RUN_TEST(test_library_screenshot);
   RUN_TEST(test_settings_view_screenshot);
@@ -815,6 +827,8 @@ int main(int argc, char **argv) {
   RUN_TEST(test_external_fonts_screenshot);
   RUN_TEST(test_modal_dialog_screenshot);
   RUN_TEST(test_modal_dialog_long_text_screenshot);
+  RUN_TEST(test_loading_widget_screenshot);
+  RUN_TEST(test_error_widget_screenshot);
   RUN_TEST(test_story_player_screenshot);
   // StreamingEpdFontFamily unit tests
   RUN_TEST(test_streaming_epd_font_family_load_plain);

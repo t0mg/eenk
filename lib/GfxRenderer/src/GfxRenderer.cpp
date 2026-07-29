@@ -1,11 +1,9 @@
 #include "GfxRenderer.h"
 
-#include <ArabicShaper.h>
 #include <ExternalFont.h>
 #include <Logging.h>
 #include <ScriptDetector.h>
 #include <StreamingEpdFont.h>
-#include <ThaiShaper.h>
 #include <Utf8.h>
 
 #include <algorithm>
@@ -225,11 +223,14 @@ int GfxRenderer::getTextWidth(const int fontId, const char* text, const EpdFontF
 
   int w = 0;
   const auto scripts = detectTextScripts(text);
+#if 0
   if (scripts.hasArabic) {
     w = getArabicTextWidth(fontId, text, style);
   } else if (scripts.hasThai) {
     w = getThaiTextWidth(fontId, text, style);
-  } else {
+  } else
+#endif
+  {
     // Character-by-character advance summation
     const auto& font = it->second;
     const char* ptr = text;
@@ -306,6 +307,7 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
   const auto& font = it->second;
 
   const auto scripts = detectTextScripts(text);
+#if 0
   if (scripts.hasArabic) {
     drawArabicText(fontId, x, y, text, black, style);
     return;
@@ -314,6 +316,7 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
     drawThaiText(fontId, x, y, text, black, style);
     return;
   }
+#endif
 
   const int yPos = y + getFontAscenderSize(fontId);
   int xpos = x;
@@ -452,6 +455,81 @@ void GfxRenderer::fillRect(const int x, const int y, const int width, const int 
         rowPtr[byteEnd] &= ~rightMask;
       else
         rowPtr[byteEnd] |= rightMask;
+    }
+  }
+}
+
+void GfxRenderer::invertRect(const int x, const int y, const int width, const int height) const {
+  if (width <= 0 || height <= 0) return;
+
+  int physX, physY, physW, physH;
+  switch (orientation) {
+    case Portrait:
+      physX = y;
+      physY = einkDisplay.getDisplayHeight() - 1 - (x + width - 1);
+      physW = height;
+      physH = width;
+      break;
+    case LandscapeClockwise:
+      physX = einkDisplay.getDisplayWidth() - 1 - (x + width - 1);
+      physY = einkDisplay.getDisplayHeight() - 1 - (y + height - 1);
+      physW = width;
+      physH = height;
+      break;
+    case PortraitInverted:
+      physX = einkDisplay.getDisplayWidth() - 1 - (y + height - 1);
+      physY = x;
+      physW = height;
+      physH = width;
+      break;
+    case LandscapeCounterClockwise:
+    default:
+      physX = x;
+      physY = y;
+      physW = width;
+      physH = height;
+      break;
+  }
+
+  const int dw = static_cast<int>(einkDisplay.getDisplayWidth());
+  const int dh = static_cast<int>(einkDisplay.getDisplayHeight());
+  if (physX >= dw || physY >= dh || physX + physW <= 0 || physY + physH <= 0) return;
+
+  const int x0 = std::max(physX, 0);
+  const int y0 = std::max(physY, 0);
+  const int x1 = std::min(physX + physW - 1, dw - 1);
+  const int y1 = std::min(physY + physH - 1, dh - 1);
+
+  const int stride = einkDisplay.getDisplayWidthBytes();
+  const int byteStart = x0 / 8;
+  const int byteEnd = x1 / 8;
+
+  if (byteStart == byteEnd) {
+    const uint8_t mask = static_cast<uint8_t>((0xFF >> (x0 & 7)) & (0xFF << (7 - (x1 & 7))));
+    for (int row = y0; row <= y1; row++) {
+      frameBuffer[row * stride + byteStart] ^= mask;
+    }
+    return;
+  }
+
+  const bool hasLeftEdge = (x0 & 7) != 0;
+  const bool hasRightEdge = (x1 & 7) != 7;
+  const uint8_t leftMask = static_cast<uint8_t>(0xFF >> (x0 & 7));
+  const uint8_t rightMask = static_cast<uint8_t>(0xFF << (7 - (x1 & 7)));
+  const int fullStart = byteStart + (hasLeftEdge ? 1 : 0);
+  const int fullEnd = byteEnd - (hasRightEdge ? 1 : 0);
+  const int fullCount = fullEnd - fullStart + 1;
+
+  for (int row = y0; row <= y1; row++) {
+    uint8_t* rowPtr = &frameBuffer[row * stride];
+    if (hasLeftEdge) {
+      rowPtr[byteStart] ^= leftMask;
+    }
+    for (int i = 0; i < fullCount; i++) {
+      rowPtr[fullStart + i] ^= 0xFF;
+    }
+    if (hasRightEdge) {
+      rowPtr[byteEnd] ^= rightMask;
     }
   }
 }
@@ -1679,6 +1757,7 @@ void GfxRenderer::drawRichText(const int fontId, const int x, const int y, const
 // Thai Text Rendering
 // ============================================================================
 
+#if 0
 int GfxRenderer::getThaiTextWidth(const int fontId, const char* text, const EpdFontFamily::Style style) const {
   if (text == nullptr || *text == '\0') {
     return 0;
@@ -1881,3 +1960,4 @@ void GfxRenderer::drawArabicText(const int fontId, const int x, const int y, con
     renderChar(font, cp, &xpos, &yPos, black, style, fontId);
   }
 }
+#endif

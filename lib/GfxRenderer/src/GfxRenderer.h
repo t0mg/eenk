@@ -2,7 +2,6 @@
 
 #include <EInkDisplay.h>
 #include <EpdFontFamily.h>
-#include <ThaiCluster.h>
 
 #include <array>
 #include <map>
@@ -114,8 +113,6 @@ class GfxRenderer {
 
   void renderChar(const EpdFontFamily& fontFamily, uint32_t cp, int* x, const int* y, bool pixelState,
                   EpdFontFamily::Style style, int fontId) const;
-  void renderThaiCluster(const EpdFontFamily& fontFamily, const ThaiShaper::ThaiCluster& cluster, int* x, int y,
-                         bool pixelState, EpdFontFamily::Style style, int fontId) const;
   void renderExternalGlyph(uint32_t cp, int* x, int y, bool pixelState, const uint8_t* bitmap = nullptr) const;
   int getExternalGlyphWidth(uint32_t cp) const;
   bool tryResolveExternalFont() const;
@@ -203,6 +200,7 @@ class GfxRenderer {
   void drawLine(int x1, int y1, int x2, int y2, bool state = true) const;
   void drawRect(int x, int y, int width, int height, bool state = true) const;
   void fillRect(int x, int y, int width, int height, bool state = true) const;
+  void invertRect(int x, int y, int width, int height) const;
   void fillHalftoneRect(int x, int y, int width, int height, bool state = true) const;
   void drawImage(const uint8_t bitmap[], int x, int y, int width, int height) const;
   void drawBitmap(const Bitmap& bitmap, int x, int y, int maxWidth, int maxHeight) const;
