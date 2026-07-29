@@ -2,12 +2,13 @@
 #include <GfxRenderer.h>
 #include <cstdio>
 
-void SleepCoverWidget::show(IDisplay &display, const char *msg, const char *title) {
+void SleepCoverWidget::show(IDisplay &display, const char *msg,
+                            const char *title) {
   auto renderer = display.getRenderer();
   if (renderer) {
     display.clear();
 
-#ifdef PLATFORM_ESP32
+#if defined(PLATFORM_ESP32) || defined(PIO_UNIT_TESTING)
     if (title && title[0] != '\0') {
       renderer->drawText(11, 50, 50, title);
     } else {

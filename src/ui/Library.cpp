@@ -4,6 +4,7 @@
 #include "Library.h"
 #include "BatteryWidget.h"
 #include "ListItemWidget.h"
+#include "LoadingWidget.h"
 #include "StoryMetadata.h"
 #include "SystemUI.h"
 #include "os/BootManager.h"
@@ -594,20 +595,9 @@ void Library::launchStory(int index) {
   Serial.printf("[Library] Launching story: %s\n", _entries[index].path);
 
   // Provide a visual cue that we registered the click before the ESP restarts
-  GfxRenderer *r = _display.getRenderer();
-  if (r) {
-    r->fillRect(0, 0, _display.getWidth(), _display.getHeight(), false);
-
-    int barWidth = _display.getWidth() - 100;
-    int barHeight = 20;
-    int barX = 50;
-    int barY = (_display.getHeight() - barHeight) / 2;
-
-    r->drawText(FONT_BOLD, barX, barY - 40, "Loading story...", true);
-    r->drawRect(barX, barY, barWidth, barHeight, true);
-
-    _display.present();
-  }
+  bool isLoaded = _entries[index].isCurrentlyLoaded;
+  const char *titleStr = isLoaded ? "Resuming story..." : "Loading story...";
+  LoadingWidget::show(_display, titleStr, 1.0f);
 
   // Release SPI peripherals so INK_RUNTIME boot can re-initialise them cleanly.
   SD.end();

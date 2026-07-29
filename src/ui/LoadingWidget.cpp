@@ -19,15 +19,19 @@ void LoadingWidget::show(IDisplay &display, const char *title, float progress) {
     // Background box
     renderer->drawShadowBox(barX, barY, barWidth, barHeight, NeuStyle::BORDER_W, NeuStyle::SHADOW_OFFSET, false);
 
+    int maxFillW = barWidth - 2 * NeuStyle::BORDER_W;
+    
+    // Fill the inside with black (start full black)
+    renderer->fillRect(barX + NeuStyle::BORDER_W, barY + NeuStyle::BORDER_W, maxFillW, barHeight - 2 * NeuStyle::BORDER_W, true);
+
     // Title centered
     int fontId = NeuStyle::FONT_HEADING;
     int textY = barY + (barHeight - renderer->getLineHeight(fontId)) / 2;
     std::string upperTitle(title ? title : "");
     for (auto &c : upperTitle) c = toupper(c);
-    renderer->drawCenteredText(fontId, textY, upperTitle.c_str(), true); // True = black text
+    renderer->drawCenteredText(fontId, textY, upperTitle.c_str(), false); // False = white text
 
     // Progress invert section
-    int maxFillW = barWidth - 2 * NeuStyle::BORDER_W;
     int fillWidth = (int)(maxFillW * progress);
     if (fillWidth > 0) {
       renderer->invertRect(barX + NeuStyle::BORDER_W, barY + NeuStyle::BORDER_W, fillWidth, barHeight - 2 * NeuStyle::BORDER_W);

@@ -570,6 +570,17 @@ void test_error_widget_screenshot(void) {
   TEST_ASSERT_EQUAL(1, 1);
 }
 
+void test_sleep_cover_screenshot(void) {
+  TestDisplay display;
+  SystemUI ui(display);
+
+  ui.showSleepCover("Zzzzz...", "Sleep mode");
+
+  saveBMP("test/golden/test_sleep_cover.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
 void test_story_player_screenshot(void) {
   TestDisplay display;
   display.clear();
@@ -829,6 +840,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_modal_dialog_long_text_screenshot);
   RUN_TEST(test_loading_widget_screenshot);
   RUN_TEST(test_error_widget_screenshot);
+  RUN_TEST(test_sleep_cover_screenshot);
   RUN_TEST(test_story_player_screenshot);
   // StreamingEpdFontFamily unit tests
   RUN_TEST(test_streaming_epd_font_family_load_plain);

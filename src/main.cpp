@@ -79,24 +79,26 @@ int main(int argc, char *argv[]) {
 #include "hal/esp32/FlashCache.h"
 #endif
 #include <Arduino.h>
-#include <SPI.h>
 #include <SD.h>
+#include <SPI.h>
 #include <rom/crc.h>
+
 
 #include "hal/esp32/EspAdcInput.h"
 #include "hal/esp32/EspEinkDisplay.h"
 #include "os/AppSettings.h"
 #include "os/BootManager.h"
+#include "serial/SerialFileServer.h"
 #include "ui/BatteryWidget.h"
 #include "ui/Library.h"
 #include "ui/SettingsView.h"
 #include "ui/StoryMetadata.h"
 #include "ui/SystemUI.h"
-#include "serial/SerialFileServer.h"
 #include <BatteryMonitor.h>
 #include <EpdFont.h>
 #include <builtinFonts/ui_12.h>
 #include <esp_sleep.h>
+
 
 extern const EpdFontFamily OpenSans;
 
@@ -148,7 +150,8 @@ void setup() {
       SPI.begin(8, 7, 10, 21);
       if (SD.begin(12, SPI, 40000000)) {
         if (SD.exists("/firmware.bin")) {
-          Serial.println("[Boot] /firmware.bin found on SD. Forcing updater mode.");
+          Serial.println(
+              "[Boot] /firmware.bin found on SD. Forcing updater mode.");
           updaterMode = true;
         }
       }
@@ -189,10 +192,11 @@ void setup() {
     // Menu / library loop — runs until the user launches a story (which
     // calls BootManager::setBootMode(INK_RUNTIME) and reboots).
     bool needsFullRefresh = true;
-    
+
     SerialFileServer serialServer;
     serialServer.onConnect = [&]() {
-      if (input) input->setAutoSleepTimeout(0); // Disable autosleep during USB sync
+      if (input)
+        input->setAutoSleepTimeout(0); // Disable autosleep during USB sync
       GfxRenderer *r = display->getRenderer();
       if (r) {
         r->fillRect(0, 0, display->getWidth(), display->getHeight(), false);
@@ -205,9 +209,8 @@ void setup() {
       Library *library =
           new Library(*display, *input, *batteryWidget, settings);
       library->setNeedsFullRefresh(needsFullRefresh);
-      library->setBackgroundTask([&serialServer]() {
-          return serialServer.poll();
-      });
+      library->setBackgroundTask(
+          [&serialServer]() { return serialServer.poll(); });
       bool goToSettings = library->run();
       delete library;
       if (goToSettings) {
@@ -216,7 +219,8 @@ void setup() {
         settingsView->run();
         delete settingsView;
         settings = AppSettings::load(); // reload after save
-        input->setAutoSleepTimeout(settings.sleepTimeoutSec); // update timeout in case it changed
+        input->setAutoSleepTimeout(
+            settings.sleepTimeoutSec); // update timeout in case it changed
         needsFullRefresh = false; // Came from settings, avoid slow full refresh
       }
     }
@@ -243,10 +247,11 @@ void setup() {
     }
 
     char savedPath[128] = {0};
-    if (BootManager::getStoryPath(savedPath, sizeof(savedPath)) && savedPath[0] != '\0') {
+    if (BootManager::getStoryPath(savedPath, sizeof(savedPath)) &&
+        savedPath[0] != '\0') {
       if (SD.exists(savedPath)) {
         size_t len = strlen(savedPath);
-        char* pathCopy = new char[len + 1];
+        char *pathCopy = new char[len + 1];
         strcpy(pathCopy, savedPath);
         sdStoryPath = pathCopy;
 
@@ -303,7 +308,8 @@ void setup() {
               storage = sdStorage;
               engine = new InkEngine(*display, *input, *storage);
               engine->applySettings(AppSettings::load());
-              storyLoaded = engine->loadStory(mappedPtr, mappedSize, sdStoryPath);
+              storyLoaded =
+                  engine->loadStory(mappedPtr, mappedSize, sdStoryPath);
               currentStoryHash = flashCache->getHash();
             } else {
               errorMessage =
@@ -349,7 +355,8 @@ void setup() {
                                   uint8_t isOld;
                                   saveFile.read(&isOld, 1);
                                   history.push_back(
-                                      {TextBlock(std::string(lineBuf)), isOld > 0});
+                                      {TextBlock(std::string(lineBuf)),
+                                       isOld > 0});
                                   delete[] lineBuf;
                                 } else {
                                   break;
@@ -419,7 +426,8 @@ void setup() {
         esp_deep_sleep_enable_gpio_wakeup(
             1ULL << InputManager::POWER_BUTTON_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
         esp_deep_sleep_start();
-      } else if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::BACK || ev == ButtonEvent::QUIT) {
+      } else if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::BACK ||
+                 ev == ButtonEvent::QUIT) {
         Serial.println("Rebooting to MENU requested by user...");
         BootManager::setBootMode(BootMode::MENU);
         delay(500);
@@ -435,7 +443,8 @@ void setup() {
 }
 
 void saveProgress() {
-  if (!engine) return;
+  if (!engine)
+    return;
 #ifdef PLATFORM_ESP32
   systemUI->showLoading("Saving Progress...", 1.0f);
   delay(100);
@@ -471,12 +480,14 @@ void saveProgress() {
       Serial.println("Game saved successfully!");
     } else {
       systemUI->showError("eenk SYSTEM ERROR",
-                          "Failed to write save file to SD.\n\nPress CONFIRM or BACK to reboot to the menu.");
+                          "Failed to write save file to SD.\n\nPress CONFIRM "
+                          "or BACK to reboot to the menu.");
       while (true) {
         ButtonEvent ev = input->pollInput();
         if (ev == ButtonEvent::SLEEP) {
           break;
-        } else if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::BACK || ev == ButtonEvent::QUIT) {
+        } else if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::BACK ||
+                   ev == ButtonEvent::QUIT) {
           Serial.println("Rebooting to MENU requested by user...");
           BootManager::setBootMode(BootMode::MENU);
           delay(500);
@@ -487,12 +498,14 @@ void saveProgress() {
     }
   } else {
     systemUI->showError("eenk SYSTEM ERROR",
-                        "Failed to create runtime snapshot.\n\nPress CONFIRM or BACK to reboot to the menu.");
+                        "Failed to create runtime snapshot.\n\nPress CONFIRM "
+                        "or BACK to reboot to the menu.");
     while (true) {
       ButtonEvent ev = input->pollInput();
       if (ev == ButtonEvent::SLEEP) {
         break;
-      } else if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::BACK || ev == ButtonEvent::QUIT) {
+      } else if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::BACK ||
+                 ev == ButtonEvent::QUIT) {
         Serial.println("Rebooting to MENU requested by user...");
         BootManager::setBootMode(BootMode::MENU);
         delay(500);
@@ -513,12 +526,14 @@ void loop() {
     BootManager::setBootMode(BootMode::INK_RUNTIME);
 
     Serial.println("Power off requested. Entering deep sleep...");
-    
+
     char titleBuf[128] = {0};
     char savedPath[128] = {0};
-    if (BootManager::getStoryPath(savedPath, sizeof(savedPath)) && savedPath[0] != '\0') {
+    if (BootManager::getStoryPath(savedPath, sizeof(savedPath)) &&
+        savedPath[0] != '\0') {
       StoryMetadata meta;
-      if (StoryMetadata::readFromSD(savedPath, &meta) && meta.title[0] != '\0') {
+      if (StoryMetadata::readFromSD(savedPath, &meta) &&
+          meta.title[0] != '\0') {
         snprintf(titleBuf, sizeof(titleBuf), "%s", meta.title);
       }
     }
@@ -528,7 +543,7 @@ void loop() {
     } else {
       systemUI->showSleepCover();
     }
-    
+
     delay(500); // Give e-ink time to finish updating
     esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN,
                                       ESP_GPIO_WAKEUP_GPIO_LOW);
@@ -545,7 +560,7 @@ void loop() {
     Serial.println("Engine done. Returning to MENU...");
     saveProgress();
     if (systemUI) {
-      systemUI->showLoading("Loading...", 0.0f);
+      systemUI->showLoading("Loading...", 1.0f);
     }
     BootManager::setBootMode(BootMode::MENU);
     delay(500);
