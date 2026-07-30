@@ -340,7 +340,19 @@ bool InkEngine::loadSnapshot(const unsigned char *data, std::size_t length) {
     return false;
 
   _globals = _story->new_globals_from_snapshot(*snap);
+  if (!_globals) {
+    printf("[InkEngine] Failed to load globals from snapshot (corrupt or incompatible save)\n");
+    delete snap;
+    return false;
+  }
+
   _runner = _story->new_runner_from_snapshot(*snap, _globals);
+  if (!_runner) {
+    printf("[InkEngine] Failed to load runner from snapshot\n");
+    _globals = nullptr;
+    delete snap;
+    return false;
+  }
 
   delete snap;
 

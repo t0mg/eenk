@@ -640,11 +640,31 @@ void GfxRenderer::fillHalftoneRect(const int x, const int y, const int width, co
 }
 
 void GfxRenderer::drawImage(const uint8_t bitmap[], const int x, const int y, const int width, const int height) const {
-  // TODO: Rotate bits
-  int rotatedX = 0;
-  int rotatedY = 0;
-  rotateCoordinates(x, y, &rotatedX, &rotatedY);
-  einkDisplay.drawImage(bitmap, rotatedX, rotatedY, width, height);
+  if (orientation == LandscapeCounterClockwise) {
+      einkDisplay.drawImage(bitmap, x, y, width, height);
+      return;
+  }
+
+  const int panelW = einkDisplay.getDisplayWidth();
+  const int panelH = einkDisplay.getDisplayHeight();
+  const int stride = panelW / 8;
+  const int widthBytes = width / 8;
+  const int logicalW = getScreenWidth();
+  const int logicalH = getScreenHeight();
+
+  for (int row = 0; row < height; row++) {
+    int screenY = y + row;
+    if (screenY < 0 || screenY >= logicalH) continue;
+    
+    for (int col = 0; col < width; col++) {
+      int screenX = x + col;
+      if (screenX < 0 || screenX >= logicalW) continue;
+      
+      bool isBlack = (bitmap[row * widthBytes + (col / 8)] & (1 << (7 - (col % 8)))) == 0;
+      
+      orientedWriteFB(frameBuffer, stride, screenX, screenY, orientation, panelW, panelH, isBlack, false);
+    }
+  }
 }
 
 void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, const int maxWidth,
