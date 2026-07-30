@@ -1,6 +1,8 @@
 // Include <cmath> FIRST so GCC 15's specfun.h special-math functions are
 // emitted at global scope rather than inside ink::runtime namespace.
 #include <cmath>
+#include <SDCardManager.h>
+#include <string>
 
 #include "engine/InkEngine.h"
 
@@ -16,6 +18,10 @@
 #include <cstring>
 #include <cstdio>
 #include <snapshot.h>
+#include "ui/ImageWidget.h"
+#ifdef PLATFORM_NATIVE
+#include "hal/sdl/mock/FS.h"
+#endif
 
 #ifdef PLATFORM_NATIVE
 #include <SDL.h> // for SDL_Delay
@@ -207,8 +213,9 @@ bool InkEngine::loadStory(const char *path) {
       storyDir[dirLen] = '\0';
     }
   }
-
+  _storyDir = storyDir;
   _resolveAndApplyFont(meta, storyBase, storyDir);
+  loadMediaSidecar((meta.flags & 1) != 0);
 
   _wrappedLines.clear();
   _scrollY    = 0;
@@ -288,7 +295,9 @@ bool InkEngine::loadStory(const unsigned char *data,
     if (dot) *dot = '\0';
   }
 
+  _storyDir = storyDir;
   _resolveAndApplyFont(meta, storyBase, storyDir);
+  loadMediaSidecar((meta.flags & 1) != 0);
 
   _wrappedLines.clear();
   _scrollY    = 0;
@@ -511,6 +520,43 @@ void InkEngine::update() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+void InkEngine::loadMediaSidecar(bool hasMediaFlag) {
+    _mediaDict.clear();
+    if (!hasMediaFlag) return;
+    
+    std::string mediaPath = _storyDir + "/main.media";
+    SdFile file = SDCardManager::getInstance().openFile(mediaPath.c_str());
+    if (!file) {
+        printf("[InkEngine] Media sidecar expected but not found at %s\n", mediaPath.c_str());
+        return;
+    }
+    
+    uint8_t magic[4];
+    if (file.read(magic, 4) != 4 || memcmp(magic, "ENKM", 4) != 0) {
+        printf("[InkEngine] Media sidecar has invalid magic\n");
+        return;
+    }
+    
+    uint32_t count = 0;
+    if (file.read(reinterpret_cast<uint8_t*>(&count), 4) != 4) return;
+    
+    for (uint32_t i = 0; i < count; i++) {
+        uint8_t buf[20];
+        if (file.read(buf, 20) != 20) break;
+        
+        uint32_t hash = buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
+        ImageMeta meta;
+        meta.offset = buf[4] | (buf[5] << 8) | (buf[6] << 16) | (buf[7] << 24);
+        meta.size = buf[8] | (buf[9] << 8) | (buf[10] << 16) | (buf[11] << 24);
+        meta.width = buf[12] | (buf[13] << 8) | (buf[14] << 16) | (buf[15] << 24);
+        meta.height = buf[16] | (buf[17] << 8) | (buf[18] << 16) | (buf[19] << 24);
+        _mediaDict[hash] = meta;
+    }
+    
+    printf("[InkEngine] Loaded %zu media dictionary entries\n", _mediaDict.size());
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 void InkEngine::tickRunningText() {
   GfxRenderer *renderer = _display.getRenderer();
   int marginX = g_marginPx;
@@ -519,19 +565,19 @@ void InkEngine::tickRunningText() {
 
   auto pushLine = [&](const std::string &str) {
     if (str.empty()) {
-      _wrappedLines.push_back({TextBlock(), false});
+      _wrappedLines.push_back({TextBlock(), false, false, "", 0});
       newLinesCount++;
     } else if (renderer) {
       std::vector<TextRun> runs = InkRichTextParser::parse(str.c_str());
       auto wraps = renderer->wrapRichText(FONT_NARRATIVE, runs, narrativeWidth, 100);
       for (auto &w : wraps) {
-        _wrappedLines.push_back({w, false});
+        _wrappedLines.push_back({w, false, false, "", 0});
         newLinesCount++;
       }
     } else {
       TextBlock tb;
       tb.addRun(str, EpdFontFamily::REGULAR);
-      _wrappedLines.push_back({tb, false});
+      _wrappedLines.push_back({tb, false, false, "", 0});
       newLinesCount++;
     }
   };
@@ -543,7 +589,38 @@ void InkEngine::tickRunningText() {
       while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) {
         s.pop_back();
       }
-      pushLine(s);
+      
+      // Parse IMAGE tags attached to this line
+      if (_runner->has_tags()) {
+        for (size_t i = 0; i < _runner->num_tags(); i++) {
+          const char* tag = _runner->get_tag(i);
+          if (tag && strncasecmp(tag, "IMAGE:", 6) == 0) {
+            const char* pathStr = tag + 6;
+            while (*pathStr == ' ') pathStr++; // trim leading space
+            
+            WrappedLine wl;
+            wl.isImage = true;
+            wl.imagePath = pathStr;
+            wl.imageHeight = 0;
+            
+            uint32_t hash = fnv1a_32(wl.imagePath.c_str());
+            auto it = _mediaDict.find(hash);
+            if (it != _mediaDict.end()) {
+                wl.imageHeight = it->second.height;
+                printf("[InkEngine] Found image tag '%s', height=%d\n", pathStr, wl.imageHeight);
+            } else {
+                printf("[InkEngine] Image tag '%s' not found in media dict (hash: %u)\n", pathStr, hash);
+            }
+            
+            _wrappedLines.push_back(wl);
+            newLinesCount++;
+          }
+        }
+      }
+      
+      if (!s.empty()) {
+        pushLine(s);
+      }
     }
   }
 
@@ -563,22 +640,31 @@ void InkEngine::tickRunningText() {
     int height = _display.getHeight();
     int marginY = 24;
     int choiceHeight = getChoicesHeight(renderer);
-    int documentHeight =
-        _wrappedLines.size() * renderer->getLineHeight(FONT_NARRATIVE) +
-        choiceHeight;
+    int documentHeight = choiceHeight;
+    for (const auto &w : _wrappedLines) {
+      documentHeight += w.isImage ? w.imageHeight : renderer->getLineHeight(FONT_NARRATIVE);
+    }
+    
     int availableHeight = height - (2 * marginY);
 
     _maxScrollY = std::max(0, documentHeight - availableHeight);
 
-    int newContentHeight =
-        newLinesCount * renderer->getLineHeight(FONT_NARRATIVE) + choiceHeight;
+    int newContentHeight = choiceHeight;
+    int startIndex = std::max(0, (int)_wrappedLines.size() - newLinesCount);
+    for (size_t i = startIndex; i < _wrappedLines.size(); ++i) {
+      const auto &w = _wrappedLines[i];
+      newContentHeight += w.isImage ? w.imageHeight : renderer->getLineHeight(FONT_NARRATIVE);
+    }
+
     if (newContentHeight > availableHeight) {
       // Scroll so the first new line is at the top of the visible narrative
       // area
-      int oldLinesCount =
-          std::max(0, (int)_wrappedLines.size() - newLinesCount);
-      _scrollY = std::min(
-          _maxScrollY, oldLinesCount * renderer->getLineHeight(FONT_NARRATIVE));
+      int oldLinesHeight = 0;
+      for (int i = 0; i < startIndex; ++i) {
+        const auto &w = _wrappedLines[i];
+        oldLinesHeight += w.isImage ? w.imageHeight : renderer->getLineHeight(FONT_NARRATIVE);
+      }
+      _scrollY = std::min(_maxScrollY, oldLinesHeight);
     } else {
       // Snap to bottom
       _scrollY = _maxScrollY;
@@ -874,12 +960,30 @@ void InkEngine::redraw() {
   int y = marginY - _scrollY;
 
   for (const auto &w : _wrappedLines) {
-    if (!w.block.isEmpty() && (y + lineHeight > 0) && (y < height)) {
-      renderer->setHalftone(w.isOld);
-      renderer->drawRichText(FONT_NARRATIVE, marginX, y, w.block);
-      renderer->setHalftone(false);
+    int itemHeight = w.isImage ? w.imageHeight : lineHeight;
+    if (!w.block.isEmpty() || w.isImage) {
+      if ((y + itemHeight > 0) && (y < height)) {
+        if (w.isImage) {
+          uint32_t hash = fnv1a_32(w.imagePath.c_str());
+          auto it = _mediaDict.find(hash);
+          if (it != _mediaDict.end()) {
+            std::string mediaPath = _storyDir + "/main.media";
+            SdFile file = SDCardManager::getInstance().openFile(mediaPath.c_str());
+            if (file) {
+              const ImageMeta& meta = it->second;
+              ImageWidget::draw(*renderer, file, meta.offset, meta.size, meta.width, meta.height, marginX, y, narrativeWidth, w.imageHeight);
+            } else {
+              printf("[InkEngine] Failed to open main.media for image: %s\n", w.imagePath.c_str());
+            }
+          }
+        } else {
+          renderer->setHalftone(w.isOld);
+          renderer->drawRichText(FONT_NARRATIVE, marginX, y, w.block);
+          renderer->setHalftone(false);
+        }
+      }
     }
-    y += lineHeight;
+    y += itemHeight;
   }
 
   if (_numChoices > 0) {

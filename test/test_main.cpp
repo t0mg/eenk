@@ -39,6 +39,7 @@
 #include <builtinFonts/ui_10.h>
 #include <builtinFonts/ui_12.h>
 #include <builtinFonts/ui_bold_12.h>
+#include "ui/ImageWidget.h"
 #include <cstdio>
 
 #endif
@@ -824,6 +825,22 @@ void test_sd_font_catalogue_family_detection(void) {
   remove(bpath);
   remove(ipath);
 }
+
+void test_image_widget_screenshot(void) {
+  TestDisplay display;
+  display.clear();
+  FS fs;
+  File rawFile = fs.open("test/golden/test_battery_widget.bmp", "r");
+  TEST_ASSERT_TRUE(rawFile);
+  FsFile file(rawFile);
+
+  GfxRenderer &r = display.renderer;
+  // Draw the image scaled/centered. For now, draw it at x=100, y=100, maxWidth=600, maxHeight=280
+  ImageWidget::draw(r, file, 100, 100, 600, 280);
+  
+  saveBMP("test/golden/test_image_widget.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+}
 #endif
 
 int main(int argc, char **argv) {
@@ -842,6 +859,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_error_widget_screenshot);
   RUN_TEST(test_sleep_cover_screenshot);
   RUN_TEST(test_story_player_screenshot);
+  RUN_TEST(test_image_widget_screenshot);
   // StreamingEpdFontFamily unit tests
   RUN_TEST(test_streaming_epd_font_family_load_plain);
   RUN_TEST(test_streaming_epd_font_family_load_regular_suffix);

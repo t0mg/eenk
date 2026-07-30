@@ -27,7 +27,19 @@ public:
     void displayBufferDriveAll(bool turnOffScreen = false) {}
     void cleanupGrayscaleBuffers(uint8_t* fb) const {}
     
-    void drawImage(const uint8_t* bitmap, int x, int y, int w, int h) const {}
+    void drawImage(const uint8_t* bitmap, int x, int y, int w, int h) const {
+        const int imageWidthBytes = w / 8;
+        for (int row = 0; row < h; row++) {
+            int destY = y + row;
+            if (destY >= DISPLAY_HEIGHT) break;
+            int destOffset = destY * DISPLAY_WIDTH_BYTES + (x / 8);
+            int srcOffset = row * imageWidthBytes;
+            for (int col = 0; col < imageWidthBytes; col++) {
+                if ((x / 8 + col) >= DISPLAY_WIDTH_BYTES) break;
+                _frameBuffer[destOffset + col] = bitmap[srcOffset + col];
+            }
+        }
+    }
     void displayWindow(int x, int y, int w, int h, bool turnOffScreen = false) const {}
     void grayscaleRevert() const {}
     void copyGrayscaleLsbBuffers(uint8_t* fb) const {}

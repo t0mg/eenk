@@ -354,9 +354,17 @@ void setup() {
                                   lineBuf[lineLen] = '\0';
                                   uint8_t isOld;
                                   saveFile.read(&isOld, 1);
+                                  std::string str(lineBuf);
+                                  bool isImage = false;
+                                  std::string imagePath = "";
+                                  if (str.length() > 7 && str.substr(0, 6) == "\x1B[IMG:") {
+                                    isImage = true;
+                                    imagePath = str.substr(6, str.length() - 7);
+                                    str = "";
+                                  }
                                   history.push_back(
-                                      {TextBlock(std::string(lineBuf)),
-                                       isOld > 0});
+                                      {TextBlock(str),
+                                       isOld > 0, isImage, imagePath, isImage ? 280 : 0});
                                   delete[] lineBuf;
                                 } else {
                                   break;
@@ -469,6 +477,9 @@ void saveProgress() {
       f.write((const uint8_t *)&historySize, 2);
       for (const auto &line : history) {
         std::string text = line.block.getText();
+        if (line.isImage) {
+          text = "\x1B[IMG:" + line.imagePath + "]";
+        }
         uint16_t len = text.length();
         f.write((const uint8_t *)&len, 2);
         f.write((const uint8_t *)text.c_str(), len);
