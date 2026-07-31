@@ -130,9 +130,21 @@ BootMode BootManager::getBootMode() { return BootMode::MENU; }
 
 void BootManager::setBootMode(BootMode /*mode*/) {}
 
-void BootManager::setStoryPath(const char * /*path*/) {}
+static char nativeStoryPath[256] = "";
 
-bool BootManager::getStoryPath(char * /*outPath*/, size_t /*maxLen*/) {
+void BootManager::setStoryPath(const char * path) {
+  if (path) {
+    strncpy(nativeStoryPath, path, sizeof(nativeStoryPath) - 1);
+    nativeStoryPath[sizeof(nativeStoryPath) - 1] = '\0';
+  }
+}
+
+bool BootManager::getStoryPath(char *outPath, size_t maxLen) {
+  if (nativeStoryPath[0] != '\0' && outPath && maxLen > 0) {
+    strncpy(outPath, nativeStoryPath, maxLen);
+    outPath[maxLen - 1] = '\0';
+    return true;
+  }
   return false;
 }
 

@@ -24,6 +24,10 @@
 #include "os/AppSettings.h"
 #include "os/SdFontCatalogue.h"
 #include "ui/BatteryWidget.h"
+#include "os/BootManager.h"
+#include "test_sleep_cover_media.h"
+
+#define FRAME_W 800
 #include "ui/FooterWidget.h"
 #include "ui/ImageWidget.h"
 #include "ui/Library.h"
@@ -583,6 +587,27 @@ void test_sleep_cover_screenshot(void) {
   TEST_ASSERT_EQUAL(1, 1);
 }
 
+void test_sleep_cover_image_screenshot(void) {
+  TestDisplay display;
+  SystemUI ui(display);
+  
+  FILE* f = fopen("test/test.media", "wb");
+  if (f) {
+    fwrite(test_sleep_cover_media, 1, test_sleep_cover_media_len, f);
+    fclose(f);
+  }
+  
+  BootManager::setStoryPath("test/test.bin");
+  
+  ui.showSleepCover("Zzzzz...", "Sleep mode");
+  
+  saveBMP("test/golden/test_sleep_cover_image.bmp", display.eink.getFrameBuffer(), display.getWidth(), display.getHeight());
+  
+  remove("test/test.media");
+  
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
 void test_story_player_screenshot(void) {
   TestDisplay display;
   display.clear();
@@ -847,6 +872,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_loading_widget_screenshot);
   RUN_TEST(test_error_widget_screenshot);
   RUN_TEST(test_sleep_cover_screenshot);
+  RUN_TEST(test_sleep_cover_image_screenshot);
   RUN_TEST(test_story_player_screenshot);
   RUN_TEST(test_image_widget_screenshot);
   // StreamingEpdFontFamily unit tests
