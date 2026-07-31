@@ -23,6 +23,7 @@ struct StoryMetadata;          // forward declaration
 #include <string>
 #include <map>
 #include <TextBlock.h>
+#include <SDCardManager.h>
 
 // FNV-1a hash function
 constexpr uint32_t fnv1a_32(const char* s, size_t count) {
@@ -107,6 +108,7 @@ private:
         uint32_t height;
     };
     std::map<uint32_t, ImageMeta> _mediaDict;
+    SdFile _mediaFile;
     void loadMediaSidecar(bool hasMediaFlag);
 
     static constexpr int MAX_CHOICES = 8;

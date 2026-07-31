@@ -129,6 +129,9 @@ InkEngine::~InkEngine() {
     delete _streamingFamily;
     _streamingFamily = nullptr;
   }
+  if (_mediaFile) {
+    _mediaFile.close();
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -535,26 +538,27 @@ void InkEngine::update() {
 void InkEngine::loadMediaSidecar(bool hasMediaFlag) {
     _mediaDict.clear();
     if (!hasMediaFlag) return;
+    if (_mediaFile) _mediaFile.close();
     
     std::string mediaPath = _storyDir + "/main.media";
-    SdFile file = SDCardManager::getInstance().openFile(mediaPath.c_str());
-    if (!file) {
+    _mediaFile = SDCardManager::getInstance().openFile(mediaPath.c_str());
+    if (!_mediaFile) {
         printf("[InkEngine] Media sidecar expected but not found at %s\n", mediaPath.c_str());
         return;
     }
     
     uint8_t magic[4];
-    if (file.read(magic, 4) != 4 || memcmp(magic, "ENKM", 4) != 0) {
+    if (_mediaFile.read(magic, 4) != 4 || memcmp(magic, "ENKM", 4) != 0) {
         printf("[InkEngine] Media sidecar has invalid magic\n");
         return;
     }
     
     uint32_t count = 0;
-    if (file.read(reinterpret_cast<uint8_t*>(&count), 4) != 4) return;
+    if (_mediaFile.read(reinterpret_cast<uint8_t*>(&count), 4) != 4) return;
     
     for (uint32_t i = 0; i < count; i++) {
         uint8_t buf[20];
-        if (file.read(buf, 20) != 20) break;
+        if (_mediaFile.read(buf, 20) != 20) break;
         
         uint32_t hash = buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
         ImageMeta meta;
@@ -1032,13 +1036,11 @@ void InkEngine::redraw() {
           uint32_t hash = fnv1a_32(w.imagePath.c_str());
           auto it = _mediaDict.find(hash);
           if (it != _mediaDict.end()) {
-            std::string mediaPath = _storyDir + "/main.media";
-            SdFile file = SDCardManager::getInstance().openFile(mediaPath.c_str());
-            if (file) {
+            if (_mediaFile) {
               const ImageMeta& meta = it->second;
-              ImageWidget::draw(*renderer, file, meta.offset, meta.size, meta.width, meta.height, marginX, y, narrativeWidth, w.imageHeight);
+              ImageWidget::draw(*renderer, _mediaFile, meta.offset, meta.size, meta.width, meta.height, marginX, y, narrativeWidth, w.imageHeight);
             } else {
-              printf("[InkEngine] Failed to open main.media for image: %s\n", w.imagePath.c_str());
+              printf("[InkEngine] Media sidecar not open for image: %s\n", w.imagePath.c_str());
             }
           }
         } else {
