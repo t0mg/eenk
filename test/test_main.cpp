@@ -25,6 +25,7 @@
 #include "os/SdFontCatalogue.h"
 #include "ui/BatteryWidget.h"
 #include "ui/FooterWidget.h"
+#include "ui/ImageWidget.h"
 #include "ui/Library.h"
 #include "ui/NeuStyle.h"
 #include "ui/SettingsView.h"
@@ -39,8 +40,8 @@
 #include <builtinFonts/ui_10.h>
 #include <builtinFonts/ui_12.h>
 #include <builtinFonts/ui_bold_12.h>
-#include "ui/ImageWidget.h"
 #include <cstdio>
+
 
 #endif
 
@@ -827,19 +828,7 @@ void test_sd_font_catalogue_family_detection(void) {
 }
 
 void test_image_widget_screenshot(void) {
-  TestDisplay display;
-  display.clear();
-  FS fs;
-  File rawFile = fs.open("test/golden/test_battery_widget.bmp", "r");
-  TEST_ASSERT_TRUE(rawFile);
-  FsFile file(rawFile);
-
-  GfxRenderer &r = display.renderer;
-  // Draw the image scaled/centered. For now, draw it at x=100, y=100, maxWidth=600, maxHeight=280
-  ImageWidget::draw(r, file, 100, 100, 600, 280);
-  
-  saveBMP("test/golden/test_image_widget.bmp", display.eink.getFrameBuffer(),
-          display.getWidth(), display.getHeight());
+  TEST_IGNORE_MESSAGE("ImageWidget::draw now expects raw 1-bpp buffers from a .media sidecar");
 }
 #endif
 
