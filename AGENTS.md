@@ -231,6 +231,14 @@ npm run build   # Production build of the Vue renderer
 > [!IMPORTANT]
 > **Run `npm run setup`** (from the `app/` directory) whenever the parent `eenk` repo has changes that affect the native simulator binary. This rebuilds and copies `eenk-sim.exe` and `inkcpp_cl.exe` into the expected locations.
 
+> [!NOTE]
+> If you have **uncommitted changes** in the primary `eenk` repository that you want to test in the simulator, `npm run setup` will not pick them up (it pulls and builds the submodule from HEAD). Instead, build the native target manually in the primary `eenk` repo and copy the binary directly:
+> ```powershell
+> # From eenk/ directory
+> pio run -e native
+> Copy-Item -Path ".pio\build\native\program.exe" -Destination "tools\eenky\app\main-process\ink\win\eenk-sim.exe" -Force
+> ```
+
 ### IDE Architecture
 
 ```
