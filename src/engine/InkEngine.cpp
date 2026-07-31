@@ -568,6 +568,15 @@ void InkEngine::loadMediaSidecar(bool hasMediaFlag) {
     printf("[InkEngine] Loaded %zu media dictionary entries\n", _mediaDict.size());
 }
 
+int InkEngine::getImageHeight(const char* imagePath) const {
+    uint32_t hash = fnv1a_32(imagePath);
+    auto it = _mediaDict.find(hash);
+    if (it != _mediaDict.end()) {
+        return it->second.height;
+    }
+    return 280; // fallback if not found
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 void InkEngine::tickRunningText() {
   GfxRenderer *renderer = _display.getRenderer();

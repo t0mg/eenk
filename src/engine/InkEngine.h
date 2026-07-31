@@ -106,6 +106,7 @@ private:
     };
     std::map<uint32_t, ImageMeta> _mediaDict;
     void loadMediaSidecar(bool hasMediaFlag);
+    int getImageHeight(const char* imagePath) const;
 
     static constexpr int MAX_CHOICES = 8;
     char  _choiceText[MAX_CHOICES][128] = {};

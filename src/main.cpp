@@ -364,7 +364,7 @@ void setup() {
                                   }
                                   history.push_back(
                                       {TextBlock(str),
-                                       isOld > 0, isImage, imagePath, isImage ? 280 : 0});
+                                       isOld > 0, isImage, imagePath, isImage ? engine->getImageHeight(imagePath.c_str()) : 0});
                                   delete[] lineBuf;
                                 } else {
                                   break;
