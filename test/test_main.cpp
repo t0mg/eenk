@@ -563,7 +563,7 @@ void test_error_widget_screenshot(void) {
   TestDisplay display;
   SystemUI ui(display);
 
-  ui.showError("Failed to load story",
+  ui.showMessage("Failed to load story",
                "The story file is corrupted or could not be found.\nPlease try "
                "re-flashing the device or formatting the SD card.");
 

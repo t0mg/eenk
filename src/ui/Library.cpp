@@ -14,6 +14,8 @@
 #include <cctype>
 #include <cstdio>
 #include <cstring>
+#include "ImageWidget.h"
+#include <SDCardManager.h>
 
 #ifdef PLATFORM_ESP32
 #include <Arduino.h>
@@ -51,6 +53,67 @@ static EpdFontFamily s_glFamilyHeading(&s_glHeading);
 Library::Library(IDisplay &display, IInput &input, BatteryWidget &battery,
                  AppSettings &settings)
     : _display(display), _input(input), _battery(battery), _settings(settings) {
+}
+
+static uint32_t library_fnv1a_32(const char *str) {
+  uint32_t hash = 2166136261u;
+  while (*str) {
+    hash ^= (unsigned char)*str++;
+    hash *= 16777619u;
+  }
+  return hash;
+}
+
+void Library::parseThumbMetadata(Library::StoryEntry& e) {
+  e.thumbOffset = 0;
+  e.thumbSize = 0;
+  e.thumbW = 0;
+  e.thumbH = 0;
+  
+  char mediaPath[256];
+  snprintf(mediaPath, sizeof(mediaPath), "%s", e.path);
+  char* dot = strrchr(mediaPath, '.');
+  if (dot) {
+    strcpy(dot, ".media");
+  } else {
+    return;
+  }
+
+  auto file = SDCardManager::getInstance().openFile(mediaPath);
+  if (!file) return;
+
+  uint32_t magic = 0;
+  if (file.read(&magic, 4) != 4 || magic != 0x4D4B4E45) { // "ENKM"
+    file.close();
+    return;
+  }
+
+  uint32_t numEntries = 0;
+  if (file.read(&numEntries, 4) != 4) {
+    file.close();
+    return;
+  }
+
+  uint32_t targetHash = library_fnv1a_32("@thumbnail");
+
+  for (uint32_t i = 0; i < numEntries; ++i) {
+    uint32_t hash = 0, offset = 0, size = 0, w = 0, h = 0;
+    if (file.read(&hash, 4) != 4) break;
+    if (file.read(&offset, 4) != 4) break;
+    if (file.read(&size, 4) != 4) break;
+    if (file.read(&w, 4) != 4) break;
+    if (file.read(&h, 4) != 4) break;
+    
+    if (hash == targetHash) {
+      e.thumbOffset = offset;
+      e.thumbSize = size;
+      e.thumbW = (uint16_t)w;
+      e.thumbH = (uint16_t)h;
+      break;
+    }
+  }
+
+  file.close();
 }
 
 // ─── ensureFonts()
@@ -278,6 +341,8 @@ void Library::scanSD() {
           e.isCurrentlyLoaded =
               (currentPath[0] != '\0' && strcmp(e.path, currentPath) == 0);
 
+          parseThumbMetadata(e);
+
           _numEntries++;
         }
       }
@@ -335,6 +400,8 @@ void Library::scanSD() {
             StoryMetadata::getSavePath(e.path, savePath, sizeof(savePath));
             e.hasSave = false; // native stub
             e.isCurrentlyLoaded = false;
+            
+            parseThumbMetadata(e);
 
             _numEntries++;
           }
@@ -397,6 +464,7 @@ void Library::renderEntry(int index, int yPos, bool selected) {
 
         // ── Title
         // ─────────────────────────────────────────────────────────────────
+        int thumbShift = (e.thumbSize > 0) ? 152 + 12 : 0;
         int lineH_bold = r->getLineHeight(FONT_BOLD);
         int lineH_small = r->getLineHeight(FONT_SMALL);
 
@@ -422,6 +490,27 @@ void Library::renderEntry(int index, int yPos, bool selected) {
         // Draw size at right edge.
         r->drawText(FONT_SMALL, annotX, textY + (lineH_bold - lineH_small) / 2,
                     sizeStr, ink);
+
+        // Draw titles with shift
+        r->drawText(FONT_BOLD, inX + ITEM_MARGIN_X + thumbShift, textY, e.title, ink);
+        if (hasAuthor) {
+          r->drawText(FONT_SMALL, inX + ITEM_MARGIN_X + thumbShift, textY + lineH_bold + 2,
+                      e.author, ink);
+        }
+        
+        // Draw thumbnail
+        if (e.thumbSize > 0) {
+          char mediaPath[256];
+          snprintf(mediaPath, sizeof(mediaPath), "%s", e.path);
+          char* dot = strrchr(mediaPath, '.');
+          if (dot) strcpy(dot, ".media");
+          
+          auto file = SDCardManager::getInstance().openFile(mediaPath);
+          if (file) {
+            ImageWidget::draw(*r, file, e.thumbOffset, e.thumbSize, e.thumbW, e.thumbH, inX + ITEM_MARGIN_X, inY + (inH - e.thumbH) / 2, e.thumbW, e.thumbH);
+            file.close();
+          }
+        }
 
         // Draw save indicator
         if (e.hasSave) {

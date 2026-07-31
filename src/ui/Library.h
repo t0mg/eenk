@@ -46,17 +46,21 @@ protected:
         bool     hasSave;           // Has a save in /.eenk_saves/<filename>.bin.save
         bool     isCurrentlyLoaded; // Path matches NVS boot.story_path
         bool     hasMetadata;       // Whether eenk header was found
+        uint32_t thumbOffset;       // Optional thumbnail offset in .media sidecar
+        uint32_t thumbSize;         // Optional thumbnail size
+        uint16_t thumbW;
+        uint16_t thumbH;
     };
 
     static constexpr int MAX_STORIES   = 32;
-    static constexpr int ITEM_H        = 94;   // px per story list entry
+    static constexpr int ITEM_H        = 168;  // px per story list entry
     // floor((800 - STATUS_BAR_H - FooterWidget::HEIGHT) / ITEM_H)
-    static constexpr int VISIBLE_ITEMS = 7;
+    static constexpr int VISIBLE_ITEMS = 4;
     static constexpr int DISPLAY_W     = 480;
     static constexpr int DISPLAY_H     = 800;
     static constexpr int ITEM_MARGIN_X = 12;   // left/right text margin within an entry
 
-    // Font IDs registered in the renderer (must not clash with InkEngine 0/1,
+    void parseThumbMetadata(StoryEntry& e);
     // SystemUI 10/11, or BatteryWidget 20).
     static constexpr int FONT_NORMAL = 30;   // ui_12
     static constexpr int FONT_BOLD   = 31;   // ui_bold_12
