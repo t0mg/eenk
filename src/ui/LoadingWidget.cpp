@@ -44,7 +44,7 @@ void LoadingWidget::show(IDisplay &display, const char *title, float progress) {
   }
 }
 
-void LoadingWidget::showError(IDisplay &display, const char *title, const char *message) {
+void LoadingWidget::showMessage(IDisplay &display, const char *title, const char *message) {
   auto renderer = display.getRenderer();
   if (renderer) {
     display.clear();

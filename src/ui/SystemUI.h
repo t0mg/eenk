@@ -7,7 +7,7 @@ public:
   SystemUI(IDisplay &display);
   ~SystemUI();
 
-  void showError(const char *title, const char *message);
+  void showMessage(const char *title, const char *message);
   void showLoading(const char *title, float progress);
   // Displays a full-screen sleeping cover.
   void showSleepCover(const char *msg = "Sleeping...", const char *title = nullptr);

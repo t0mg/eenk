@@ -86,7 +86,6 @@ int main(int argc, char *argv[]) {
 #include <SPI.h>
 #include <rom/crc.h>
 
-
 #include "hal/esp32/EspAdcInput.h"
 #include "hal/esp32/EspEinkDisplay.h"
 #include "os/AppSettings.h"
@@ -101,7 +100,6 @@ int main(int argc, char *argv[]) {
 #include <EpdFont.h>
 #include <builtinFonts/ui_12.h>
 #include <esp_sleep.h>
-
 
 extern const EpdFontFamily OpenSans;
 
@@ -200,12 +198,8 @@ void setup() {
     serialServer.onConnect = [&]() {
       if (input)
         input->setAutoSleepTimeout(0); // Disable autosleep during USB sync
-      GfxRenderer *r = display->getRenderer();
-      if (r) {
-        r->fillRect(0, 0, display->getWidth(), display->getHeight(), false);
-        r->drawText(31, 30, display->getHeight() / 2, "USB Connected", true);
-        display->present();
-      }
+      systemUI->showMessage("USB Connected",
+                            "Please do not unplug or power off.");
     };
 
     while (true) {
@@ -360,14 +354,18 @@ void setup() {
                                   std::string str(lineBuf);
                                   bool isImage = false;
                                   std::string imagePath = "";
-                                  if (str.length() > 7 && str.substr(0, 6) == "\x1B[IMG:") {
+                                  if (str.length() > 7 &&
+                                      str.substr(0, 6) == "\x1B[IMG:") {
                                     isImage = true;
                                     imagePath = str.substr(6, str.length() - 7);
                                     str = "";
                                   }
                                   history.push_back(
-                                      {TextBlock(str),
-                                       isOld > 0, isImage, imagePath, isImage ? engine->getImageHeight(imagePath.c_str()) : 0});
+                                      {TextBlock(str), isOld > 0, isImage,
+                                       imagePath,
+                                       isImage ? engine->getImageHeight(
+                                                     imagePath.c_str())
+                                               : 0});
                                   delete[] lineBuf;
                                 } else {
                                   break;
@@ -426,7 +424,7 @@ void setup() {
     errorMessage += "\n\nPress CONFIRM or BACK to reboot to the menu.";
     Serial.printf("FATAL: %s\n", errorMessage.c_str());
 
-    systemUI->showError("eenk SYSTEM ERROR", errorMessage.c_str());
+    systemUI->showMessage("eenk SYSTEM ERROR", errorMessage.c_str());
 
     while (true) {
 #ifdef PLATFORM_ESP32
@@ -493,9 +491,9 @@ void saveProgress() {
       f.close();
       Serial.println("Game saved successfully!");
     } else {
-      systemUI->showError("eenk SYSTEM ERROR",
-                          "Failed to write save file to SD.\n\nPress CONFIRM "
-                          "or BACK to reboot to the menu.");
+      systemUI->showMessage("eenk SYSTEM ERROR",
+                            "Failed to write save file to SD.\n\nPress CONFIRM "
+                            "or BACK to reboot to the menu.");
       while (true) {
         ButtonEvent ev = input->pollInput();
         if (ev == ButtonEvent::SLEEP) {
@@ -511,9 +509,9 @@ void saveProgress() {
       }
     }
   } else {
-    systemUI->showError("eenk SYSTEM ERROR",
-                        "Failed to create runtime snapshot.\n\nPress CONFIRM "
-                        "or BACK to reboot to the menu.");
+    systemUI->showMessage("eenk SYSTEM ERROR",
+                          "Failed to create runtime snapshot.\n\nPress CONFIRM "
+                          "or BACK to reboot to the menu.");
     while (true) {
       ButtonEvent ev = input->pollInput();
       if (ev == ButtonEvent::SLEEP) {

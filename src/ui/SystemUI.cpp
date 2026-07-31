@@ -56,9 +56,9 @@ void SystemUI::ensureFonts() {
 #include "LoadingWidget.h"
 #include "ModalDialogWidget.h"
 
-void SystemUI::showError(const char *title, const char *message) {
+void SystemUI::showMessage(const char *title, const char *message) {
   ensureFonts();
-  LoadingWidget::showError(_display, title, message);
+  LoadingWidget::showMessage(_display, title, message);
 }
 
 void SystemUI::showLoading(const char *title, float progress) {
