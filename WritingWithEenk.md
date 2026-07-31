@@ -46,6 +46,27 @@ If the engine cannot find those variants, synthetic variants are generated from 
 ### 4. Fallback
 If the requested font stem cannot be found in any of the above locations, eenk will gracefully fall back to the user's device default setting, or the builtin font.
 
+## Images in eenk
+
+You can embed images in your story using the standard Ink `# IMAGE:` tag. eenky will automatically process these images during compilation and bundle them into an optimized `.media` sidecar file.
+
+```ink
+# IMAGE: my-image.png
+# IMAGE: https://example.com/online-image.jpg
+```
+
+- **Local Images:** You can reference local images by placing them in the same folder as your `.ink` file.
+- **Online Images:** You can also provide a direct URL to an online image. eenky will download it automatically during compilation.
+
+### The Media Sidecar
+
+During the compilation process, eenky collects all the `# IMAGE:` tags it finds in your story, processes the images (scaling, dithering, and converting to 1-bit format for the e-ink display), and packs them into a single binary file named after your story with the `.media` extension (e.g., `main.media`). 
+
+When transferring your story to the device using the Device Manager in eenky, this `.media` file is automatically transferred alongside your main `.bin` story file and any custom `.epdfont` files.
+
+> [!NOTE]
+> The classic Web export mode in eenky also fully supports this exact same `# IMAGE:` tag format for rendering images in the browser!
+
 ## Building with eenky
 
 eenky is the desktop companion application that compiles your `.ink` files into a `.bin` file optimized for the eenk hardware. It uses a customized compiler pipeline (`inklecate` -> `inkcpp_cl`).
