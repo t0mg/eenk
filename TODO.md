@@ -11,6 +11,7 @@
 ## UI & UX
 
 * The OTA updater mode needs some love, text now wraps but the ui is unstyled.
+* The USB Conneced page should also use a new modal box (we can use the error message from loadingwidget)
 
 ## Refactoring
 

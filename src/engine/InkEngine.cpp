@@ -702,8 +702,27 @@ void InkEngine::tickRunningText() {
     _state = State::SHOWING_CHOICES;
     redraw();
   } else {
-    pushLine("--- THE END ---");
-    pushLine("[Press ENTER to restart, ESC to quit]");
+    _numChoices = 2;
+    _selectedChoice = 0;
+    strncpy(_choiceText[0], "Exit to menu", sizeof(_choiceText[0]) - 1);
+    strncpy(_choiceText[1], "Replay story", sizeof(_choiceText[1]) - 1);
+
+    GfxRenderer *renderer = _display.getRenderer();
+    if (renderer) {
+      int width = _display.getWidth();
+      int marginX = g_marginPx;
+      int narrativeWidth = width - (2 * marginX);
+      int indicatorWidth = 24;
+      if (narrativeWidth > indicatorWidth) {
+        int wrapWidth = narrativeWidth - indicatorWidth;
+        _wrappedChoices[0] = renderer->wrapRichText(
+            FONT_CHOICE, {TextRun(_choiceText[0], EpdFontFamily::Style::REGULAR)},
+            wrapWidth, 2);
+        _wrappedChoices[1] = renderer->wrapRichText(
+            FONT_CHOICE, {TextRun(_choiceText[1], EpdFontFamily::Style::REGULAR)},
+            wrapWidth, 2);
+      }
+    }
     doAutoScroll();
     _state = State::STORY_ENDED;
     redraw();
@@ -889,39 +908,64 @@ void InkEngine::tickWaitingInput() {
 void InkEngine::tickStoryEnded() {
   ButtonEvent ev = _input.pollInput();
   if (ev == ButtonEvent::CONFIRM) {
-    SystemUI ui(_display);
-    if (ui.showConfirmDialog(_input, "Restart Story", "Begin the story again?")) {
-      _globals = _story->new_globals();
-      _runner = _story->new_runner(_globals);
-      _wrappedLines.clear();
-      _scrollY = 0;
-      _maxScrollY = 0;
-      _state = State::RUNNING_TEXT;
-    } else {
-      redraw();
-    }
-  } else if (ev == ButtonEvent::LEFT || ev == ButtonEvent::UP) {
-    int scrollAmount = _display.getHeight() / 4;
-    _scrollY -= scrollAmount;
-    if (_scrollY < 0)
-      _scrollY = 0;
-    redraw();
-  } else if (ev == ButtonEvent::RIGHT || ev == ButtonEvent::DOWN) {
-    int scrollAmount = _display.getHeight() / 4;
-    _scrollY += scrollAmount;
-
-    GfxRenderer *renderer = _display.getRenderer();
-    if (renderer && _numChoices > 0) {
-      int marginY = g_marginPx;
-      int choiceHeight = getChoicesHeight(renderer);
-      if (_scrollY > _maxScrollY - choiceHeight - marginY) {
-        _scrollY = _maxScrollY;
+    if (_selectedChoice == 0) {
+#ifdef PLATFORM_NATIVE
+      _shouldSleep = false;
+      _state = State::DONE;
+#else
+      SystemUI ui(_display);
+      if (ui.showConfirmDialog(_input, "Exit Story", "Return to the menu?")) {
+        _shouldSleep = false;
+        _state = State::DONE;
+      } else {
+        redraw();
+      }
+#endif
+    } else if (_selectedChoice == 1) {
+      SystemUI ui(_display);
+      if (ui.showConfirmDialog(_input, "Restart Story", "Begin the story again?")) {
+        _globals = _story->new_globals();
+        _runner = _story->new_runner(_globals);
+        _wrappedLines.clear();
+        _scrollY = 0;
+        _maxScrollY = 0;
+        _state = State::RUNNING_TEXT;
+      } else {
+        redraw();
       }
     }
+  } else if (ev == ButtonEvent::LEFT || ev == ButtonEvent::UP) {
+    if (_selectedChoice > 0) {
+      _selectedChoice--;
+      redraw();
+    } else {
+      int scrollAmount = _display.getHeight() / 4;
+      _scrollY -= scrollAmount;
+      if (_scrollY < 0)
+        _scrollY = 0;
+      redraw();
+    }
+  } else if (ev == ButtonEvent::RIGHT || ev == ButtonEvent::DOWN) {
+    if (_selectedChoice < _numChoices - 1) {
+      _selectedChoice++;
+      redraw();
+    } else {
+      int scrollAmount = _display.getHeight() / 4;
+      _scrollY += scrollAmount;
 
-    if (_scrollY > _maxScrollY)
-      _scrollY = _maxScrollY;
-    redraw();
+      GfxRenderer *renderer = _display.getRenderer();
+      if (renderer && _numChoices > 0) {
+        int marginY = g_marginPx;
+        int choiceHeight = getChoicesHeight(renderer);
+        if (_scrollY > _maxScrollY - choiceHeight - marginY) {
+          _scrollY = _maxScrollY;
+        }
+      }
+
+      if (_scrollY > _maxScrollY)
+        _scrollY = _maxScrollY;
+      redraw();
+    }
   } else if (ev == ButtonEvent::BACK || ev == ButtonEvent::QUIT) {
 #ifdef PLATFORM_NATIVE
     _shouldSleep = false;
