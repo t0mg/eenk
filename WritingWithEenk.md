@@ -72,25 +72,29 @@ When transferring your story to the device using the Device Manager in eenky, th
 eenky is the desktop companion application that compiles your `.ink` files into a `.bin` file optimized for the eenk hardware. It uses a customized compiler pipeline (`inklecate` -> `inkcpp_cl`).
 
 1. Open your Ink project folder in eenky.
-2. Click the **Compile** button in the toolbar.
-3. eenky will automatically extract your metadata headers, compile the ink script, and generate a `.bin` file in the same directory. It will also convert the source `.ttf` fonts to `.epdfont` files and generate a `.media` file if there are any `# IMAGE:` tags in your story. These additional files will be placed in the same directory as the `.bin` file.
+2. Click the **Compile** button in the toolbar (also available from the File menu or with Ctrl+B or Cmd+B keyboard shortcut).
 
-## Transferring to the SD Card
+eenky will automatically extract your metadata headers, compile the ink script, and generate a `.bin` file in the same directory. It will also convert the source `.ttf` fonts to `.epdfont` files and generate a `.media` file if there are any `# IMAGE:` tags in your story.
 
-To play your compiled story on the hardware device you can either take the SD card out and put it in your computer, or transfer directly from eenky to the device if it has USB Serial enabled.
+You can play it in eenky's simulator by clicking the device button in the toolbar (also available from the Device menu or with Ctrl+L or Cmd+L keyboard shortcut).
+
+## Transferring to the eenk device
+
+To play your compiled story on the hardware device you can either take the SD card out and put it in your computer, or transfer directly from eenky to the device if it has USB Serial capability.
 
 ### Using the Device Manager in eenky
 
-1. Open **Device Manager** from the home screen or menu. 
-2. Wake up your eenk device and put it into the menu.
-3. Connect it to your computer via USB.
-4. Click Connect and select the correct COM port (e.g. `USB jtag/serial debug unit`).
-5. Click upload and select your story `.bin` file and upload. Associated files like fonts and `.media` will be added automatically.
+1. Wake up your eenk device and put it into the menu screen.
+2. Connect it to your computer via USB.
+3. Open eenky's **Device Manager** from the home screen, Device menu or keyboard shortcut (Ctrl+D or Cmd+D). 
+4. Click **Connect** and select the correct COM port (e.g. `USB jtag/serial debug unit`).
+5. Click **Upload Story** and select your story `.bin` file. Associated files like fonts and `.media` will be added automatically.
+6. Click **Disconnect** and the device will reboot to reveal your new story in the library!
 
 ### Manual write to the SD card
 
 1. Remove the SD card from your device and plug it into your computer.
 2. Ensure there is an `eenk` folder on the root of the SD card.
 3. Copy the compiled `.bin` file into the `/eenk/` directory, or in a subfolder in this directory (useful if there are additional files such as fonts).
-4. If you have custom fonts or `.media` file, place them next to our story file (fonts can also go in the `/fonts/` folder).
+4. If you have custom fonts or a `.media` file, place them next to our story file (fonts can also go in the `/fonts/` folder).
 5. Eject the SD card, put it back in the device, and turn it on. Your story will appear in the library!
