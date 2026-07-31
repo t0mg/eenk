@@ -108,6 +108,16 @@ static int g_refreshInterval = 10;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
+int InkEngine::WrappedLine::getHeight(GfxRenderer* renderer) const {
+  if (!renderer) return 0;
+  int h = isImage ? imageHeight : renderer->getLineHeight(FONT_NARRATIVE);
+  if (endOfParagraph) {
+    h += (renderer->getLineHeight(FONT_NARRATIVE) / 2);
+  }
+  return h;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Construction / destruction
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -589,19 +599,20 @@ void InkEngine::tickRunningText() {
 
   auto pushLine = [&](const std::string &str) {
     if (str.empty()) {
-      _wrappedLines.push_back({TextBlock(), false, false, "", 0});
+      _wrappedLines.push_back({TextBlock(), false, false, "", 0, true});
       newLinesCount++;
     } else if (renderer) {
       std::vector<TextRun> runs = InkRichTextParser::parse(str.c_str());
       auto wraps = renderer->wrapRichText(FONT_NARRATIVE, runs, narrativeWidth, 100);
-      for (auto &w : wraps) {
-        _wrappedLines.push_back({w, false, false, "", 0});
+      for (size_t i = 0; i < wraps.size(); ++i) {
+        bool eop = (i == wraps.size() - 1);
+        _wrappedLines.push_back({wraps[i], false, false, "", 0, eop});
         newLinesCount++;
       }
     } else {
       TextBlock tb;
       tb.addRun(str, EpdFontFamily::REGULAR);
-      _wrappedLines.push_back({tb, false, false, "", 0});
+      _wrappedLines.push_back({tb, false, false, "", 0, true});
       newLinesCount++;
     }
   };
@@ -626,6 +637,7 @@ void InkEngine::tickRunningText() {
             wl.isImage = true;
             wl.imagePath = pathStr;
             wl.imageHeight = 0;
+            wl.endOfParagraph = true;
             
             uint32_t hash = fnv1a_32(wl.imagePath.c_str());
             auto it = _mediaDict.find(hash);
@@ -641,8 +653,11 @@ void InkEngine::tickRunningText() {
           }
         }
       }
-      
-      if (!s.empty()) {
+
+      if (s.empty() && _runner->has_tags()) {
+        // Skip pushing a blank text line if this line only contained tags (e.g. #IMAGE)
+        // so invisible tags or image tags don't introduce unwanted extra text lines.
+      } else {
         pushLine(s);
       }
     }
@@ -666,7 +681,7 @@ void InkEngine::tickRunningText() {
     int choiceHeight = getChoicesHeight(renderer);
     int documentHeight = choiceHeight;
     for (const auto &w : _wrappedLines) {
-      documentHeight += w.isImage ? w.imageHeight : renderer->getLineHeight(FONT_NARRATIVE);
+      documentHeight += w.getHeight(renderer);
     }
     
     int availableHeight = height - (2 * marginY);
@@ -677,7 +692,7 @@ void InkEngine::tickRunningText() {
     int startIndex = std::max(0, (int)_wrappedLines.size() - newLinesCount);
     for (size_t i = startIndex; i < _wrappedLines.size(); ++i) {
       const auto &w = _wrappedLines[i];
-      newContentHeight += w.isImage ? w.imageHeight : renderer->getLineHeight(FONT_NARRATIVE);
+      newContentHeight += w.getHeight(renderer);
     }
 
     if (newContentHeight > availableHeight) {
@@ -686,7 +701,7 @@ void InkEngine::tickRunningText() {
       int oldLinesHeight = 0;
       for (int i = 0; i < startIndex; ++i) {
         const auto &w = _wrappedLines[i];
-        oldLinesHeight += w.isImage ? w.imageHeight : renderer->getLineHeight(FONT_NARRATIVE);
+        oldLinesHeight += w.getHeight(renderer);
       }
       _scrollY = std::min(_maxScrollY, oldLinesHeight);
     } else {
@@ -1028,7 +1043,7 @@ void InkEngine::redraw() {
   int y = marginY - _scrollY;
 
   for (const auto &w : _wrappedLines) {
-    int itemHeight = w.isImage ? w.imageHeight : lineHeight;
+    int itemHeight = w.getHeight(renderer);
     if (!w.block.isEmpty() || w.isImage) {
       if ((y + itemHeight > 0) && (y < height)) {
         if (w.isImage) {

@@ -27,6 +27,9 @@ int main(int argc, char *argv[]) {
   if (argc > 1)
     storyPath = argv[1];
 
+  setvbuf(stdout, NULL, _IONBF, 0);
+  setvbuf(stderr, NULL, _IONBF, 0);
+
   printf("=== eenk Interactive Fiction Runtime ===\n");
   printf("Story: %s\n\n", storyPath);
 

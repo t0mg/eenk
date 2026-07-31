@@ -71,6 +71,8 @@ public:
         bool isImage = false;
         std::string imagePath = "";
         int imageHeight = 0;
+        bool endOfParagraph = false;
+        int getHeight(class GfxRenderer* renderer) const;
     };
     const std::deque<WrappedLine>& getHistory() const { return _wrappedLines; }
     void setHistory(const std::deque<WrappedLine>& history) { _wrappedLines = history; }
