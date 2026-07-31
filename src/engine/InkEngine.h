@@ -76,6 +76,8 @@ public:
 
     void applySettings(const struct AppSettings& settings);
 
+    int getImageHeight(const char* imagePath) const;
+
 private:
     IDisplay&  _display;
     IInput&    _input;
@@ -106,7 +108,6 @@ private:
     };
     std::map<uint32_t, ImageMeta> _mediaDict;
     void loadMediaSidecar(bool hasMediaFlag);
-    int getImageHeight(const char* imagePath) const;
 
     static constexpr int MAX_CHOICES = 8;
     char  _choiceText[MAX_CHOICES][128] = {};

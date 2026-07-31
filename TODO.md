@@ -4,6 +4,7 @@
 
 ## Bugs
 
+* small bug when the end of a story is reached: we get the ugly "---THE END---..." message, but the previous choice option still render. Instead we should drop that text and render a hardcoded choice set "Exit to menu" and "Replay story".
 * eenky frontend font decode error: `OTS parsing error: invalid sfntVersion: 1008821359` for Literata-VariableFont.
 * Battery charge indicator never shows up in the battery widget. **Root cause identified:** the X4 uses `BatteryMonitor(GPIO0)` (ADC mode), and `BatteryMonitor::isCharging()` always returns `false` in ADC mode — only the BQ27220 fuel gauge (X3 hardware) supports charge detection. The charge LED on the X4 is driven directly by the charge IC hardware, with no GPIO routed to the ESP32-C3. Options: (a) leave as-is and remove the charging label path from BatteryWidget for cleanliness, (b) check if the X4 schematic exposes a charge-detect GPIO that we missed, or (c) detect charger presence via USB VBUS detection if a suitable pin is available.
 
