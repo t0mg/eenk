@@ -22,10 +22,11 @@
 #include "StreamingEpdFontFamily.h"
 #include "hal/sdl/mock/EInkDisplay.h"
 #include "os/AppSettings.h"
-#include "os/SdFontCatalogue.h"
-#include "ui/BatteryWidget.h"
 #include "os/BootManager.h"
+#include "os/SdFontCatalogue.h"
 #include "test_sleep_cover_media.h"
+#include "ui/BatteryWidget.h"
+
 
 #define FRAME_W 800
 #include "ui/FooterWidget.h"
@@ -45,7 +46,6 @@
 #include <builtinFonts/ui_12.h>
 #include <builtinFonts/ui_bold_12.h>
 #include <cstdio>
-
 
 #endif
 
@@ -293,13 +293,16 @@ protected:
     snprintf(_entries[0].title, sizeof(_entries[0].title),
              "The Hitchhiker's Guide");
     snprintf(_entries[0].author, sizeof(_entries[0].author), "Douglas Adams");
+    snprintf(_entries[0].path, sizeof(_entries[0].path), "test/test.bin");
     _entries[0].sizeBytes = 1500000;
     _entries[0].hasMetadata = true;
     _entries[0].hasSave = true;
     _entries[0].isCurrentlyLoaded = true;
+    parseThumbMetadata(_entries[0]);
 
     snprintf(_entries[1].title, sizeof(_entries[1].title),
-             "Zork I: The Great Underground Empire");
+             "Zork I: The Great Underground Empire Very Long Title That "
+             "Doesn't Fit");
     snprintf(_entries[1].author, sizeof(_entries[1].author), "Infocom");
     _entries[1].sizeBytes = 105000;
     _entries[1].hasMetadata = true;
@@ -352,8 +355,16 @@ void test_library_screenshot(void) {
   BatteryWidget widget(display.renderer, battery);
   AppSettings settings = AppSettings::defaults();
 
+  FILE *f = fopen("test/test.media", "wb");
+  if (f) {
+    fwrite(test_sleep_cover_media, 1, test_sleep_cover_media_len, f);
+    fclose(f);
+  }
+
   TestLibrary library(display, input, widget, settings);
   library.run();
+
+  remove("test/test.media");
 
   saveBMP("test/golden/test_library.bmp", display.eink.getFrameBuffer(),
           display.getWidth(), display.getHeight());
@@ -567,9 +578,10 @@ void test_error_widget_screenshot(void) {
   TestDisplay display;
   SystemUI ui(display);
 
-  ui.showMessage("Failed to load story",
-               "The story file is corrupted or could not be found.\nPlease try "
-               "re-flashing the device or formatting the SD card.");
+  ui.showMessage(
+      "Failed to load story",
+      "The story file is corrupted or could not be found.\nPlease try "
+      "re-flashing the device or formatting the SD card.");
 
   saveBMP("test/golden/test_error_widget.bmp", display.eink.getFrameBuffer(),
           display.getWidth(), display.getHeight());
@@ -590,21 +602,23 @@ void test_sleep_cover_screenshot(void) {
 void test_sleep_cover_image_screenshot(void) {
   TestDisplay display;
   SystemUI ui(display);
-  
-  FILE* f = fopen("test/test.media", "wb");
+
+  FILE *f = fopen("test/test.media", "wb");
   if (f) {
     fwrite(test_sleep_cover_media, 1, test_sleep_cover_media_len, f);
     fclose(f);
   }
-  
+
   BootManager::setStoryPath("test/test.bin");
-  
+
   ui.showSleepCover("Zzzzz...", "Sleep mode");
-  
-  saveBMP("test/golden/test_sleep_cover_image.bmp", display.eink.getFrameBuffer(), display.getWidth(), display.getHeight());
-  
+
+  saveBMP("test/golden/test_sleep_cover_image.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+
   remove("test/test.media");
-  
+
   TEST_ASSERT_EQUAL(1, 1);
 }
 
@@ -853,7 +867,8 @@ void test_sd_font_catalogue_family_detection(void) {
 }
 
 void test_image_widget_screenshot(void) {
-  TEST_IGNORE_MESSAGE("ImageWidget::draw now expects raw 1-bpp buffers from a .media sidecar");
+  TEST_IGNORE_MESSAGE(
+      "ImageWidget::draw now expects raw 1-bpp buffers from a .media sidecar");
 }
 #endif
 

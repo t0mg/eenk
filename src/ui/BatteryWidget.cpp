@@ -15,23 +15,13 @@
 #include <BatteryMonitor.h>
 #endif
 #include <GfxRenderer.h>
-#include <builtinFonts/ui_10.h>
+#include "NeuStyle.h"
 
 #ifdef PLATFORM_ESP32
 #include <Arduino.h>
-#include <EpdFont.h>
-#include <EpdFontFamily.h>
-
-// Font ID 20 is reserved for BatteryWidget (avoids clashing with InkEngine
-// IDs 0/1 or SystemUI IDs 10/11).
-static constexpr int kBatteryFontId = 20;
-
-static EpdFont s_batFont(&ui_10);
-static EpdFontFamily s_batFamily(&s_batFont);
 #else
 // On native, millis() comes from the mock Arduino.h via the include path.
 #include <Arduino.h>
-static constexpr int kBatteryFontId = 20;
 #endif
 
 // ─── Construction ────────────────────────────────────────────────────────────
@@ -53,9 +43,6 @@ void BatteryWidget::tick() {
 // ─── draw() ──────────────────────────────────────────────────────────────────
 
 void BatteryWidget::draw(int x, int y, bool inverted) {
-#ifdef PLATFORM_ESP32
-  _renderer.insertFont(kBatteryFontId, s_batFamily);
-#endif
 
   // Neubrutalist battery: white body on black header, black depletion overlay.
   // When inverted=true (default on black header), body is white, depletion is
@@ -98,16 +85,16 @@ void BatteryWidget::draw(int x, int y, bool inverted) {
 #endif
 
   if (isCharging) {
-    snprintf(label, sizeof(label), "charging %d%%", pct);
+    snprintf(label, sizeof(label), "CHRG %d%%", pct);
   } else {
     snprintf(label, sizeof(label), "%d%%", pct);
   }
 
 #if defined(PLATFORM_ESP32) || defined(PIO_UNIT_TESTING)
   static constexpr int kLabelGap = 4;
-  int textW = _renderer.getTextWidth(kBatteryFontId, label);
+  int textW = _renderer.getTextWidth(NeuStyle::FONT_HEADING, label);
   int labelX = x - kLabelGap - textW;
-  _renderer.drawText(kBatteryFontId, labelX, labelY, label, bodyColor);
+  _renderer.drawText(NeuStyle::FONT_HEADING, labelX, labelY, label, bodyColor);
 #else
   (void)labelY;
   (void)label;

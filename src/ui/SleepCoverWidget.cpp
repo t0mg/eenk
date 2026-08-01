@@ -33,17 +33,18 @@ void SleepCoverWidget::show(IDisplay &display, const char *msg,
         auto file = SDCardManager::getInstance().openFile(mediaPath);
         if (file) {
           uint32_t magic = 0;
-          if (file.read(&magic, 4) == 4 && magic == 0x4D4B4E45) { // "ENKM"
+          if (file.read((uint8_t*)&magic, 4) == 4 && magic == 0x4D4B4E45) { // "ENKM"
             uint32_t numEntries = 0;
-            if (file.read(&numEntries, 4) == 4) {
+            if (file.read((uint8_t*)&numEntries, 4) == 4) {
               uint32_t targetHash = sleepcover_fnv1a_32("@cover");
               for (uint32_t i = 0; i < numEntries; ++i) {
                 uint32_t hash = 0, offset = 0, size = 0, w = 0, h = 0;
-                if (file.read(&hash, 4) != 4) break;
-                if (file.read(&offset, 4) != 4) break;
-                if (file.read(&size, 4) != 4) break;
-                if (file.read(&w, 4) != 4) break;
-                if (file.read(&h, 4) != 4) break;
+                if (file.read((uint8_t*)&hash, 4) != 4) break;
+                if (file.read((uint8_t*)&offset, 4) != 4) break;
+                if (file.read((uint8_t*)&size, 4) != 4) break;
+                if (file.read((uint8_t*)&w, 4) != 4) break;
+                if (file.read((uint8_t*)&h, 4) != 4) break;
+
                 
                 if (hash == targetHash) {
                   ImageWidget::draw(*renderer, file, offset, size, w, h, 0, 0, display.getWidth(), display.getHeight());

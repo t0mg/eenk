@@ -9,13 +9,13 @@
 #include "SystemUI.h"
 #include "os/BootManager.h"
 
+#include "ImageWidget.h"
 #include "NeuStyle.h"
 #include <GfxRenderer.h>
+#include <SDCardManager.h>
 #include <cctype>
 #include <cstdio>
 #include <cstring>
-#include "ImageWidget.h"
-#include <SDCardManager.h>
 
 #ifdef PLATFORM_ESP32
 #include <Arduino.h>
@@ -64,15 +64,15 @@ static uint32_t library_fnv1a_32(const char *str) {
   return hash;
 }
 
-void Library::parseThumbMetadata(Library::StoryEntry& e) {
+void Library::parseThumbMetadata(Library::StoryEntry &e) {
   e.thumbOffset = 0;
   e.thumbSize = 0;
   e.thumbW = 0;
   e.thumbH = 0;
-  
+
   char mediaPath[256];
   snprintf(mediaPath, sizeof(mediaPath), "%s", e.path);
-  char* dot = strrchr(mediaPath, '.');
+  char *dot = strrchr(mediaPath, '.');
   if (dot) {
     strcpy(dot, ".media");
   } else {
@@ -80,16 +80,17 @@ void Library::parseThumbMetadata(Library::StoryEntry& e) {
   }
 
   auto file = SDCardManager::getInstance().openFile(mediaPath);
-  if (!file) return;
+  if (!file)
+    return;
 
   uint32_t magic = 0;
-  if (file.read(&magic, 4) != 4 || magic != 0x4D4B4E45) { // "ENKM"
+  if (file.read((uint8_t *)&magic, 4) != 4 || magic != 0x4D4B4E45) { // "ENKM"
     file.close();
     return;
   }
 
   uint32_t numEntries = 0;
-  if (file.read(&numEntries, 4) != 4) {
+  if (file.read((uint8_t *)&numEntries, 4) != 4) {
     file.close();
     return;
   }
@@ -98,12 +99,17 @@ void Library::parseThumbMetadata(Library::StoryEntry& e) {
 
   for (uint32_t i = 0; i < numEntries; ++i) {
     uint32_t hash = 0, offset = 0, size = 0, w = 0, h = 0;
-    if (file.read(&hash, 4) != 4) break;
-    if (file.read(&offset, 4) != 4) break;
-    if (file.read(&size, 4) != 4) break;
-    if (file.read(&w, 4) != 4) break;
-    if (file.read(&h, 4) != 4) break;
-    
+    if (file.read((uint8_t *)&hash, 4) != 4)
+      break;
+    if (file.read((uint8_t *)&offset, 4) != 4)
+      break;
+    if (file.read((uint8_t *)&size, 4) != 4)
+      break;
+    if (file.read((uint8_t *)&w, 4) != 4)
+      break;
+    if (file.read((uint8_t *)&h, 4) != 4)
+      break;
+
     if (hash == targetHash) {
       e.thumbOffset = offset;
       e.thumbSize = size;
@@ -400,7 +406,7 @@ void Library::scanSD() {
             StoryMetadata::getSavePath(e.path, savePath, sizeof(savePath));
             e.hasSave = false; // native stub
             e.isCurrentlyLoaded = false;
-            
+
             parseThumbMetadata(e);
 
             _numEntries++;
@@ -462,60 +468,82 @@ void Library::renderEntry(int index, int yPos, bool selected) {
       [&](int inX, int inY, int inW, int inH) {
         bool ink = true; // Always black text on white background inside card
 
-        // ── Title
-        // ─────────────────────────────────────────────────────────────────
-        int thumbShift = (e.thumbSize > 0) ? 152 + 12 : 0;
-        int lineH_bold = r->getLineHeight(FONT_BOLD);
-        int lineH_small = r->getLineHeight(FONT_SMALL);
+        // ── Layout
+        int squareW = e.thumbSize > 0 ? inH : 0;
+        int textStartX = inX + squareW + 16;
+        int annotX = inX + inW - 8;
 
-        bool hasAuthor = (e.author[0] != '\0');
-        int textBlockH = lineH_bold + (hasAuthor ? (lineH_small + 2) : 0);
-        int textY = inY + (inH - textBlockH) / 2;
-
-        // Build size string.
-        char sizeStr[16];
-        formatSize(e.sizeBytes, sizeStr, sizeof(sizeStr));
-        int sizeW = r->getTextWidth(FONT_SMALL, sizeStr);
-
-        // Save indicator: 16x16 floppy icon if hasSave.
-        int saveW = e.hasSave ? 16 : 0;
-
-        // Currently-loaded marker.
-        const char *loadedStr = e.isCurrentlyLoaded ? "[LOADED]" : "";
-        int loadedW =
-            e.isCurrentlyLoaded ? r->getTextWidth(FONT_SMALL, loadedStr) : 0;
-
-        int annotX = inX + inW - 8 - sizeW;
-
-        // Draw size at right edge.
-        r->drawText(FONT_SMALL, annotX, textY + (lineH_bold - lineH_small) / 2,
-                    sizeStr, ink);
-
-        // Draw titles with shift
-        r->drawText(FONT_BOLD, inX + ITEM_MARGIN_X + thumbShift, textY, e.title, ink);
-        if (hasAuthor) {
-          r->drawText(FONT_SMALL, inX + ITEM_MARGIN_X + thumbShift, textY + lineH_bold + 2,
-                      e.author, ink);
-        }
-        
-        // Draw thumbnail
+        // ── Left Side Square (Thumbnail)
         if (e.thumbSize > 0) {
+          r->fillRect(inX, inY, squareW, inH, true);
           char mediaPath[256];
           snprintf(mediaPath, sizeof(mediaPath), "%s", e.path);
-          char* dot = strrchr(mediaPath, '.');
-          if (dot) strcpy(dot, ".media");
-          
+          char *dot = strrchr(mediaPath, '.');
+          if (dot)
+            strcpy(dot, ".media");
+
           auto file = SDCardManager::getInstance().openFile(mediaPath);
           if (file) {
-            ImageWidget::draw(*r, file, e.thumbOffset, e.thumbSize, e.thumbW, e.thumbH, inX + ITEM_MARGIN_X, inY + (inH - e.thumbH) / 2, e.thumbW, e.thumbH);
+            ImageWidget::draw(*r, file, e.thumbOffset, e.thumbSize, e.thumbW,
+                              e.thumbH, inX + (squareW - e.thumbW) / 2,
+                              inY + (inH - e.thumbH) / 2, e.thumbW, e.thumbH);
             file.close();
           }
         }
 
-        // Draw save indicator
+        // ── Title & Author Layout
+        int lineH_bold = r->getLineHeight(FONT_BOLD);
+        int lineH_small = r->getLineHeight(FONT_SMALL);
+        bool hasAuthor = (e.author[0] != '\0');
+
+        // Available width for the title
+        int maxTitleW = annotX - textStartX;
+        
+        int maxTitleLines = e.thumbSize > 0 ? 3 : 2;
+
+        auto titleLinesCheck = r->wrapTextWithHyphenation(FONT_BOLD, e.title, maxTitleW, maxTitleLines + 1);
+        if (titleLinesCheck.empty()) {
+            titleLinesCheck.push_back(e.title);
+        }
+        int titleLinesCount = std::min((int)titleLinesCheck.size(), maxTitleLines);
+
+        int textBlockH = lineH_bold * titleLinesCount;
+        if (hasAuthor) textBlockH += 2 + lineH_small;
+        textBlockH += 8 + 16; // Padding + status line
+
+        int textY = inY + (inH - textBlockH) / 2;
+        int currentY = textY;
+
+        for (int i = 0; i < titleLinesCount; ++i) {
+            if (i == titleLinesCount - 1 && titleLinesCheck.size() > (size_t)titleLinesCount) {
+                std::string remainder = titleLinesCheck[i];
+                for (size_t j = i + 1; j < titleLinesCheck.size(); ++j) {
+                    remainder += " " + titleLinesCheck[j];
+                }
+                std::string truncTitle = r->truncatedText(FONT_BOLD, remainder.c_str(), maxTitleW);
+                r->drawText(FONT_BOLD, textStartX, currentY, truncTitle.c_str(), ink);
+            } else {
+                r->drawText(FONT_BOLD, textStartX, currentY, titleLinesCheck[i].c_str(), ink);
+            }
+            currentY += lineH_bold;
+        }
+
+        if (hasAuthor) {
+          int authorY = currentY + 2;
+          std::string truncAuthor =
+              r->truncatedText(FONT_SMALL, e.author, maxTitleW);
+          r->drawText(FONT_SMALL, textStartX, authorY, truncAuthor.c_str(),
+                      ink);
+          currentY = authorY + lineH_small;
+        }
+
+        // ── Status Line (Save icon, Size, Loaded)
+        int statusY = currentY + 8;
+
+        int currentX = textStartX;
+
+        // Save indicator: 16x16 floppy icon if hasSave.
         if (e.hasSave) {
-          int svX = annotX - saveW - 6;
-          int svY = textY + (lineH_bold - 16) / 2;
           static const uint8_t kFloppyIcon16[32] = {
               0xf0, 0x6c, 0xf0, 0x6e, 0xf0, 0x6f, 0xf0, 0x6f, 0xf0, 0x0f, 0xff,
               0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc0, 0x03, 0xd9, 0x2b,
@@ -525,35 +553,28 @@ void Library::renderEntry(int index, int yPos, bool selected) {
               uint8_t b = kFloppyIcon16[fy * 2 + fx_byte];
               for (int fx_bit = 0; fx_bit < 8; fx_bit++) {
                 if (b & (1 << (7 - fx_bit))) {
-                  r->drawPixel(svX + fx_byte * 8 + fx_bit, svY + fy, ink);
+                  r->drawPixel(currentX + fx_byte * 8 + fx_bit, statusY + fy,
+                               ink);
                 }
               }
             }
           }
+          currentX += 16 + 8; // width + margin
         }
 
-        // Draw currently-loaded marker
+        // Build size string.
+        char sizeStr[16];
+        formatSize(e.sizeBytes, sizeStr, sizeof(sizeStr));
+        int sizeW = r->getTextWidth(FONT_SMALL, sizeStr);
+        int textOffsetY = (16 - lineH_small) / 2;
+
+        r->drawText(FONT_SMALL, currentX, statusY + textOffsetY, sizeStr, ink);
+        currentX += sizeW + 12;
+
+        // Currently-loaded marker.
         if (e.isCurrentlyLoaded) {
-          int ldX = inX + inW - 8 - loadedW;
-          int ldY = textY + lineH_bold + 2;
-          r->drawText(FONT_SMALL, ldX, ldY, loadedStr, ink);
-        }
-
-        // Available width for the title
-        int maxTitleW = annotX - inX - 8 - (saveW > 0 ? saveW + 6 : 0);
-
-        std::string truncTitle =
-            r->truncatedText(FONT_BOLD, e.title, maxTitleW);
-        r->drawText(FONT_BOLD, inX + 8, textY, truncTitle.c_str(), ink);
-
-        // ── Author
-        // ────────────────────────────────────────────────────────────────
-        if (hasAuthor) {
-          int authorY = textY + lineH_bold + 2;
-          int maxAuthorW = annotX - inX - 8;
-          std::string truncAuthor =
-              r->truncatedText(FONT_SMALL, e.author, maxAuthorW);
-          r->drawText(FONT_SMALL, inX + 8, authorY, truncAuthor.c_str(), ink);
+          r->drawText(FONT_SMALL, currentX, statusY + textOffsetY, "[LOADED]",
+                      ink);
         }
       });
 #else

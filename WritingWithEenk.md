@@ -4,13 +4,15 @@ Welcome to the eenk authoring guide! This document covers the eenk-specific feat
 
 ## Story Header Metadata
 
-You can define metadata for your story by adding a block comment at the very top of your main ink file using `@` tags. eenky parses these tags during compilation and bakes them into your compiled story binary so the device can display them in the library.
+You can define metadata for your story by adding a block comment at the very top of your main ink file using `@` tags. eenky parses these tags during compilation and bakes them into your compiled story binary (`.bin` file) so the device can display them in the library.
 
 ```ink
 /*
   @title My Amazing Story
   @author John Doe
   @font my-custom-font
+  @cover cover.png
+  @thumbnail thumb.png
 */
 
 Once upon a time...
@@ -18,7 +20,11 @@ Once upon a time...
 
 - **@title**: The title of your story (maximum 63 characters).
 - **@author**: The author of the story (maximum 31 characters).
-- **@font**: The stem name of the font you want to use for the story (maximum 15 characters).
+- **@font**: The stem name of the font you want to use for the story (maximum 15 characters). See [Fonts in eenk](#fonts-in-eenk) below.
+- **@cover**: The cover image will automatically be resized to fit the device screen (480x800) for the sleep screen. Using this tag will create a `.media` file alongside your compiled story, see [Images in eenk](#images-in-eenk) below.
+- **@thumbnail**: A separate image path to be used as a 156x156 thumbnail in the library list. If not provided, the cover image will be resized and used instead. Using this tag will also create the `.media` file.
+
+> Note: Metadata tags are all optional. The whole metadata header is, too: you don't have to provide it to compile an ink story for eenk.
 
 ## Fonts in eenk
 
@@ -64,8 +70,7 @@ During the compilation process, eenky collects all the `# IMAGE:` tags it finds 
 
 When transferring your story to the device using the Device Manager in eenky, this `.media` file is automatically transferred alongside your main `.bin` story file and any custom `.epdfont` files.
 
-> [!NOTE]
-> eenky inherits the classic Web export mode from Inky, which also supports this exact same `# IMAGE:` tag format for rendering images in the browser!
+> Note: eenky inherits the classic Web export mode from Inky, which also supports the very same `# IMAGE:` tag format for rendering images in the browser! What are the odds!?
 
 ## Building with eenky
 
