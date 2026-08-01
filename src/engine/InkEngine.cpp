@@ -228,7 +228,7 @@ bool InkEngine::loadStory(const char *path) {
   }
   _storyDir = storyDir;
   _resolveAndApplyFont(meta, storyBase, storyDir);
-  loadMediaSidecar((meta.flags & 1) != 0);
+  loadMediaSidecar((meta.flags & 1) != 0, path);
 
   _wrappedLines.clear();
   _scrollY    = 0;
@@ -310,7 +310,7 @@ bool InkEngine::loadStory(const unsigned char *data,
 
   _storyDir = storyDir;
   _resolveAndApplyFont(meta, storyBase, storyDir);
-  loadMediaSidecar((meta.flags & 1) != 0);
+  loadMediaSidecar((meta.flags & 1) != 0, storyPath);
 
   _wrappedLines.clear();
   _scrollY    = 0;
@@ -544,15 +544,23 @@ void InkEngine::update() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-void InkEngine::loadMediaSidecar(bool hasMediaFlag) {
+void InkEngine::loadMediaSidecar(bool hasMediaFlag, const char *storyPath) {
     _mediaDict.clear();
-    if (!hasMediaFlag) return;
+    if (!hasMediaFlag || !storyPath || !storyPath[0]) return;
     if (_mediaFile) _mediaFile.close();
     
-    std::string mediaPath = _storyDir + "/main.media";
-    _mediaFile = SDCardManager::getInstance().openFile(mediaPath.c_str());
+    char mediaPath[512] = {};
+    snprintf(mediaPath, sizeof(mediaPath), "%s", storyPath);
+    char* dot = strrchr(mediaPath, '.');
+    if (dot) {
+        strcpy(dot, ".media");
+    } else {
+        strcat(mediaPath, ".media");
+    }
+
+    _mediaFile = SDCardManager::getInstance().openFile(mediaPath);
     if (!_mediaFile) {
-        printf("[InkEngine] Media sidecar expected but not found at %s\n", mediaPath.c_str());
+        printf("[InkEngine] Media sidecar expected but not found at %s\n", mediaPath);
         return;
     }
     
@@ -621,9 +629,11 @@ void InkEngine::tickRunningText() {
     const char *line = _runner->getline_alloc();
     if (line) {
       std::string s(line);
-      while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) {
+      // Remove trailing newline if present
+      if (!s.empty() && s.back() == '\n') {
         s.pop_back();
       }
+      printf("[InkEngine] getline_alloc returned '%s'. s.empty()=%d, has_tags=%d, num_tags=%d\n", s.c_str(), s.empty(), _runner->has_tags(), _runner->num_tags());
       
       // Parse IMAGE tags attached to this line
       if (_runner->has_tags()) {
@@ -646,6 +656,7 @@ void InkEngine::tickRunningText() {
                 printf("[InkEngine] Found image tag '%s', height=%d\n", pathStr, wl.imageHeight);
             } else {
                 printf("[InkEngine] Image tag '%s' not found in media dict (hash: %u)\n", pathStr, hash);
+                wl.imageHeight = 100; // FORCE HEIGHT FOR TESTING
             }
             
             _wrappedLines.push_back(wl);
@@ -1056,6 +1067,10 @@ void InkEngine::redraw() {
             } else {
               printf("[InkEngine] Media sidecar not open for image: %s\n", w.imagePath.c_str());
             }
+          } else {
+            renderer->setHalftone(true);
+            renderer->fillRect(marginX, y, narrativeWidth, w.imageHeight, true);
+            renderer->setHalftone(false);
           }
         } else {
           renderer->setHalftone(w.isOld);

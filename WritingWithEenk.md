@@ -66,7 +66,7 @@ You can embed images in your story using the standard Ink `# IMAGE:` tag. eenky 
 
 ### The Media Sidecar
 
-During the compilation process, eenky collects all the `# IMAGE:` tags it finds in your story, processes the images (scaling, dithering, and converting to 1-bit format for the e-ink display), and packs them into a single binary file named after your story with the `.media` extension (e.g., `main.media`).
+During the compilation process, eenky collects all the `# IMAGE:` tags it finds in your story, processes the images (scaling, dithering, and converting to 1-bit format for the e-ink display), and packs them into a single binary file named after your story with the `.media` extension (e.g., `mystory.media`).
 
 When transferring your story to the device using the Device Manager in eenky, this `.media` file is automatically transferred alongside your main `.bin` story file and any custom `.epdfont` files.
 

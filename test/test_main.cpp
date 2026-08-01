@@ -24,7 +24,7 @@
 #include "os/AppSettings.h"
 #include "os/BootManager.h"
 #include "os/SdFontCatalogue.h"
-#include "test_sleep_cover_media.h"
+#include "engine/InkEngine.h"
 #include "ui/BatteryWidget.h"
 
 
@@ -280,6 +280,17 @@ void test_battery_widget_screenshot(void) {
   TEST_ASSERT_EQUAL(1, 1);
 }
 
+static void ensure_test_story_media(bool forceRebuild = false) {
+  FILE *f = fopen("test/story/story.media", "rb");
+  if (!f || forceRebuild) {
+    if (f) fclose(f);
+    int res = system("node test/build_test_story.js");
+    (void)res;
+  } else {
+    fclose(f);
+  }
+}
+
 class TestLibrary : public Library {
 public:
   TestLibrary(IDisplay &display, IInput &input, BatteryWidget &battery,
@@ -293,7 +304,7 @@ protected:
     snprintf(_entries[0].title, sizeof(_entries[0].title),
              "The Hitchhiker's Guide");
     snprintf(_entries[0].author, sizeof(_entries[0].author), "Douglas Adams");
-    snprintf(_entries[0].path, sizeof(_entries[0].path), "test/test.bin");
+    snprintf(_entries[0].path, sizeof(_entries[0].path), "test/story/story.bin");
     _entries[0].sizeBytes = 1500000;
     _entries[0].hasMetadata = true;
     _entries[0].hasSave = true;
@@ -349,22 +360,16 @@ protected:
 };
 
 void test_library_screenshot(void) {
+  ensure_test_story_media();
+
   TestDisplay display;
   MockInput input;
   BatteryMonitor battery;
   BatteryWidget widget(display.renderer, battery);
   AppSettings settings = AppSettings::defaults();
 
-  FILE *f = fopen("test/test.media", "wb");
-  if (f) {
-    fwrite(test_sleep_cover_media, 1, test_sleep_cover_media_len, f);
-    fclose(f);
-  }
-
   TestLibrary library(display, input, widget, settings);
   library.run();
-
-  remove("test/test.media");
 
   saveBMP("test/golden/test_library.bmp", display.eink.getFrameBuffer(),
           display.getWidth(), display.getHeight());
@@ -600,24 +605,18 @@ void test_sleep_cover_screenshot(void) {
 }
 
 void test_sleep_cover_image_screenshot(void) {
+  ensure_test_story_media();
+
   TestDisplay display;
   SystemUI ui(display);
 
-  FILE *f = fopen("test/test.media", "wb");
-  if (f) {
-    fwrite(test_sleep_cover_media, 1, test_sleep_cover_media_len, f);
-    fclose(f);
-  }
-
-  BootManager::setStoryPath("test/test.bin");
+  BootManager::setStoryPath("test/story/story.bin");
 
   ui.showSleepCover("Zzzzz...", "Sleep mode");
 
   saveBMP("test/golden/test_sleep_cover_image.bmp",
           display.eink.getFrameBuffer(), display.getWidth(),
           display.getHeight());
-
-  remove("test/test.media");
 
   TEST_ASSERT_EQUAL(1, 1);
 }
@@ -866,9 +865,24 @@ void test_sd_font_catalogue_family_detection(void) {
   remove(ipath);
 }
 
+#include "hal/sdl/SDLStorage.h"
+
 void test_image_widget_screenshot(void) {
-  TEST_IGNORE_MESSAGE(
-      "ImageWidget::draw now expects raw 1-bpp buffers from a .media sidecar");
+  ensure_test_story_media();
+
+  TestDisplay display;
+  MockInput input;
+  SDLStorage storage;
+  InkEngine engine(display, input, storage);
+
+  BootManager::setStoryPath("test/story/story.bin");
+  engine.loadStory("test/story/story.bin");
+  engine.update();
+
+  saveBMP("test/golden/test_image_widget.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+
+  TEST_ASSERT_EQUAL(1, 1);
 }
 #endif
 

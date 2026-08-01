@@ -111,7 +111,7 @@ private:
     };
     std::map<uint32_t, ImageMeta> _mediaDict;
     SdFile _mediaFile;
-    void loadMediaSidecar(bool hasMediaFlag);
+    void loadMediaSidecar(bool hasMediaFlag, const char* storyPath = nullptr);
 
     static constexpr int MAX_CHOICES = 8;
     char  _choiceText[MAX_CHOICES][128] = {};
