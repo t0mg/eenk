@@ -182,6 +182,12 @@ bool BatteryMonitor::readBq27220Current_(int16_t* outMa) const {
 }
 
 bool BatteryMonitor::isCharging() const {
+  if (_mode == Mode::Cw2017) {
+#if defined(PLATFORM_ESP32) && defined(ARDUINO_USB_CDC_ON_BOOT) && ARDUINO_USB_CDC_ON_BOOT
+    if (Serial) return true;
+#endif
+    return false;
+  }
   if (_mode != Mode::Bq27220) {
     return false;
   }

@@ -19,6 +19,11 @@ enum class ButtonEvent {
   BACK,    ///< Save / exit / cancel
   SLEEP,   ///< Device power off / sleep requested
   QUIT,    ///< Platform quit (window close, power button)
+  SWIPE_UP,
+  SWIPE_DOWN,
+  SWIPE_LEFT,
+  SWIPE_RIGHT,
+  TOP_EDGE_SWIPE,
 };
 
 class IInput {
@@ -30,6 +35,16 @@ public:
    * Returns ButtonEvent::NONE if no key/button was pressed since the last call.
    */
   virtual ButtonEvent pollInput() = 0;
+
+  /**
+   * Returns the last recorded touch coordinate (x, y) if a touch event occurred.
+   * Returns false if no touch is active.
+   */
+  virtual bool getTouchPosition(int& x, int& y) const {
+    x = -1;
+    y = -1;
+    return false;
+  }
 
   /**
    * Returns the timestamp (in millis) of the last physical button

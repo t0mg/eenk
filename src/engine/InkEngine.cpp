@@ -14,6 +14,8 @@
 #include "InkRichTextParser.h"
 #include "os/AppSettings.h"
 #include "ui/SystemUI.h"
+#include "ui/QuickMenuWidget.h"
+#include "ui/SettingsView.h"
 #include <cctype>
 #include <cstring>
 #include <cstdio>
@@ -719,10 +721,6 @@ void InkEngine::tickRunningText() {
       // Snap to bottom
       _scrollY = _maxScrollY;
     }
-
-    if (_numChoices > 0 && _scrollY > _maxScrollY - choiceHeight - marginY) {
-      _scrollY = _maxScrollY;
-    }
   };
 
   if (_runner->has_choices()) {
@@ -816,114 +814,127 @@ int InkEngine::getChoicesHeight(GfxRenderer *renderer) const {
 // ─────────────────────────────────────────────────────────────────────────────
 void InkEngine::tickWaitingInput() {
   ButtonEvent ev = _input.pollInput();
+  if (ev == ButtonEvent::NONE) return;
 
-  bool choicesVisible = false;
   GfxRenderer *renderer = _display.getRenderer();
-  if (renderer && _numChoices > 0) {
-    int marginY = g_marginPx;
-    int choiceHeight = getChoicesHeight(renderer);
-    if (_scrollY > _maxScrollY - choiceHeight - marginY) {
+  int marginY = g_marginPx;
+  int choiceHeight = (renderer && _numChoices > 0) ? getChoicesHeight(renderer) : 0;
+  bool choicesVisible = false;
+  if (_numChoices > 0) {
+    if (_scrollY >= _maxScrollY - choiceHeight - marginY) {
       choicesVisible = true;
     }
-  } else if (!renderer) {
+  } else {
     choicesVisible = true;
   }
 
-  if (!choicesVisible) {
-    if (ev == ButtonEvent::UP)
-      ev = ButtonEvent::LEFT;
-    if (ev == ButtonEvent::DOWN)
-      ev = ButtonEvent::RIGHT;
+  int scrollAmount = _display.getHeight() * 3 / 4;
+
+  // Handle touch tap on choice rows or text scroll
+  int touchX = -1, touchY = -1;
+  if (_input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >= 0) {
+    if (choicesVisible && _numChoices > 0 && renderer) {
+      int choicesTop = _display.getHeight() - marginY - choiceHeight;
+      if (touchY >= choicesTop && touchY < _display.getHeight() - marginY) {
+        int relY = touchY - choicesTop;
+        int choiceLineH = renderer->getLineHeight(FONT_CHOICE);
+        int choicePadding = choiceLineH / 3;
+        int clickedIdx = relY / (choiceLineH + choicePadding);
+        if (clickedIdx >= 0 && clickedIdx < _numChoices) {
+          _selectedChoice = clickedIdx;
+          for (auto &l : _wrappedLines) l.isOld = true;
+          _runner->choose(static_cast<std::size_t>(_selectedChoice));
+          _refreshCount++;
+          _state = State::RUNNING_TEXT;
+          redraw();
+          return;
+        }
+      }
+    }
+    // Touch tap on upper/lower narrative text area ONLY scrolls back and forth (does NOT cycle options!)
+    if (touchY < _display.getHeight() / 2) {
+      _scrollY -= scrollAmount;
+      if (_scrollY < 0) _scrollY = 0;
+      redraw();
+      return;
+    } else {
+      _scrollY += scrollAmount;
+      if (_scrollY > _maxScrollY) _scrollY = _maxScrollY;
+      redraw();
+      return;
+    }
   }
 
+  // Handle TOP_EDGE_SWIPE: Open Quick Settings overlay
+  if (ev == ButtonEvent::TOP_EDGE_SWIPE) {
+    BatteryMonitor *dummyBm = nullptr;
+    BatteryWidget stackBw(*_display.getRenderer(), *dummyBm);
+    BatteryWidget &bw = _batteryWidget ? *_batteryWidget : stackBw;
+    QuickMenuWidget menu(_display, _input, bw, _frontlight, _settings);
+    QuickMenuAction action = menu.show();
+    if (action == QuickMenuAction::SLEEP_DEVICE) {
+      _shouldSleep = true;
+    } else if (action == QuickMenuAction::OPEN_SETTINGS) {
+      SettingsView view(_display, _input, bw, _settings);
+      view.run();
+      _settings = AppSettings::load();
+    }
+    redraw();
+    return;
+  }
+
+  // Handle SWIPE gestures: strictly scroll back & forth in history (never cycle options!)
+  if (ev == ButtonEvent::SWIPE_DOWN) {
+    _scrollY -= scrollAmount;
+    if (_scrollY < 0) _scrollY = 0;
+    redraw();
+    return;
+  } else if (ev == ButtonEvent::SWIPE_UP) {
+    _scrollY += scrollAmount;
+    if (_scrollY > _maxScrollY) _scrollY = _maxScrollY;
+    redraw();
+    return;
+  }
+
+  // Handle Hardware Buttons (UP/LEFT move choice up or scroll back in history; DOWN/RIGHT move choice down or scroll forward)
   switch (ev) {
-  case ButtonEvent::UP:
-    if (_selectedChoice > 0) {
+  case ButtonEvent::LEFT:
+  case ButtonEvent::UP: {
+    if (choicesVisible && _numChoices > 0 && _selectedChoice > 0) {
       --_selectedChoice;
       redraw();
     } else {
-      int scrollAmount = _display.getHeight() / 4;
       _scrollY -= scrollAmount;
-      if (_scrollY < 0)
-        _scrollY = 0;
-      redraw();
-    }
-    break;
-  case ButtonEvent::DOWN:
-    if (_selectedChoice < _numChoices - 1)
-      ++_selectedChoice;
-    else if (_numChoices > 0)
-      _selectedChoice = 0;
-    redraw();
-    break;
-  case ButtonEvent::LEFT: {
-    if (_numChoices > 0) {
-      if (_selectedChoice > 0)
-        --_selectedChoice;
-      else
-        _selectedChoice = _numChoices - 1;
-      redraw();
-    } else {
-      int scrollAmount = _display.getHeight() / 4;
-      _scrollY -= scrollAmount;
-      if (_scrollY < 0)
-        _scrollY = 0;
+      if (_scrollY < 0) _scrollY = 0;
       redraw();
     }
     break;
   }
-  case ButtonEvent::RIGHT: {
-    if (_numChoices > 0) {
-      if (_selectedChoice < _numChoices - 1)
-        ++_selectedChoice;
-      else
-        _selectedChoice = 0;
-      redraw();
-    } else {
-      int scrollAmount = _display.getHeight() / 4;
-      _scrollY += scrollAmount;
-
-      GfxRenderer *renderer = _display.getRenderer();
-      if (renderer && _numChoices > 0) {
-        int marginY = g_marginPx;
-        int choiceHeight = getChoicesHeight(renderer);
-        if (_scrollY > _maxScrollY - choiceHeight - marginY) {
-          _scrollY = _maxScrollY;
-        }
-      }
-
-      if (_scrollY > _maxScrollY)
-        _scrollY = _maxScrollY;
-      redraw();
-    }
-    break;
-  }
-  case ButtonEvent::CONFIRM:
+  case ButtonEvent::RIGHT:
+  case ButtonEvent::DOWN: {
     if (!choicesVisible) {
-      int scrollAmount = _display.getHeight() / 4;
       _scrollY += scrollAmount;
-
-      GfxRenderer *renderer = _display.getRenderer();
-      if (renderer && _numChoices > 0) {
-        int marginY = g_marginPx;
-        int choiceHeight = getChoicesHeight(renderer);
-        if (_scrollY > _maxScrollY - choiceHeight - marginY) {
-          _scrollY = _maxScrollY;
-        }
-      }
-
-      if (_scrollY > _maxScrollY)
-        _scrollY = _maxScrollY;
-      _refreshCount++;
+      if (_scrollY > _maxScrollY) _scrollY = _maxScrollY;
       redraw();
     } else if (_numChoices > 0) {
-      for (auto &l : _wrappedLines)
-        l.isOld = true;
+      _selectedChoice = (_selectedChoice + 1) % _numChoices;
+      redraw();
+    }
+    break;
+  }
+  case ButtonEvent::CONFIRM: {
+    if (!choicesVisible) {
+      _scrollY += scrollAmount;
+      if (_scrollY > _maxScrollY) _scrollY = _maxScrollY;
+      redraw();
+    } else if (_numChoices > 0) {
+      for (auto &l : _wrappedLines) l.isOld = true;
       _runner->choose(static_cast<std::size_t>(_selectedChoice));
       _refreshCount++;
       _state = State::RUNNING_TEXT;
     }
     break;
+  }
   case ButtonEvent::BACK:
   case ButtonEvent::QUIT: {
 #ifdef PLATFORM_NATIVE
@@ -932,7 +943,6 @@ void InkEngine::tickWaitingInput() {
 #else
     SystemUI ui(_display);
     if (ui.showConfirmDialog(_input, "Exit Story", "Return to the menu?")) {
-      // Exit to menu: save state, then signal done so main loop reboots to MENU.
       _shouldSleep = false;
       _state = State::DONE;
     } else {

@@ -85,8 +85,6 @@ Gt911Driver::TouchState Gt911Driver::readState() {
 
     if (status & 0x80) { // Buffer ready
         uint8_t points = status & 0x0F;
-        state.homePressed = (status & 0x10) != 0;
-
         if (points > 0) {
             uint8_t ptBuf[8];
             if (readRegs(GT911_REG_POINT1, ptBuf, 8)) {
@@ -94,6 +92,8 @@ Gt911Driver::TouchState Gt911Driver::readState() {
                 state.x = ptBuf[1] | (ptBuf[2] << 8);
                 state.y = ptBuf[3] | (ptBuf[4] << 8);
             }
+        } else {
+            state.homePressed = (status & 0x10) != 0;
         }
 
         // Clear status flag

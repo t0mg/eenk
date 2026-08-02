@@ -79,12 +79,17 @@ public:
 
     void applySettings(const struct AppSettings& settings);
 
+    void setFrontlight(class IFrontlight* fl) { _frontlight = fl; }
+    void setBatteryWidget(class BatteryWidget* bw) { _batteryWidget = bw; }
+
     int getImageHeight(const char* imagePath) const;
 
 private:
     IDisplay&  _display;
     IInput&    _input;
     IStorage&  _storage;
+    class IFrontlight* _frontlight = nullptr;
+    class BatteryWidget* _batteryWidget = nullptr;
     struct AppSettings* _settingsObj = nullptr;
 
     AppSettings _settings = AppSettings::defaults(); // cached settings for FontResolver

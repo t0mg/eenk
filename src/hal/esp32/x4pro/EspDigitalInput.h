@@ -11,6 +11,7 @@ public:
     ~EspDigitalInput() override = default;
 
     ButtonEvent pollInput() override;
+    bool getTouchPosition(int& x, int& y) const override;
     uint32_t getLastActivityTime() const override { return _lastActivityMs; }
     void setAutoSleepTimeout(uint16_t seconds) override { _timeoutSec = seconds; }
 
@@ -22,6 +23,11 @@ private:
     uint16_t _timeoutSec;
     Gt911Driver _touch;
     Gt911Driver::TouchState _lastTouch;
+
+    bool _isSwiping = false;
+    int _swipeStartX = -1;
+    int _swipeStartY = -1;
+    uint32_t _swipeStartTime = 0;
 
     static constexpr int PIN_LEFT  = 0;   // Left button -> LEFT
     static constexpr int PIN_RIGHT = 7;   // Right button -> RIGHT

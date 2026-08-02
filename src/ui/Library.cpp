@@ -9,6 +9,7 @@
 #include "SystemUI.h"
 #include "os/BootManager.h"
 
+#include "QuickMenuWidget.h"
 #include "ImageWidget.h"
 #include "NeuStyle.h"
 #include <GfxRenderer.h>
@@ -740,6 +741,41 @@ bool Library::run() {
     SystemUI::checkBatteryAndShutdown(_battery, _display);
 
     ButtonEvent ev = _input.pollInput();
+
+    int touchX = -1, touchY = -1;
+    if (_input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >= 0) {
+      if (touchY >= 440) {
+        if (touchX < 400) {
+          return true; // Open settings
+        } else if (_numEntries > 0) {
+          launchStory(_selectedIndex);
+        }
+      } else if (_numEntries > 0) {
+        int relY = touchY - 45;
+        if (relY >= 0) {
+          int clickedIdx = _scrollOffset + (relY / 54);
+          if (clickedIdx >= 0 && clickedIdx < _numEntries) {
+            if (_selectedIndex == clickedIdx) {
+              launchStory(clickedIdx);
+            } else {
+              _selectedIndex = clickedIdx;
+              render();
+            }
+          }
+        }
+      }
+    }
+
+    if (ev == ButtonEvent::TOP_EDGE_SWIPE) {
+      QuickMenuWidget qm(_display, _input, _battery, nullptr, _settings);
+      QuickMenuAction action = qm.show();
+      if (action == QuickMenuAction::OPEN_SETTINGS) {
+        return true;
+      }
+      render();
+      continue;
+    }
+
     switch (ev) {
     case ButtonEvent::UP:
     case ButtonEvent::LEFT:

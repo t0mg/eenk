@@ -2,6 +2,7 @@
 
 #include "HalInit.h"
 #include "EspSdmmcStorage.h"
+#include "EspFrontlight.h"
 #include "os/BootManager.h"
 #include <Arduino.h>
 #include <BatteryMonitor.h>
@@ -70,6 +71,10 @@ void prepareForSleep() {
 BatteryMonitor* createBatteryMonitor() {
     BatteryMonitor::Cw2017Config cfg;
     return new BatteryMonitor(cfg);
+}
+
+IFrontlight* createFrontlight() {
+    return new EspFrontlight();
 }
 
 } // namespace HalInit

@@ -173,6 +173,32 @@ void SettingsView::run() {
     SystemUI::checkBatteryAndShutdown(_battery, _display);
 
     ButtonEvent ev = _input.pollInput();
+
+    int touchX = -1, touchY = -1;
+    if (_input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >= 0) {
+      if (touchY >= 440) {
+        if (touchX < 400) {
+          running = false;
+          break;
+        } else {
+          ev = ButtonEvent::CONFIRM;
+        }
+      } else {
+        int relY = touchY - (HeaderWidget::HEIGHT + CARD_INSET_Y);
+        if (relY >= 0) {
+          int clickedIdx = relY / ROW_H;
+          if (clickedIdx >= 0 && clickedIdx <= 7) {
+            if (_itemIndex == clickedIdx) {
+              ev = ButtonEvent::CONFIRM;
+            } else {
+              _itemIndex = clickedIdx;
+              renderPage();
+            }
+          }
+        }
+      }
+    }
+
     if (ev == ButtonEvent::NONE) {
 #ifdef PLATFORM_ESP32
       delay(16);

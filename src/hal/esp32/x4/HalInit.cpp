@@ -60,6 +60,10 @@ BatteryMonitor* createBatteryMonitor() {
     return new BatteryMonitor(0 /*GPIO0*/);
 }
 
+IFrontlight* createFrontlight() {
+    return nullptr;
+}
+
 } // namespace HalInit
 
 #endif // PLATFORM_ESP32

@@ -96,6 +96,8 @@ int main(int argc, char *argv[]) {
 #include "ui/SettingsView.h"
 #include "ui/StoryMetadata.h"
 #include "ui/SystemUI.h"
+#include "ui/QuickMenuWidget.h"
+#include "hal/IFrontlight.h"
 #include <BatteryMonitor.h>
 #include <EpdFont.h>
 #include <builtinFonts/ui_12.h>
@@ -106,6 +108,7 @@ extern const EpdFontFamily OpenSans;
 DisplayType *display = nullptr;
 InputType *input = nullptr;
 IStorage *storage = nullptr;
+IFrontlight *frontlight = nullptr;
 #ifdef HAS_SD_CARD
 StorageType *sdStorage = nullptr;
 #if HAS_FLASH_CACHE
@@ -141,6 +144,7 @@ void setup() {
 
   display = new DisplayType();
   input = new InputType();
+  frontlight = HalInit::createFrontlight();
   // Storage is assigned later in the STORY boot branch.
   // storage = new EspLittleFSStorage();
   systemUI = new SystemUI(*display);
@@ -279,6 +283,8 @@ void setup() {
             if (mappedSize >= 128 && memcmp(mappedPtr, "eenk", 4) == 0) {
               storage = sdStorage;
               engine = new InkEngine(*display, *input, *storage);
+              engine->setFrontlight(frontlight);
+              engine->setBatteryWidget(batteryWidget);
               engine->applySettings(AppSettings::load());
               storyLoaded =
                   engine->loadStory(mappedPtr, mappedSize, sdStoryPath);
