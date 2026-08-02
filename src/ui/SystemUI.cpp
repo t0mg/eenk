@@ -16,6 +16,7 @@
 #include <builtinFonts/ui_bold_12.h>
 
 #ifdef PLATFORM_ESP32
+#include "HalInit.h"
 #include <InputManager.h>
 #include <esp_sleep.h>
 extern BatteryWidget *batteryWidget;
@@ -91,8 +92,7 @@ void SystemUI::checkBatteryAndShutdown(class BatteryWidget &battery,
     ui.showSleepCover("Battery Depleted");
     // Give e-ink time to finish updating
     delay(500);
-    esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN,
-                                      ESP_GPIO_WAKEUP_GPIO_LOW);
+    HalInit::prepareForSleep();
     esp_deep_sleep_start();
 #else
     printf("Native: Battery depleted, would power off.\n");

@@ -14,24 +14,30 @@
 
 #ifdef PLATFORM_ESP32
 // ── ESP32 ────────────────────────────────────────────────────────────────────
+#ifdef USE_SD_MMC
+#include <SD_MMC.h>
+#define SD_FS SD_MMC
+#else
 #include <SD.h>
+#define SD_FS SD
+#endif
 
-using SdFile = File;  // Arduino SD.h File
+using SdFile = File;  // Arduino FS.h File
 
 class SDCardManager {
 public:
     static SDCardManager& getInstance() { static SDCardManager instance; return instance; }
 
-    SdFile openFile(const char* path) { return SD.open(path, FILE_READ); }
-    SdFile open(const char* path, int /*mode*/) { return SD.open(path, FILE_READ); }
+    SdFile openFile(const char* path) { return SD_FS.open(path, FILE_READ); }
+    SdFile open(const char* path, int /*mode*/) { return SD_FS.open(path, FILE_READ); }
 
     bool openFileForRead(const char* /*type*/, const char* path, SdFile& file) {
-        file = SD.open(path, FILE_READ);
+        file = SD_FS.open(path, FILE_READ);
         return (bool)file;
     }
 
     bool openFileForWrite(const char* /*type*/, const char* path, SdFile& file) {
-        file = SD.open(path, FILE_WRITE);
+        file = SD_FS.open(path, FILE_WRITE);
         return (bool)file;
     }
 };

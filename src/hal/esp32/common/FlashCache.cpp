@@ -1,3 +1,7 @@
+#include "HalTypes.h"
+
+#if HAS_FLASH_CACHE
+
 #include "FlashCache.h"
 #include "EspSdStorage.h"
 #include "esp_partition.h"
@@ -182,3 +186,5 @@ bool FlashCache::loadStoryStreaming(EspSdStorage& sdStorage,
     
     return false;
 }
+
+#endif // HAS_FLASH_CACHE

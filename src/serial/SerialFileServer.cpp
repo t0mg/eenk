@@ -22,10 +22,10 @@ bool SerialFileServer::poll() {
     if (readLine(buf, sizeof(buf), 50)) {
         if (strcmp(buf, SYNC_MAGIC) == 0) {
             uint64_t freeBytes = 0;
-            uint64_t total = SD.totalBytes();
-            if (total == 0) total = SD.cardSize();
+            uint64_t total = SD_FS.totalBytes();
+            if (total == 0) total = SD_FS.cardSize();
             if (total > 0) {
-                freeBytes = total - SD.usedBytes();
+                freeBytes = total - SD_FS.usedBytes();
             }
             sendLine("OK EENK %s %llu", PROTOCOL_VERSION, (unsigned long long)freeBytes);
             if (onConnect) {
@@ -94,8 +94,8 @@ void SerialFileServer::runCommandLoop() {
         } else if (strcmp(cmd, "INFO") == 0) {
             handleInfo();
         } else if (strcmp(cmd, "EENK_SYNC") == 0) {
-            uint32_t freeBytes = SD.totalBytes() - SD.usedBytes();
-            sendLine("OK EENK %s %u", PROTOCOL_VERSION, (unsigned)freeBytes);
+            uint32_t freeBytes = SD_FS.totalBytes() - SD_FS.usedBytes();
+            sendLine("OK %lu", (unsigned long)freeBytes);
         } else {
             sendError("INVALID_CMD", cmd);
         }
@@ -105,7 +105,7 @@ void SerialFileServer::runCommandLoop() {
 }
 
 void SerialFileServer::handleList(const char* path) {
-    File dir = SD.open(path);
+    File dir = SD_FS.open(path);
     if (!dir || !dir.isDirectory()) {
         sendError("NOT_FOUND", path);
         if (dir) dir.close();
@@ -135,16 +135,16 @@ void SerialFileServer::handleList(const char* path) {
 }
 
 void SerialFileServer::handleDelete(const char* path) {
-    if (!SD.exists(path)) {
-        sendError("NOT_FOUND", path);
+    if (!SD_FS.exists(path)) {
+        sendLine("ERR_NOT_FOUND File does not exist");
         return;
     }
     
-    File f = SD.open(path);
-    bool isDir = f && f.isDirectory();
+    File f = SD_FS.open(path);
+    bool isDir = f ? f.isDirectory() : false;
     if (f) f.close();
 
-    bool success = isDir ? removeDirectoryRecursively(path) : SD.remove(path);
+    bool success = isDir ? removeDirectoryRecursively(path) : SD_FS.remove(path);
     if (success) {
         sendLine("OK DELETE");
     } else {
@@ -164,12 +164,12 @@ void SerialFileServer::handleUpload(const char* path, uint32_t totalSize) {
     }
 
     // Check if card has enough space
-    if (totalSize > (SD.totalBytes() - SD.usedBytes())) {
-        sendError("SD_FULL");
+    if (totalSize > (SD_FS.totalBytes() - SD_FS.usedBytes())) {
+        sendLine("ERR_NOSPACE Not enough storage space");
         return;
     }
 
-    File f = SD.open(path, FILE_WRITE);
+    File f = SD_FS.open(path, FILE_WRITE);
     if (!f) {
         sendError("IO_ERROR", "Failed to open for write");
         return;
@@ -189,7 +189,7 @@ void SerialFileServer::handleUpload(const char* path, uint32_t totalSize) {
         if (!readLine(line, sizeof(line), CMD_TIMEOUT_MS)) {
             sendError("TIMEOUT", "Waiting for CHUNK line");
             f.close();
-            SD.remove(path);
+            SD_FS.remove(path);
             Serial.setTimeout(oldTimeout);
             return;
         }
@@ -198,7 +198,7 @@ void SerialFileServer::handleUpload(const char* path, uint32_t totalSize) {
         if (sscanf(line, "CHUNK %u", &chunkSize) != 1) {
             sendError("INVALID_CMD", "Expected CHUNK <size>");
             f.close();
-            SD.remove(path);
+            SD_FS.remove(path);
             Serial.setTimeout(oldTimeout);
             return;
         }
@@ -206,7 +206,7 @@ void SerialFileServer::handleUpload(const char* path, uint32_t totalSize) {
         if (chunkSize > sizeof(buf)) {
             sendError("INVALID_CMD", "Chunk too large");
             f.close();
-            SD.remove(path);
+            SD_FS.remove(path);
             Serial.setTimeout(oldTimeout);
             return;
         }
@@ -216,7 +216,7 @@ void SerialFileServer::handleUpload(const char* path, uint32_t totalSize) {
         if (readCount != chunkSize) {
             sendError("TIMEOUT", "Chunk read incomplete");
             f.close();
-            SD.remove(path);
+            SD_FS.remove(path);
             Serial.setTimeout(oldTimeout);
             return;
         }
@@ -225,7 +225,7 @@ void SerialFileServer::handleUpload(const char* path, uint32_t totalSize) {
         if (written != chunkSize) {
             sendError("IO_ERROR", "Disk write failed");
             f.close();
-            SD.remove(path);
+            SD_FS.remove(path);
             Serial.setTimeout(oldTimeout);
             return;
         }
@@ -239,7 +239,7 @@ void SerialFileServer::handleUpload(const char* path, uint32_t totalSize) {
     if (!readLine(line, sizeof(line), CMD_TIMEOUT_MS)) {
         sendError("TIMEOUT", "Waiting for END");
         f.close();
-        SD.remove(path);
+        SD_FS.remove(path);
         Serial.setTimeout(oldTimeout);
         return;
     }
@@ -248,7 +248,7 @@ void SerialFileServer::handleUpload(const char* path, uint32_t totalSize) {
     if (sscanf(line, "END %x", &expectedCrc) != 1) {
         sendError("INVALID_CMD", "Expected END <crc_hex>");
         f.close();
-        SD.remove(path);
+        SD_FS.remove(path);
         Serial.setTimeout(oldTimeout);
         return;
     }
@@ -260,12 +260,12 @@ void SerialFileServer::handleUpload(const char* path, uint32_t totalSize) {
         sendLine("OK UPLOAD %08x", runningCrc);
     } else {
         sendLine("ERR CRC_MISMATCH %08x %08x", expectedCrc, runningCrc);
-        SD.remove(path);
+        SD_FS.remove(path);
     }
 }
 
 void SerialFileServer::handleDownload(const char* path) {
-    File f = SD.open(path, FILE_READ);
+    File f = SD_FS.open(path, FILE_READ);
     if (!f) {
         sendError("NOT_FOUND", path);
         return;
@@ -312,9 +312,9 @@ void SerialFileServer::handleMkdir(const char* path) {
 }
 
 void SerialFileServer::handleInfo() {
-    uint64_t total = SD.totalBytes();
-    if (total == 0) total = SD.cardSize();
-    uint64_t used = SD.usedBytes();
+    uint64_t total = SD_FS.totalBytes();
+    if (total == 0) total = SD_FS.cardSize();
+    uint64_t used = SD_FS.usedBytes();
     uint64_t free = total > used ? total - used : 0;
     
     // If total is STILL 0 but we know we're here, just fake a size so the UI doesn't think it's absent
@@ -324,7 +324,7 @@ void SerialFileServer::handleInfo() {
 }
 
 bool SerialFileServer::makeDirectory(const char* path) {
-    if (SD.exists(path)) return true;
+    if (SD_FS.exists(path)) return true;
     
     char tmp[256];
     strncpy(tmp, path, sizeof(tmp)-1);
@@ -333,17 +333,17 @@ bool SerialFileServer::makeDirectory(const char* path) {
     for (char* p = tmp + 1; *p; p++) {
         if (*p == '/') {
             *p = '\0';
-            if (!SD.exists(tmp)) {
-                SD.mkdir(tmp);
+            if (!SD_FS.exists(tmp)) {
+                SD_FS.mkdir(tmp);
             }
             *p = '/';
         }
     }
-    return SD.mkdir(tmp);
+    return SD_FS.mkdir(tmp);
 }
 
 bool SerialFileServer::removeDirectoryRecursively(const char* path) {
-    File dir = SD.open(path);
+    File dir = SD_FS.open(path);
     if (!dir || !dir.isDirectory()) {
         return false;
     }
@@ -369,13 +369,13 @@ bool SerialFileServer::removeDirectoryRecursively(const char* path) {
         if (isDir) {
             if (!removeDirectoryRecursively(fullPath)) success = false;
         } else {
-            if (!SD.remove(fullPath)) success = false;
+            if (!SD_FS.remove(fullPath)) success = false;
         }
     }
     dir.close();
     
     if (success) {
-        return SD.rmdir(path);
+        return SD_FS.rmdir(path);
     }
     return false;
 }

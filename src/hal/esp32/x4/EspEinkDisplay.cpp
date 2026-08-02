@@ -11,6 +11,29 @@
 #define EPD_RST 5
 #define EPD_BUSY 6
 
+#include "BoardConfig.h"
+
+// Define the global ACTIVE configuration object that FreeInk SDK drivers use.
+BoardConfig::BoardProfile BoardConfig::ACTIVE = {
+    "X4",
+    BoardConfig::Board::XteinkX4,
+    800, // width
+    480, // height
+    10000000, // SPI hz
+    BoardConfig::DisplayController::SSD1677,
+    {false, false}, // mirrorX, mirrorY
+    {EPD_SCLK, EPD_MOSI, -1, EPD_CS, EPD_DC, EPD_RST, EPD_BUSY}, // display pins
+    {}, // sd
+    {}, // input
+    {}, // frontlight
+    {}, // audio
+    {}, // mic
+    {}, // sensors
+    {}, // leds
+    {}, // touch
+    {}  // power
+};
+
 EspEinkDisplay::EspEinkDisplay() 
     : _eink(EPD_SCLK, EPD_MOSI, EPD_CS, EPD_DC, EPD_RST, EPD_BUSY)
     , _gfxRenderer(_eink)

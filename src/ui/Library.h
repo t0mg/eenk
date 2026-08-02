@@ -5,120 +5,130 @@
 //
 // run() blocks until:
 //   - The user selects a story  → sets BootManager to INK_RUNTIME and reboots
-//   - The user presses RIGHT or BACK → returns false (caller shows SettingsView)
+//   - The user presses RIGHT or BACK → returns false (caller shows
+//   SettingsView)
 #pragma once
+#include "FooterWidget.h"
+#include "HeaderWidget.h"
 #include "hal/IDisplay.h"
 #include "hal/IInput.h"
 #include "os/AppSettings.h"
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
-#include "FooterWidget.h"
-#include "HeaderWidget.h"
+
 
 class BatteryWidget;
 
 class Library {
 public:
-    Library(IDisplay& display, IInput& input, BatteryWidget& battery, AppSettings& settings);
-    virtual ~Library() = default;
+  Library(IDisplay &display, IInput &input, BatteryWidget &battery,
+          AppSettings &settings);
+  virtual ~Library() = default;
 
-    // Run the story library loop. Blocks until the user selects a game
-    // (which sets BootManager and reboots) or presses RIGHT/BACK to go to settings.
-    // Returns false if user pressed RIGHT or BACK (wants settings).
-    // Never returns on game launch (reboots inside).
-    bool run();
+  // Run the story library loop. Blocks until the user selects a game
+  // (which sets BootManager and reboots) or presses RIGHT/BACK to go to
+  // settings. Returns false if user pressed RIGHT or BACK (wants settings).
+  // Never returns on game launch (reboots inside).
+  bool run();
 
-    void setNeedsFullRefresh(bool needs) { _needsFullRefresh = needs; }
-    void setBackgroundTask(std::function<bool()> task) { _backgroundTask = task; }
+  void setNeedsFullRefresh(bool needs) { _needsFullRefresh = needs; }
+  void setBackgroundTask(std::function<bool()> task) { _backgroundTask = task; }
 
 protected:
-    IDisplay&      _display;
-    IInput&        _input;
-    BatteryWidget& _battery;
-    AppSettings&   _settings;
+  IDisplay &_display;
+  IInput &_input;
+  BatteryWidget &_battery;
+  AppSettings &_settings;
 
-    struct StoryEntry {
-        char     path[128];         // "/eenk/filename.bin"
-        char     title[64];         // From metadata or derived from filename
-        char     author[32];        // From metadata or empty
-        uint32_t sizeBytes;         // File size in bytes
-        bool     hasSave;           // Has a save in /.eenk_saves/<filename>.bin.save
-        bool     isCurrentlyLoaded; // Path matches NVS boot.story_path
-        bool     hasMetadata;       // Whether eenk header was found
-        uint32_t thumbOffset;       // Optional thumbnail offset in .media sidecar
-        uint32_t thumbSize;         // Optional thumbnail size
-        uint16_t thumbW;
-        uint16_t thumbH;
-    };
+  struct StoryEntry {
+    char path[128];         // "/eenk/filename.bin"
+    char title[64];         // From metadata or derived from filename
+    char author[32];        // From metadata or empty
+    uint32_t sizeBytes;     // File size in bytes
+    bool hasSave;           // Has a save in /.eenk_saves/<filename>.bin.save
+    bool isCurrentlyLoaded; // Path matches NVS boot.story_path
+    bool hasMetadata;       // Whether eenk header was found
+    uint32_t thumbOffset;   // Optional thumbnail offset in .media sidecar
+    uint32_t thumbSize;     // Optional thumbnail size
+    uint16_t thumbW;
+    uint16_t thumbH;
+  };
 
-    static constexpr int MAX_STORIES   = 32;
-    static constexpr int ITEM_H        = 168;  // px per story list entry
-    // floor((800 - STATUS_BAR_H - FooterWidget::HEIGHT) / ITEM_H)
-    static constexpr int VISIBLE_ITEMS = 4;
-    static constexpr int DISPLAY_W     = 480;
-    static constexpr int DISPLAY_H     = 800;
-    static constexpr int ITEM_MARGIN_X = 12;   // left/right text margin within an entry
+  static constexpr int MAX_STORIES = 32;
+  static constexpr int ITEM_H = 172; // px per story list entry
+  // floor((800 - STATUS_BAR_H - FooterWidget::HEIGHT) / ITEM_H)
+  static constexpr int VISIBLE_ITEMS = 4;
+  static constexpr int DISPLAY_W = 480;
+  static constexpr int DISPLAY_H = 800;
+  static constexpr int ITEM_MARGIN_X =
+      12; // left/right text margin within an entry
 
-    void parseThumbMetadata(StoryEntry& e);
-    // SystemUI 10/11, or BatteryWidget 20).
-    static constexpr int FONT_NORMAL = 30;   // ui_12
-    static constexpr int FONT_BOLD   = 31;   // ui_bold_12
-    static constexpr int FONT_SMALL  = 32;   // ui_10
+  void parseThumbMetadata(StoryEntry &e);
+  // SystemUI 10/11, or BatteryWidget 20).
+  static constexpr int FONT_NORMAL = 30; // ui_12
+  static constexpr int FONT_BOLD = 31;   // ui_bold_12
+  static constexpr int FONT_SMALL = 32;  // ui_10
 
-    StoryEntry _entries[MAX_STORIES];
-    int        _numEntries    = 0;
-    int        _selectedIndex = 0;
-    int        _scrollOffset  = 0;
-    bool       _firstRender   = true;
-    bool       _needsFullRefresh = true;
-    bool       _fontsLoaded   = false;
-    std::function<bool()> _backgroundTask = nullptr;
+  StoryEntry _entries[MAX_STORIES];
+  int _numEntries = 0;
+  int _selectedIndex = 0;
+  int _scrollOffset = 0;
+  bool _firstRender = true;
+  bool _needsFullRefresh = true;
+  bool _fontsLoaded = false;
+  std::function<bool()> _backgroundTask = nullptr;
 
-    // ── Private helpers ───────────────────────────────────────────────────────
+  // ── Private helpers ───────────────────────────────────────────────────────
 
-    // Register UI fonts in the renderer (idempotent).
-    void ensureFonts();
+  // Register UI fonts in the renderer (idempotent).
+  void ensureFonts();
 
-    // Populate _entries[] by scanning the SD card (or local stories/ dir on native).
-    virtual void scanSD();
+  // Populate _entries[] by scanning the SD card (or local stories/ dir on
+  // native).
+  virtual void scanSD();
 
-    // Focus the currently loaded story (if any) in the list and scroll it into view.
-    void focusLoadedStory();
+  // Focus the currently loaded story (if any) in the list and scroll it into
+  // view.
+  void focusLoadedStory();
 
-    // Sort _entries[0.._numEntries) alphabetically by title (insertion sort — n≤32).
-    void sortEntries();
+  // Sort _entries[0.._numEntries) alphabetically by title (insertion sort —
+  // n≤32).
+  void sortEntries();
 
-    // Derive a human-readable title from a raw filename: strip ".bin", replace
-    // underscores and hyphens with spaces, capitalise first letter.
-    static void titleFromFilename(const char* filename, char* outTitle, size_t outLen);
+  // Derive a human-readable title from a raw filename: strip ".bin", replace
+  // underscores and hyphens with spaces, capitalise first letter.
+  static void titleFromFilename(const char *filename, char *outTitle,
+                                size_t outLen);
 
-    // Derive title from full path: if filename is generic (main.bin), use parent directory name.
-    static void titleFromPath(const char* storyPath, char* outTitle, size_t outLen);
+  // Derive title from full path: if filename is generic (main.bin), use parent
+  // directory name.
+  static void titleFromPath(const char *storyPath, char *outTitle,
+                            size_t outLen);
 
-    // Format a byte count as a compact human-readable string: "3 KB", "1.2 MB".
-    static void formatSize(uint32_t bytes, char* out, size_t outLen);
+  // Format a byte count as a compact human-readable string: "3 KB", "1.2 MB".
+  static void formatSize(uint32_t bytes, char *out, size_t outLen);
 
-    // ── Rendering ─────────────────────────────────────────────────────────────
+  // ── Rendering ─────────────────────────────────────────────────────────────
 
-    // Full-screen redraw.
-    void render();
+  // Full-screen redraw.
+  void render();
 
-    // Draw one story row at vertical position yPos.
-    // index: entry index in _entries[]; selected: true if currently highlighted.
-    void renderEntry(int index, int yPos, bool selected);
+  // Draw one story row at vertical position yPos.
+  // index: entry index in _entries[]; selected: true if currently highlighted.
+  void renderEntry(int index, int yPos, bool selected);
 
-    // Draw "No stories found" centered message.
-    void renderEmpty();
+  // Draw "No stories found" centered message.
+  void renderEmpty();
 
-    // Draw the bottom hint bar showing available button actions.
-    void renderFooter();
+  // Draw the bottom hint bar showing available button actions.
+  void renderFooter();
 
-    // ── Actions ───────────────────────────────────────────────────────────────
+  // ── Actions ───────────────────────────────────────────────────────────────
 
-    // Adjust _scrollOffset so _selectedIndex is always visible.
-    void clampScroll();
+  // Adjust _scrollOffset so _selectedIndex is always visible.
+  void clampScroll();
 
-    // Set BootManager state and reboot into INK_RUNTIME for entry at index.
-    void launchStory(int index);
+  // Set BootManager state and reboot into INK_RUNTIME for entry at index.
+  void launchStory(int index);
 };

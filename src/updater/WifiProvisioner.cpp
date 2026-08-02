@@ -1,13 +1,13 @@
 #include "WifiProvisioner.h"
-#include <SD.h>
+#include "HalTypes.h"
 #include <WiFi.h>
 
 bool WifiProvisioner::readCredentialsFromSD(String& ssid, String& password) {
-    if (!SD.exists("/wifi.txt")) {
+    if (!SD_FS.exists("/wifi.txt")) {
         return false;
     }
 
-    File f = SD.open("/wifi.txt", FILE_READ);
+    File f = SD_FS.open("/wifi.txt", FILE_READ);
     if (!f) {
         return false;
     }

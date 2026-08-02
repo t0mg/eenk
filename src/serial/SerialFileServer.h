@@ -2,8 +2,8 @@
 
 #ifdef PLATFORM_ESP32
 
+#include "HalTypes.h"
 #include <Arduino.h>
-#include <SD.h>
 #include <cstdint>
 #include <cstddef>
 #include <functional>

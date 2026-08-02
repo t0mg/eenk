@@ -29,7 +29,13 @@ bool readBq27220Reg16Le(uint8_t reg, uint16_t* out) {
 BatteryMonitor::BatteryMonitor(uint8_t adcPin, float dividerMultiplier)
     : _mode(Mode::Adc), _adcPin(adcPin), _dividerMultiplier(dividerMultiplier) {}
 
-BatteryMonitor::BatteryMonitor(const Bq27220Config& cfg) : _mode(Mode::Bq27220), _i2c(cfg) {}
+BatteryMonitor::BatteryMonitor(const Bq27220Config& cfg) : _mode(Mode::Bq27220) {
+  _i2c.bq = cfg;
+}
+
+BatteryMonitor::BatteryMonitor(const Cw2017Config& cfg) : _mode(Mode::Cw2017) {
+  _i2c.cw = cfg;
+}
 
 uint16_t BatteryMonitor::readBq27220Soc_() const {
   const unsigned long now = millis();
@@ -37,14 +43,14 @@ uint16_t BatteryMonitor::readBq27220Soc_() const {
     return _lastGoodSoc;
   }
 
-  Wire.begin(_i2c.sdaPin, _i2c.sclPin, _i2c.freq);
+  Wire.begin(_i2c.bq.sdaPin, _i2c.bq.sclPin, _i2c.bq.freq);
   Wire.setTimeOut(BQ27220_TIMEOUT_MS);
   uint16_t soc = 0;
   const bool ok = readBq27220Reg16Le(BQ27220_SOC_REG, &soc);
   Wire.end();
   // Hand pins back so digitalRead(UART0_RXD=20) for USB detection still works.
-  pinMode(_i2c.sdaPin, INPUT);
-  pinMode(_i2c.sclPin, INPUT);
+  pinMode(_i2c.bq.sdaPin, INPUT);
+  pinMode(_i2c.bq.sclPin, INPUT);
 
   _lastSocPollMs = now;
   if (!ok || soc > 100) {
@@ -65,13 +71,13 @@ uint16_t BatteryMonitor::readBq27220Mv_() const {
     return _lastGoodMv;
   }
 
-  Wire.begin(_i2c.sdaPin, _i2c.sclPin, _i2c.freq);
+  Wire.begin(_i2c.bq.sdaPin, _i2c.bq.sclPin, _i2c.bq.freq);
   Wire.setTimeOut(BQ27220_TIMEOUT_MS);
   uint16_t mv = 0;
   const bool ok = readBq27220Reg16Le(BQ27220_VOLT_REG, &mv);
   Wire.end();
-  pinMode(_i2c.sdaPin, INPUT);
-  pinMode(_i2c.sclPin, INPUT);
+  pinMode(_i2c.bq.sdaPin, INPUT);
+  pinMode(_i2c.bq.sclPin, INPUT);
 
   _lastMvPollMs = now;
   if (!ok || mv < 2500 || mv > 5000) {
@@ -85,10 +91,30 @@ uint16_t BatteryMonitor::readBq27220Mv_() const {
   return mv;
 }
 
-uint16_t BatteryMonitor::readPercentage() const {
-  if (_mode == Mode::Bq27220) {
-    return readBq27220Soc_();
+uint16_t BatteryMonitor::readCw2017Soc_() const {
+  Wire.beginTransmission(0x63);
+  Wire.write(0x04);
+  if (Wire.endTransmission(false) == 0 && Wire.requestFrom(0x63, 1) == 1) {
+    int pct = Wire.read();
+    return pct > 100 ? 100 : pct;
   }
+  return 100;
+}
+
+uint16_t BatteryMonitor::readCw2017Mv_() const {
+  Wire.beginTransmission(0x63);
+  Wire.write(0x02);
+  if (Wire.endTransmission(false) == 0 && Wire.requestFrom(0x63, 2) == 2) {
+    uint16_t val = (Wire.read() << 8) | Wire.read();
+    return (val * 305) / 1000;
+  }
+  return 4200;
+}
+
+uint16_t BatteryMonitor::readPercentage() const {
+  if (_mode == Mode::Bq27220) return readBq27220Soc_();
+  if (_mode == Mode::Cw2017) return readCw2017Soc_();
+  if (_mode == Mode::Adc && _adcPin == 1) return 100; // Dummy mode for X4 Pro phase 1
   return percentageFromMillivolts(readMillivolts());
 }
 
@@ -107,6 +133,9 @@ uint16_t BatteryMonitor::readMillivolts() const {
   if (_mode == Mode::Bq27220) {
     return readBq27220Mv_();
   }
+  if (_mode == Mode::Cw2017) {
+    return readCw2017Mv_();
+  }
   const uint16_t mv = readRawMillivolts();
   return static_cast<uint16_t>(mv * _dividerMultiplier);
 }
@@ -114,6 +143,9 @@ uint16_t BatteryMonitor::readMillivolts() const {
 uint16_t BatteryMonitor::readRawMillivolts() const {
   if (_mode == Mode::Bq27220) {
     return readBq27220Mv_();
+  }
+  if (_mode == Mode::Cw2017) {
+    return readCw2017Mv_();
   }
   return analogReadMilliVolts(_adcPin);
 }
@@ -127,13 +159,13 @@ bool BatteryMonitor::readBq27220Current_(int16_t* outMa) const {
     return true;
   }
 
-  Wire.begin(_i2c.sdaPin, _i2c.sclPin, _i2c.freq);
+  Wire.begin(_i2c.bq.sdaPin, _i2c.bq.sclPin, _i2c.bq.freq);
   Wire.setTimeOut(BQ27220_TIMEOUT_MS);
   uint16_t raw = 0;
   const bool ok = readBq27220Reg16Le(BQ27220_CUR_REG, &raw);
   Wire.end();
-  pinMode(_i2c.sdaPin, INPUT);
-  pinMode(_i2c.sclPin, INPUT);
+  pinMode(_i2c.bq.sdaPin, INPUT);
+  pinMode(_i2c.bq.sclPin, INPUT);
 
   _lastCurrentPollMs = now;
   if (!ok) {

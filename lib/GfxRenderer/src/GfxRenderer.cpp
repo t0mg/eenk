@@ -824,7 +824,7 @@ void GfxRenderer::displayBufferDriveAll(bool turnOffScreen) const {
     LOG_DBG(TAG, "Render took %lu ms", millis() - renderStartMs);
     renderStartMs = 0;
   }
-  einkDisplay.displayBufferDriveAll(turnOffScreen);
+  einkDisplay.displayBuffer(EInkDisplay::FULL_REFRESH, turnOffScreen);
 }
 
 void GfxRenderer::displayBuffer(const EInkDisplay::RefreshMode refreshMode, bool turnOffScreen) const {

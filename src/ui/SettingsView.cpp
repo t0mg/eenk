@@ -23,6 +23,11 @@
 #include <cstdio>
 #include <cstring>
 
+#ifdef PLATFORM_ESP32
+#include "HalInit.h"
+#include <esp_sleep.h>
+#endif
+
 // Builtin font table (for display names in the font picker)
 #include <BuiltinFonts.h>
 
@@ -189,8 +194,7 @@ void SettingsView::run() {
         SystemUI ui(_display);
         ui.showSleepCover();
       }
-      esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN,
-                                        ESP_GPIO_WAKEUP_GPIO_LOW);
+      HalInit::prepareForSleep();
       esp_deep_sleep_start();
 #endif
       continue;

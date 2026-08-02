@@ -77,17 +77,17 @@ int main(int argc, char *argv[]) {
 
 #include "engine/InkEngine.h"
 
-#ifdef HAS_SD_CARD
-#include "hal/esp32/EspSdStorage.h"
-#include "hal/esp32/FlashCache.h"
+#include "HalTypes.h"
+#include "HalInit.h"
+
+#if HAS_FLASH_CACHE
+#include "hal/esp32/common/FlashCache.h"
 #endif
 #include <Arduino.h>
 #include <SD.h>
 #include <SPI.h>
 #include <rom/crc.h>
 
-#include "hal/esp32/EspAdcInput.h"
-#include "hal/esp32/EspEinkDisplay.h"
 #include "os/AppSettings.h"
 #include "os/BootManager.h"
 #include "serial/SerialFileServer.h"
@@ -103,15 +103,14 @@ int main(int argc, char *argv[]) {
 
 extern const EpdFontFamily OpenSans;
 
-using DisplayType = EspEinkDisplay;
-using InputType = EspAdcInput;
-
 DisplayType *display = nullptr;
 InputType *input = nullptr;
 IStorage *storage = nullptr;
 #ifdef HAS_SD_CARD
-EspSdStorage *sdStorage = nullptr;
+StorageType *sdStorage = nullptr;
+#if HAS_FLASH_CACHE
 FlashCache *flashCache = nullptr;
+#endif
 #endif
 InkEngine *engine = nullptr;
 SystemUI *systemUI = nullptr;
@@ -122,48 +121,23 @@ uint32_t currentStoryHash = 0;
 
 void setup() {
   Serial.begin(115200);
-
+#if defined(ARDUINO_USB_CDC_ON_BOOT) && ARDUINO_USB_CDC_ON_BOOT
+  unsigned long serialStart = millis();
+  while (!Serial && (millis() - serialStart < 2000)) {
+    delay(10);
+  }
+#else
   delay(1000);
+#endif
   Serial.print("\x1B[2J\x1B[H");
-  Serial.println("=== eenk Interactive Fiction Runtime (ESP32-C3) ===");
+  Serial.println("=== eenk Interactive Fiction Runtime ===");
   Serial.printf("Free heap before init: %u bytes\n", ESP.getFreeHeap());
 
   // ── Initialise NVS (must be first — BootManager and AppSettings both use it)
   BootManager::init();
 
   // ── Early check for updater mode ──
-  {
-    bool updaterMode = false;
-
-    // Check UP button
-    InputManager im;
-    im.begin();
-    im.update();
-    if (im.isPressed(InputManager::BTN_UP)) {
-      Serial.println("[Boot] UP button held. Forcing updater mode.");
-      updaterMode = true;
-    }
-
-    // Check SD card for /firmware.bin
-    if (!updaterMode) {
-      // Init SPI first so SD.begin() works
-      // Pins: SCLK=8, MISO=7, MOSI=10, CS=21
-      SPI.begin(8, 7, 10, 21);
-      if (SD.begin(12, SPI, 40000000)) {
-        if (SD.exists("/firmware.bin")) {
-          Serial.println(
-              "[Boot] /firmware.bin found on SD. Forcing updater mode.");
-          updaterMode = true;
-        }
-      }
-    }
-
-    if (updaterMode) {
-      Serial.println("[Boot] Restarting into Updater (app1)...");
-      BootManager::bootUpdater();
-      return; // Will reboot
-    }
-  }
+  HalInit::earlyBootCheck();
 
   display = new DisplayType();
   input = new InputType();
@@ -172,7 +146,7 @@ void setup() {
   systemUI = new SystemUI(*display);
 
   // ── Battery
-  batteryMonitor = new BatteryMonitor(0 /*GPIO0*/);
+  batteryMonitor = HalInit::createBatteryMonitor();
   batteryWidget = new BatteryWidget(*display->getRenderer(), *batteryMonitor);
 
   // ── Dual-boot dispatch ─────────────────────────────────────────────────────
@@ -183,7 +157,7 @@ void setup() {
 
   if (mode == BootMode::MENU) {
     // Mount the SD card so Library can scan for stories.
-    sdStorage = new EspSdStorage();
+    sdStorage = new StorageType();
     if (!sdStorage->begin()) {
       Serial.println("[Boot] MENU: SD mount failed — library will show empty.");
     } else {
@@ -232,21 +206,21 @@ void setup() {
 
 #ifdef HAS_SD_CARD
   // Try loading story from SD card via flash cache (mmap)
-  sdStorage = new EspSdStorage();
+  sdStorage = new StorageType();
   if (sdStorage->begin()) {
     Serial.println("[SD] SD card mounted OK");
 
     const char *sdStoryPath = nullptr;
 
     // Ensure saves directory exists
-    if (!SD.exists("/.eenk_saves")) {
-      SD.mkdir("/.eenk_saves");
+    if (!SD_FS.exists("/.eenk_saves")) {
+      SD_FS.mkdir("/.eenk_saves");
     }
 
     char savedPath[128] = {0};
     if (BootManager::getStoryPath(savedPath, sizeof(savedPath)) &&
         savedPath[0] != '\0') {
-      if (SD.exists(savedPath)) {
+      if (SD_FS.exists(savedPath)) {
         size_t len = strlen(savedPath);
         char *pathCopy = new char[len + 1];
         strcpy(pathCopy, savedPath);
@@ -265,7 +239,7 @@ void setup() {
     if (sdStoryPath != nullptr) {
       Serial.printf("[SD] Found story: %s\n", sdStoryPath);
 
-      File storyFile = SD.open(sdStoryPath, FILE_READ);
+      File storyFile = SD_FS.open(sdStoryPath, FILE_READ);
       size_t storySize = 0;
       if (storyFile) {
         storySize = storyFile.size();
@@ -277,6 +251,7 @@ void setup() {
       } else if (storySize == 0) {
         errorMessage = "Failed to read story file or file is empty.";
       } else {
+#if HAS_FLASH_CACHE
         // Try the flash cache path first (zero-copy mmap for large stories)
         flashCache = new FlashCache();
         const unsigned char *mappedPtr = nullptr;
@@ -314,8 +289,8 @@ void setup() {
               storyLoaded = false;
             }
 
-            if (storyLoaded && SD.exists(saveFilePath)) {
-              File saveFile = SD.open(saveFilePath, FILE_READ);
+            if (storyLoaded && SD_FS.exists(saveFilePath)) {
+              File saveFile = SD_FS.open(saveFilePath, FILE_READ);
               if (saveFile) {
                 uint32_t magic = 0;
                 if (saveFile.read((uint8_t *)&magic, 4) == 4 &&
@@ -408,6 +383,21 @@ void setup() {
           Serial.println("[FlashCache] ink_cache partition not found!");
           errorMessage = "ink_cache partition missing! Update your partitions.";
         }
+#else
+        std::size_t mappedSize = 0;
+        const unsigned char *mappedPtr = sdStorage->readFileBinary(sdStoryPath, &mappedSize);
+        if (mappedPtr != nullptr && mappedSize >= 128 && memcmp(mappedPtr, "eenk", 4) == 0) {
+          storage = sdStorage;
+          engine = new InkEngine(*display, *input, *storage);
+          engine->applySettings(AppSettings::load());
+          storyLoaded = engine->loadStory(mappedPtr, mappedSize, sdStoryPath);
+          currentStoryHash = 0;
+          // DO NOT free mappedPtr here! InkEngine uses it in-place and relies on it persisting.
+        } else {
+          errorMessage = "Story could not be read or invalid metadata.";
+          storyLoaded = false;
+        }
+#endif
       }
     } else {
       errorMessage = "No .bin stories found in /stories/ folder";
@@ -432,8 +422,7 @@ void setup() {
       if (ev == ButtonEvent::SLEEP) {
         systemUI->showSleepCover();
         delay(500);
-        esp_deep_sleep_enable_gpio_wakeup(
-            1ULL << InputManager::POWER_BUTTON_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
+        HalInit::prepareForSleep();
         esp_deep_sleep_start();
       } else if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::BACK ||
                  ev == ButtonEvent::QUIT) {
@@ -461,7 +450,7 @@ void saveProgress() {
   size_t snapLen = 0;
   const unsigned char *snapData = engine->createSnapshot(&snapLen);
   if (snapData) {
-    File f = SD.open(saveFilePath, FILE_WRITE);
+    File f = SD_FS.open(saveFilePath, FILE_WRITE);
     if (f) {
       uint32_t magic = 0x314B4E45; // "ENK1"
       f.write((const uint8_t *)&magic, 4);
@@ -557,8 +546,7 @@ void loop() {
     }
 
     delay(500); // Give e-ink time to finish updating
-    esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN,
-                                      ESP_GPIO_WAKEUP_GPIO_LOW);
+    HalInit::prepareForSleep();
     esp_deep_sleep_start();
 #else
     Serial.println("Power off requested (not supported on native).");

@@ -1,7 +1,7 @@
 #pragma once
 #ifdef PLATFORM_ESP32
 
-#include "../IDisplay.h"
+#include "hal/IDisplay.h"
 #include <EInkDisplay.h>
 #include <GfxRenderer.h>
 

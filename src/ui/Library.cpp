@@ -18,11 +18,12 @@
 #include <cstring>
 
 #ifdef PLATFORM_ESP32
+#include "HalTypes.h"
+#include "HalInit.h"
 #include <Arduino.h>
 #include <EpdFont.h>
 #include <EpdFontFamily.h>
 #include <InputManager.h>
-#include <SD.h>
 #include <SPI.h>
 #include <builtinFonts/syne_bold_10.h>
 #include <builtinFonts/ui_10.h>
@@ -288,7 +289,7 @@ void Library::scanSD() {
     if (depth > 2 || _numEntries >= MAX_STORIES)
       return;
 
-    File dir = SD.open(dirPath);
+    File dir = SD_FS.open(dirPath);
     if (!dir || !dir.isDirectory())
       return;
 
@@ -342,7 +343,7 @@ void Library::scanSD() {
 
           char savePath[256];
           StoryMetadata::getSavePath(e.path, savePath, sizeof(savePath));
-          e.hasSave = SD.exists(savePath);
+          e.hasSave = SD_FS.exists(savePath);
 
           e.isCurrentlyLoaded =
               (currentPath[0] != '\0' && strcmp(e.path, currentPath) == 0);
@@ -710,7 +711,7 @@ void Library::launchStory(int index) {
   LoadingWidget::show(_display, titleStr, 1.0f);
 
   // Release SPI peripherals so INK_RUNTIME boot can re-initialise them cleanly.
-  SD.end();
+  SD_FS.end();
   SPI.end();
 #endif
   BootManager::setBootMode(BootMode::INK_RUNTIME);
@@ -781,8 +782,7 @@ bool Library::run() {
         SystemUI ui(_display);
         ui.showSleepCover();
       }
-      esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN,
-                                        ESP_GPIO_WAKEUP_GPIO_LOW);
+      HalInit::prepareForSleep();
       esp_deep_sleep_start();
       // Never returns.
 #endif

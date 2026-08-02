@@ -16,6 +16,14 @@ class BatteryMonitor {
   };
   explicit BatteryMonitor(const Bq27220Config& cfg);
 
+  // CW2017 mode (Xteink X4 Pro): fuel gauge on I²C 0x62.
+  struct Cw2017Config {
+    int sdaPin;
+    int sclPin;
+    uint32_t freq = 400000;
+  };
+  explicit BatteryMonitor(const Cw2017Config& cfg);
+
   // Read voltage and return percentage (0-100). On BQ27220, this is the chip's
   // calibrated SOC; on ADC, it's a polynomial curve fit to LiPo discharge.
   uint16_t readPercentage() const;
@@ -48,15 +56,17 @@ class BatteryMonitor {
   static uint16_t millivoltsFromRawAdc(uint16_t adc_raw);
 
  private:
-  enum class Mode : uint8_t { Adc, Bq27220 };
+  enum class Mode : uint8_t { Adc, Bq27220, Cw2017 };
   Mode _mode;
 
   // ADC mode state
   uint8_t _adcPin = 0;
   float _dividerMultiplier = 2.0f;
 
-  // BQ27220 mode state
-  Bq27220Config _i2c{};
+  union {
+    Bq27220Config bq;
+    Cw2017Config cw;
+  } _i2c{};
 
   // EMA state for readSmoothedPercentage(). Holds smoothed percentage * 10
   // to keep one decimal of precision. Mutable so the smoothing can run from
@@ -82,6 +92,8 @@ class BatteryMonitor {
   static constexpr unsigned long kBqPollIntervalMs = 1000;
 
   uint16_t readBq27220Soc_() const;
+  uint16_t readCw2017Soc_() const;
   uint16_t readBq27220Mv_() const;
+  uint16_t readCw2017Mv_() const;
   bool readBq27220Current_(int16_t* outMa) const;
 };

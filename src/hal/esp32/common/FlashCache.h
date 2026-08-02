@@ -1,4 +1,8 @@
 #pragma once
+#include "HalTypes.h"
+
+#if HAS_FLASH_CACHE
+
 #include <cstddef>
 #include <cstdint>
 #include "esp_partition.h"
@@ -62,3 +66,5 @@ private:
     bool loadHashFromNvs(uint32_t* outHash, std::size_t* outSize);
     void saveHashToNvs(uint32_t hash, std::size_t size);
 };
+
+#endif // HAS_FLASH_CACHE

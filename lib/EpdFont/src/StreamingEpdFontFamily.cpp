@@ -5,7 +5,13 @@
 #include <cctype>
 
 #ifdef PLATFORM_ESP32
-#include <SD.h>   // SD.exists()
+#ifdef USE_SD_MMC
+#include <SD_MMC.h>
+#define SD_FS SD_MMC
+#else
+#include <SD.h>
+#define SD_FS SD
+#endif
 #else
 #include <unistd.h>  // access()
 #endif
@@ -39,7 +45,7 @@ StreamingEpdFont* StreamingEpdFontFamily::tryLoadFromDirs(const char* const* dir
       // Existence pre-check: avoid the expensive (~65 ms) ESP32 VFS error log
       // that fires every time SD.open() is called on a missing file.
 #ifdef PLATFORM_ESP32
-      if (!SD.exists(path)) continue;
+      if (!SD_FS.exists(path)) continue;
 #else
       if (access(path, F_OK) != 0) continue;
 #endif

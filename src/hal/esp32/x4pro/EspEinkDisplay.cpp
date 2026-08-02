@@ -1,0 +1,78 @@
+#ifdef PLATFORM_ESP32
+#include "EspEinkDisplay.h"
+#include <Arduino.h>
+#include <SPI.h>
+#include "BoardConfig.h"
+
+#define EPD_SCLK 12
+#define EPD_MOSI 11
+#define EPD_CS 13
+#define EPD_DC 18
+#define EPD_RST 14
+#define EPD_BUSY 6
+
+// Define the global ACTIVE configuration object that FreeInk SDK drivers use.
+BoardConfig::BoardProfile BoardConfig::ACTIVE = {
+    "X4 Pro",
+    BoardConfig::Board::XteinkX4Pro,
+    800, // width
+    480, // height
+    5000000, // SPI hz (X4 Pro panel requires 5MHz, anything higher will fail)
+    BoardConfig::DisplayController::UC8179, // Default to UC8179, will be probed
+    {false, false}, // mirrorX, mirrorY
+    {EPD_SCLK, EPD_MOSI, -1, EPD_CS, EPD_DC, EPD_RST, EPD_BUSY}, // display pins
+    {}, // sd
+    {}, // input
+    {}, // frontlight
+    {}, // audio
+    {}, // mic
+    {}, // sensors
+    {}, // leds
+    {}, // touch
+    {}  // power
+};
+
+EspEinkDisplay::EspEinkDisplay() 
+    : _eink(EPD_SCLK, EPD_MOSI, EPD_CS, EPD_DC, EPD_RST, EPD_BUSY)
+    , _gfxRenderer(_eink)
+{
+    // Auto-detect the display controller by pulsing reset and reading the BUSY pin
+    pinMode(EPD_RST, OUTPUT);
+    pinMode(EPD_BUSY, INPUT);
+    
+    // Soft reset pulse to wake controller
+    digitalWrite(EPD_RST, HIGH);
+    delay(20);
+    digitalWrite(EPD_RST, LOW);
+    delay(2);
+    digitalWrite(EPD_RST, HIGH);
+    delay(20);
+
+    // Read BUSY pin idle state to detect controller type
+    // UC8179 has active-LOW BUSY (idle is HIGH)
+    // SSD1677 has active-HIGH BUSY (idle is LOW)
+    if (digitalRead(EPD_BUSY) == HIGH) {
+        BoardConfig::ACTIVE.displayController = BoardConfig::DisplayController::UC8179;
+        Serial.println("[Display] Auto-detected UC8179 controller");
+    } else {
+        BoardConfig::ACTIVE.displayController = BoardConfig::DisplayController::SSD1677;
+        Serial.println("[Display] Auto-detected SSD1677 controller");
+    }
+
+    _eink.begin();
+    _gfxRenderer.begin();
+}
+
+void EspEinkDisplay::clear() {
+    _eink.clearScreen(0xFF);
+}
+
+void EspEinkDisplay::present() {
+    _eink.displayBuffer(EInkDisplay::FAST_REFRESH);
+}
+
+void EspEinkDisplay::fullRefresh() {
+    _eink.displayBuffer(EInkDisplay::FULL_REFRESH);
+}
+
+#endif // PLATFORM_ESP32

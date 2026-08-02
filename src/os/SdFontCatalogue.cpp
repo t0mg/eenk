@@ -3,7 +3,7 @@
 #include <cctype>
 
 #ifdef PLATFORM_ESP32
-#include <SD.h>
+#include "HalTypes.h"
 #else
 #include <dirent.h>
 #endif
@@ -101,7 +101,7 @@ void SdFontCatalogue::scan() {
 
     // 2. Scan SD card /fonts directory for family roots
 #ifdef PLATFORM_ESP32
-    File dir = SD.open("/fonts");
+    File dir = SD_FS.open("/fonts");
     if (dir && dir.isDirectory()) {
         File f = dir.openNextFile();
         while (f && _count < MAX_FONTS) {

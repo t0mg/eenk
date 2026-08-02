@@ -25,7 +25,7 @@ def merge_bin(source, target, env):
     flash_freq = env.subst("${__get_board_f_flash(__env__)}")
 
     # Define the output path for the merged binary
-    merged_bin_path = os.path.join(env.get('BUILD_DIR'), "firmware-factory.bin")
+    merged_bin_path = env.subst("${BUILD_DIR}/firmware-factory.bin")
 
     # The list of binaries to merge is provided by the build environment
     # in FLASH_EXTRA_IMAGES. This includes bootloader, partitions, and boot_app0.
@@ -35,47 +35,46 @@ def merge_bin(source, target, env):
     
     # Add the main application binary (app0)
     app_offset = env.subst("$ESP32_APP_OFFSET")
-    app_path = env.subst(target[0].get_abspath())
+    app_path = env.subst("${BUILD_DIR}/${PROGNAME}.bin")
     flash_images.append((app_offset, app_path))
 
     # Add the updater application binary (app1) if it exists
-    # We assume it is built in .pio/build/esp32c3_updater/firmware.bin
-    app1_path = os.path.join(env.get('PROJECT_DIR'), ".pio", "build", "esp32c3_updater", "firmware.bin")
+    pio_env = env.get('PIOENV')
+    updater_env = f"{pio_env}_updater"
+    app1_path = os.path.join(env.get('PROJECT_DIR'), ".pio", "build", updater_env, "firmware.bin")
     if os.path.exists(app1_path):
-        print(f"Found app1 updater at {app1_path}, including it in factory binary at 0x710000")
-        flash_images.append(("0x710000", app1_path))
+        app1_offset = "0x800000" if "s3" in pio_env else "0x710000"
+        print(f"Found app1 updater at {app1_path}, including it in factory binary at {app1_offset}")
+        flash_images.append((app1_offset, app1_path))
     else:
-        print(f"Note: app1 updater not found at {app1_path}. It will not be included in the factory binary. Build 'esp32c3_updater' to include it.")
+        print(f"Note: app1 updater not found at {app1_path}. It will not be included in the factory binary.")
 
     esptool_path = os.path.join(
         env.PioPlatform().get_package_dir("tool-esptoolpy"), "esptool.py"
     )
 
-    # Define the command arguments for esptool.py
-    # Using env.subst to let PlatformIO expand variables like $PYTHONEXE
     command = [
         env.subst('"$PYTHONEXE"'),
         f'"{esptool_path}"',
         "--chip", chip,
         "merge_bin",
         "--output", f'"{merged_bin_path}"',
-        "--flash_mode", "dout", # flash_mode,
+        "--flash_mode", flash_mode,
         "--flash_freq", flash_freq,
-        "--flash_size", flash_size,
-    ] + [item for sublist in flash_images for item in sublist]
+        "--flash_size", flash_size
+    ]
 
-    print("Merging binaries with command:")
-    print(" ".join(command))
+    for offset, image in flash_images:
+        command.extend([offset, f'"{image}"'])
 
-    # Execute the command using PlatformIO's environment
-    ret = env.Execute(" ".join(command))
+    cmd_str = " ".join(command)
+    print(f"Merging binaries with command:\n{cmd_str}")
 
-    if ret == 0:
-        print(f"Successfully merged binaries to {merged_bin_path}")
-    else:
-        print(f"Error: Failed to merge binaries. Exit code: {ret}")
+    result = run(cmd_str, shell=True)
+    if result.returncode != 0:
+        print("Error: Failed to merge binaries.")
         env.Exit(1)
+    else:
+        print(f"Successfully merged binaries to {merged_bin_path}")
 
-# Register the 'merge_bin' function as a post-build action for the firmware.bin target.
-# This ensures the script runs automatically after a successful build.
-env.AddPostAction("$BUILD_DIR/firmware.bin", merge_bin)
+env.AddPostAction("buildprog", merge_bin)

@@ -1,7 +1,7 @@
 #pragma once
 #ifdef PLATFORM_ESP32
 
-#include "../IInput.h"
+#include "hal/IInput.h"
 #include <InputManager.h>
 
 class EspAdcInput : public IInput

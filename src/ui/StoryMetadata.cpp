@@ -6,10 +6,10 @@
 #include <cstring>
 
 #ifdef PLATFORM_ESP32
-#include <SD.h>
+#include "HalTypes.h"
 
 bool StoryMetadata::readFromSD(const char* path, StoryMetadata* out) {
-    File f = SD.open(path, FILE_READ);
+    File f = SD_FS.open(path, FILE_READ);
     if (!f) return false;
     uint8_t buf[SIZE];
     size_t n = f.read(buf, SIZE);
@@ -25,26 +25,15 @@ bool StoryMetadata::readFromSD(const char* /*path*/, StoryMetadata* /*out*/) {
 }
 #endif
 
-void StoryMetadata::getSavePath(const char* storyPath, char* outSavePath, size_t maxLen) {
-    if (!storyPath || !storyPath[0] || !outSavePath || maxLen == 0) return;
+void StoryMetadata::getSavePath(const char* storyBinPath, char* outSavePath, size_t maxLen) {
+    const char* lastSlash = strrchr(storyBinPath, '/');
+    const char* baseName = lastSlash ? lastSlash + 1 : storyBinPath;
 
-    const char* rel = storyPath;
-    if (strncmp(rel, "/sd", 3) == 0) rel += 3;
-    if (strncmp(rel, "/stories", 8) == 0) rel += 8;
-    else if (strncmp(rel, "/eenk", 5) == 0) rel += 5;
-    else if (strncmp(rel, "stories", 7) == 0) rel += 7;
-    while (*rel == '/' || *rel == '\\') rel++;
+    char stem[128];
+    strncpy(stem, baseName, sizeof(stem) - 1);
+    stem[sizeof(stem) - 1] = '\0';
+    char* dot = strrchr(stem, '.');
+    if (dot) *dot = '\0';
 
-    char sanitized[128] = {};
-    size_t i = 0;
-    for (; rel[i] != '\0' && i < sizeof(sanitized) - 1; ++i) {
-        if (rel[i] == '/' || rel[i] == '\\') {
-            sanitized[i] = '_';
-        } else {
-            sanitized[i] = rel[i];
-        }
-    }
-    sanitized[i] = '\0';
-
-    snprintf(outSavePath, maxLen, "/.eenk_saves/%s.save", sanitized);
+    snprintf(outSavePath, maxLen, "/.eenk_saves/%s.sav", stem);
 }

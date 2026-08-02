@@ -1,6 +1,7 @@
 #include <Arduino.h>
-#include "hal/esp32/EspEinkDisplay.h"
-#include <SD.h>
+#include "HalTypes.h"
+#include "HalInit.h"
+// SD.h included via HalTypes.h
 #include <SPI.h>
 #include <Update.h>
 #include "WifiProvisioner.h"
@@ -124,14 +125,14 @@ void performOfflineUpdate(File& updateFile) {
     size_t updateSize = updateFile.size();
     drawMessage("Offline Update Found.\nFlashing firmware...");
     
-    if (Update.begin(updateSize, U_FLASH)) {
-        size_t written = Update.writeStream(updateFile);
-        if (written == updateSize) {
             drawMessage("Update complete!\nVerifying...");
             if (Update.end()) {
                 drawMessage("Success!\nRebooting to new firmware...");
                 updateFile.close();
-                SD.rename("/firmware.bin", "/firmware.bin.bak");
+                if (SD_FS.exists("/firmware.bin.bak")) {
+                    SD_FS.remove("/firmware.bin.bak");
+                }
+                SD_FS.rename("/firmware.bin", "/firmware.bin.bak");
                 delay(2000);
                 esp_restart(); // Update library already sets boot partition to app0
                 return;
@@ -160,7 +161,7 @@ void setup() {
 
     // Mount SD card using correct pins (SCLK=8, MISO=7, MOSI=10, SD_CS=12)
     // EspEinkDisplay already called SPI.begin(8, 7, 10, 21), we can just use SD.begin
-    if (!SD.begin(12, SPI, 40000000)) {
+    if (!HalInit::mountSdForUpdater()) {
         drawMessage("Error: SD Card Mount Failed.\nPlease insert SD card and restart.\nRebooting in 5s...");
         delay(5000);
         bootToApp0();
@@ -168,9 +169,12 @@ void setup() {
     }
     Serial.println("SD card mounted successfully.");
 
-    // Check for offline update
-    if (SD.exists("/firmware.bin")) {
-        File updateFile = SD.open("/firmware.bin", FILE_READ);
+       // EspSdmmcStorage already called SD_MMC.begin() if we are on X4 Pro.
+    // On X4, HalInit::earlyBootCheck already initialized SD.
+    // So we don't need to call SD_FS.begin() here!
+
+    if (SD_FS.exists("/firmware.bin")) {
+        File updateFile = SD_FS.open("/firmware.bin", FILE_READ);
         if (updateFile) {
             performOfflineUpdate(updateFile);
             return;

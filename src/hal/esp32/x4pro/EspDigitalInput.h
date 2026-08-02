@@ -1,0 +1,31 @@
+#pragma once
+#ifdef PLATFORM_ESP32
+
+#include "hal/IInput.h"
+#include "Gt911Driver.h"
+
+class EspDigitalInput : public IInput
+{
+public:
+    EspDigitalInput();
+    ~EspDigitalInput() override = default;
+
+    ButtonEvent pollInput() override;
+    uint32_t getLastActivityTime() const override { return _lastActivityMs; }
+    void setAutoSleepTimeout(uint16_t seconds) override { _timeoutSec = seconds; }
+
+    // Touch access for Phase 2/3 UI
+    Gt911Driver::TouchState getTouchState() const { return _lastTouch; }
+
+private:
+    uint32_t _lastActivityMs;
+    uint16_t _timeoutSec;
+    Gt911Driver _touch;
+    Gt911Driver::TouchState _lastTouch;
+
+    static constexpr int PIN_LEFT  = 0;   // Left button -> LEFT
+    static constexpr int PIN_RIGHT = 7;   // Right button -> RIGHT
+    static constexpr int PIN_POWER = 3;   // Power button -> CONFIRM / SLEEP
+};
+
+#endif

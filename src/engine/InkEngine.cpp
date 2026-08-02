@@ -857,29 +857,45 @@ void InkEngine::tickWaitingInput() {
     redraw();
     break;
   case ButtonEvent::LEFT: {
-    int scrollAmount = _display.getHeight() / 4;
-    _scrollY -= scrollAmount;
-    if (_scrollY < 0)
-      _scrollY = 0;
-    redraw();
+    if (_numChoices > 0) {
+      if (_selectedChoice > 0)
+        --_selectedChoice;
+      else
+        _selectedChoice = _numChoices - 1;
+      redraw();
+    } else {
+      int scrollAmount = _display.getHeight() / 4;
+      _scrollY -= scrollAmount;
+      if (_scrollY < 0)
+        _scrollY = 0;
+      redraw();
+    }
     break;
   }
   case ButtonEvent::RIGHT: {
-    int scrollAmount = _display.getHeight() / 4;
-    _scrollY += scrollAmount;
+    if (_numChoices > 0) {
+      if (_selectedChoice < _numChoices - 1)
+        ++_selectedChoice;
+      else
+        _selectedChoice = 0;
+      redraw();
+    } else {
+      int scrollAmount = _display.getHeight() / 4;
+      _scrollY += scrollAmount;
 
-    GfxRenderer *renderer = _display.getRenderer();
-    if (renderer && _numChoices > 0) {
-      int marginY = g_marginPx;
-      int choiceHeight = getChoicesHeight(renderer);
-      if (_scrollY > _maxScrollY - choiceHeight - marginY) {
-        _scrollY = _maxScrollY;
+      GfxRenderer *renderer = _display.getRenderer();
+      if (renderer && _numChoices > 0) {
+        int marginY = g_marginPx;
+        int choiceHeight = getChoicesHeight(renderer);
+        if (_scrollY > _maxScrollY - choiceHeight - marginY) {
+          _scrollY = _maxScrollY;
+        }
       }
-    }
 
-    if (_scrollY > _maxScrollY)
-      _scrollY = _maxScrollY;
-    redraw();
+      if (_scrollY > _maxScrollY)
+        _scrollY = _maxScrollY;
+      redraw();
+    }
     break;
   }
   case ButtonEvent::CONFIRM:
