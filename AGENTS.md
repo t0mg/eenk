@@ -44,29 +44,32 @@ eenk (primary repo)
 
 ### Build System
 
-eenk uses **PlatformIO** with three build environments defined in `platformio.ini`:
+eenk uses **PlatformIO** with four build environments defined in `platformio.ini`:
 
 | Environment | Target | Purpose |
 |------------|--------|---------|
 | `native` | Host (MinGW/SDL2) | Desktop simulator, renders to 800×480 SDL2 window |
 | `esp32c3` | ESP32-C3 | Main firmware for Xteink X4 hardware (app0) |
-| `esp32c3_updater` | ESP32-C3 | Minimal OTA updater firmware (app1) |
+| `esp32c3_updater` | ESP32-C3 | Minimal OTA updater firmware for X4 (app1) |
+| `esp32s3` | ESP32-S3 | Main firmware for Xteink X4 Pro hardware (app0) |
 
 **Build commands:**
 ```sh
 pio run -e native          # Desktop simulator
-pio run -e esp32c3         # Main firmware
-pio run -e esp32c3_updater # OTA updater
+pio run -e esp32c3         # Main firmware (X4)
+pio run -e esp32s3         # Main firmware (X4 Pro)
+pio run -e esp32c3_updater # OTA updater (X4)
 pio test -e native         # Unit tests (native only)
 ```
 
 > [!IMPORTANT]
-> **After making changes, always build both `native` and `esp32c3` targets** to verify cross-platform compatibility. The native build uses host g++ with SDL2; the esp32c3 build uses the ESP-IDF Arduino framework.
+> **After making changes, always build `native`, `esp32c3`, and `esp32s3` targets** to verify cross-platform compatibility. The native build uses host g++ with SDL2; the ESP32 builds use the ESP-IDF Arduino framework.
 
 ### Partition Layout
 
-The ESP32-C3 uses a 16 MB flash chip with the following partition scheme (`partitions.csv`):
+The ESP32-C3 (X4) and ESP32-S3 (X4 Pro) both use 16 MB flash chips, but their partition schemes differ.
 
+**X4 (16 MB) Layout (`partitions.csv`):**
 | Partition | Type | Offset | Size | Purpose |
 |-----------|------|--------|------|---------|
 | `nvs` | data | 0x9000 | 20 KB | Non-volatile storage (settings, boot state) |
@@ -76,9 +79,19 @@ The ESP32-C3 uses a 16 MB flash chip with the following partition scheme (`parti
 | `ink_cache` | data (FAT) | 0x810000 | ~7.9 MB | Story file cache (FAT filesystem) |
 | `coredump` | data | 0xFF0000 | 64 KB | Crash dump storage |
 
+**X4 Pro (16 MB) Layout (`partitions_x4pro.csv`):**
+| Partition | Type | Offset | Size | Purpose |
+|-----------|------|--------|------|---------|
+| `nvs` | data | 0x9000 | 20 KB | Non-volatile storage (settings, boot state) |
+| `otadata` | data | 0xE000 | 8 KB | OTA boot selection metadata |
+| **`app0`** | app (ota_0) | 0x10000 | **~7.9 MB** | Main firmware — full interactive fiction runtime |
+| **`app1`** | app (ota_1) | 0x800000 | **~7.9 MB** | Alternate OTA partition — full runtime (A/B updates) |
+| `coredump` | data | 0xFF0000 | 64 KB | Crash dump storage |
+
 **Key constraints:**
-- `app0` (7 MB) holds the full runtime with the Ink engine, UI, fonts, and rendering. Most firmware development happens here.
-- `app1` (1 MB) is the **updater partition** — an intentionally minimal firmware that handles OTA updates and SD card firmware flashing.
+- `app0` holds the full runtime with the Ink engine, UI, fonts, and rendering. Most firmware development happens here.
+- On the X4 Pro, `app0` and `app1` are identical in size (~7.9 MB) for full A/B OTA updates. There is no `ink_cache` partition because stories are loaded directly into PSRAM.
+- On the X4 (no PSRAM), `app1` (1 MB) is the **updater partition** — an intentionally minimal firmware that handles OTA updates and SD card firmware flashing.
 
 > [!CAUTION]
 > **The updater partition (`app1`, `src/updater/`) must remain extremely lean and robust.** It is the device's recovery mechanism. Before making any change to the updater code, always ask:
@@ -311,6 +324,7 @@ Shortcuts are defined in `app/main-process/appmenus.js`. Key shortcuts include `
 After making firmware changes in eenk:
 - [ ] `pio run -e native` builds successfully
 - [ ] `pio run -e esp32c3` builds successfully
+- [ ] `pio run -e esp32s3` builds successfully
 - [ ] `pio test -e native` passes (golden screenshots match or are intentionally updated)
 - [ ] If updater was touched: `pio run -e esp32c3_updater` builds and binary fits in 1 MB
 
@@ -319,13 +333,13 @@ After making firmware changes in eenk:
 1. Make firmware changes in the **primary eenk repo** only.
 2. If changes affect the simulator, update the eenky submodule pointer and run `npm run setup` in eenky.
 3. If inkcpp was modified, update the submodule pointer in both eenk and eenky.
-4. Test both native and esp32c3 targets before committing.
+4. Test native, esp32c3, and esp32s3 targets before committing.
 
 ### Platform Macros
 
 | Macro | When Defined | Use For |
 |-------|-------------|---------|
-| `PLATFORM_ESP32` | ESP32-C3 builds | Hardware-specific code (GPIO, SPI, NVS) |
+| `PLATFORM_ESP32` | ESP32-C3 & ESP32-S3 builds | Hardware-specific code (GPIO, SPI, NVS, I2C) |
 | `PLATFORM_NATIVE` | Native/SDL builds | Desktop simulation stubs and SDL rendering |
 | `HAS_SD_CARD` | ESP32-C3 builds | SD card filesystem access |
 
