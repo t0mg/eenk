@@ -29,6 +29,10 @@ private:
     int _swipeStartY = -1;
     uint32_t _swipeStartTime = 0;
 
+    mutable bool _hasTap = false;
+    mutable int _tapX = -1;
+    mutable int _tapY = -1;
+
     static constexpr int PIN_LEFT  = 0;   // Left button -> LEFT
     static constexpr int PIN_RIGHT = 7;   // Right button -> RIGHT
     static constexpr int PIN_POWER = 3;   // Power button -> CONFIRM / SLEEP

@@ -13,9 +13,10 @@ EspDigitalInput::EspDigitalInput()
 }
 
 bool EspDigitalInput::getTouchPosition(int& x, int& y) const {
-    if (_lastTouch.touched) {
-        x = _lastTouch.x;
-        y = _lastTouch.y;
+    if (_hasTap) {
+        x = _tapX;
+        y = _tapY;
+        _hasTap = false;
         return true;
     }
     x = -1;
@@ -90,6 +91,10 @@ ButtonEvent EspDigitalInput::pollInput() {
                     }
                 } else if (abs(dx) > abs(dy) && abs(dx) > 50) {
                     ev = (dx > 0) ? ButtonEvent::SWIPE_RIGHT : ButtonEvent::SWIPE_LEFT;
+                } else if (abs(dx) < 30 && abs(dy) < 30 && dt < 400) {
+                    _tapX = _swipeStartX;
+                    _tapY = _swipeStartY;
+                    _hasTap = true;
                 }
             }
         }

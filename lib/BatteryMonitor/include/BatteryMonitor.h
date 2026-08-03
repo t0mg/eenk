@@ -18,8 +18,8 @@ class BatteryMonitor {
 
   // CW2017 mode (Xteink X4 Pro): fuel gauge on I²C 0x62.
   struct Cw2017Config {
-    int sdaPin;
-    int sclPin;
+    int sdaPin = 39;
+    int sclPin = 38;
     uint32_t freq = 400000;
   };
   explicit BatteryMonitor(const Cw2017Config& cfg);

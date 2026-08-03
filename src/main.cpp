@@ -77,8 +77,8 @@ int main(int argc, char *argv[]) {
 
 #include "engine/InkEngine.h"
 
-#include "HalTypes.h"
 #include "HalInit.h"
+#include "HalTypes.h"
 
 #if HAS_FLASH_CACHE
 #include "hal/esp32/common/FlashCache.h"
@@ -88,16 +88,16 @@ int main(int argc, char *argv[]) {
 #include <SPI.h>
 #include <rom/crc.h>
 
+#include "hal/IFrontlight.h"
 #include "os/AppSettings.h"
 #include "os/BootManager.h"
 #include "serial/SerialFileServer.h"
 #include "ui/BatteryWidget.h"
 #include "ui/Library.h"
+#include "ui/QuickMenuWidget.h"
 #include "ui/SettingsView.h"
 #include "ui/StoryMetadata.h"
 #include "ui/SystemUI.h"
-#include "ui/QuickMenuWidget.h"
-#include "hal/IFrontlight.h"
 #include <BatteryMonitor.h>
 #include <EpdFont.h>
 #include <builtinFonts/ui_12.h>
@@ -294,94 +294,6 @@ void setup() {
                   "Story could not be read (missing or invalid metadata).";
               storyLoaded = false;
             }
-
-            if (storyLoaded && SD_FS.exists(saveFilePath)) {
-              File saveFile = SD_FS.open(saveFilePath, FILE_READ);
-              if (saveFile) {
-                uint32_t magic = 0;
-                if (saveFile.read((uint8_t *)&magic, 4) == 4 &&
-                    magic == 0x314B4E45) { // "ENK1"
-                  uint32_t savedHash = 0;
-                  if (saveFile.read((uint8_t *)&savedHash, 4) == 4 &&
-                      savedHash == currentStoryHash) {
-                    uint32_t snapSize = 0;
-                    if (saveFile.read((uint8_t *)&snapSize, 4) == 4) {
-                      // Cap size to reasonable limit (e.g. 1MB) to prevent bad
-                      // allocs on corrupt files
-                      if (snapSize < 1024 * 1024) {
-                        unsigned char *buf =
-                            new (std::nothrow) unsigned char[snapSize];
-                        if (buf) {
-                          saveFile.read(buf, snapSize);
-                          if (engine->loadSnapshot(buf, snapSize)) {
-                            Serial.println("Save loaded successfully!");
-
-                            // Read history
-                            uint16_t historySize = 0;
-                            if (saveFile.read((uint8_t *)&historySize, 2) ==
-                                2) {
-                              std::deque<InkEngine::WrappedLine> history;
-                              for (uint16_t i = 0; i < historySize; i++) {
-                                uint16_t lineLen;
-                                if (saveFile.read((uint8_t *)&lineLen, 2) != 2)
-                                  break;
-                                char *lineBuf =
-                                    new (std::nothrow) char[lineLen + 1];
-                                if (lineBuf) {
-                                  saveFile.read((uint8_t *)lineBuf, lineLen);
-                                  lineBuf[lineLen] = '\0';
-                                  uint8_t isOld;
-                                  saveFile.read(&isOld, 1);
-                                  std::string str(lineBuf);
-                                  bool isImage = false;
-                                  std::string imagePath = "";
-                                  if (str.length() > 7 &&
-                                      str.substr(0, 6) == "\x1B[IMG:") {
-                                    isImage = true;
-                                    imagePath = str.substr(6, str.length() - 7);
-                                    str = "";
-                                  }
-                                  history.push_back(
-                                      {TextBlock(str), isOld > 0, isImage,
-                                       imagePath,
-                                       isImage ? engine->getImageHeight(
-                                                     imagePath.c_str())
-                                               : 0});
-                                  delete[] lineBuf;
-                                } else {
-                                  break;
-                                }
-                              }
-                              engine->setHistory(history);
-                            }
-                          } else {
-                            Serial.println("Failed to load save file.");
-                            errorMessage = "Failed to load save file.";
-                            storyLoaded = false;
-                          }
-                          delete[] buf;
-                        } else {
-                          Serial.println("Out of memory reading save.");
-                          errorMessage = "Out of memory reading save.";
-                          storyLoaded = false;
-                        }
-                      } else {
-                        Serial.println("Save file snapshot too large.");
-                        errorMessage = "Save file corrupt (size).";
-                        storyLoaded = false;
-                      }
-                    }
-                  } else {
-                    Serial.println("Save file is for an older version of the "
-                                   "story. Starting fresh.");
-                  }
-                } else {
-                  Serial.println("Incompatible save file. Starting fresh.");
-                  // It's an old save file. Just ignore it and start fresh.
-                }
-                saveFile.close();
-              }
-            }
           } else {
             errorMessage = "Failed to stream story to flash";
           }
@@ -391,19 +303,111 @@ void setup() {
         }
 #else
         std::size_t mappedSize = 0;
-        const unsigned char *mappedPtr = sdStorage->readFileBinary(sdStoryPath, &mappedSize);
-        if (mappedPtr != nullptr && mappedSize >= 128 && memcmp(mappedPtr, "eenk", 4) == 0) {
+        const unsigned char *mappedPtr =
+            sdStorage->readFileBinary(sdStoryPath, &mappedSize);
+        if (mappedPtr != nullptr && mappedSize >= 128 &&
+            memcmp(mappedPtr, "eenk", 4) == 0) {
           storage = sdStorage;
           engine = new InkEngine(*display, *input, *storage);
+          engine->setFrontlight(frontlight);
+          engine->setBatteryWidget(batteryWidget);
           engine->applySettings(AppSettings::load());
           storyLoaded = engine->loadStory(mappedPtr, mappedSize, sdStoryPath);
-          currentStoryHash = 0;
-          // DO NOT free mappedPtr here! InkEngine uses it in-place and relies on it persisting.
+          currentStoryHash = crc32_le(0, mappedPtr, mappedSize);
+          // DO NOT free mappedPtr here! InkEngine uses it in-place and relies
+          // on it persisting.
         } else {
           errorMessage = "Story could not be read or invalid metadata.";
           storyLoaded = false;
         }
 #endif
+
+        if (storyLoaded && SD_FS.exists(saveFilePath)) {
+          File saveFile = SD_FS.open(saveFilePath, FILE_READ);
+          if (saveFile) {
+            uint32_t magic = 0;
+            if (saveFile.read((uint8_t *)&magic, 4) == 4 &&
+                magic == 0x314B4E45) { // "ENK1"
+              uint32_t savedHash = 0;
+              if (saveFile.read((uint8_t *)&savedHash, 4) == 4 &&
+                  savedHash == currentStoryHash) {
+                uint32_t snapSize = 0;
+                if (saveFile.read((uint8_t *)&snapSize, 4) == 4) {
+                  // Cap size to reasonable limit (e.g. 1MB) to prevent bad
+                  // allocs on corrupt files
+                  if (snapSize < 1024 * 1024) {
+                    unsigned char *buf =
+                        new (std::nothrow) unsigned char[snapSize];
+                    if (buf) {
+                      saveFile.read(buf, snapSize);
+                      if (engine->loadSnapshot(buf, snapSize)) {
+                        Serial.println("Save loaded successfully!");
+
+                        // Read history
+                        uint16_t historySize = 0;
+                        if (saveFile.read((uint8_t *)&historySize, 2) == 2) {
+                          std::deque<InkEngine::WrappedLine> history;
+                          for (uint16_t i = 0; i < historySize; i++) {
+                            uint16_t lineLen;
+                            if (saveFile.read((uint8_t *)&lineLen, 2) != 2)
+                              break;
+                            char *lineBuf =
+                                new (std::nothrow) char[lineLen + 1];
+                            if (lineBuf) {
+                              saveFile.read((uint8_t *)lineBuf, lineLen);
+                              lineBuf[lineLen] = '\0';
+                              uint8_t isOld;
+                              saveFile.read(&isOld, 1);
+                              std::string str(lineBuf);
+                              bool isImage = false;
+                              std::string imagePath = "";
+                              if (str.length() > 7 &&
+                                  str.substr(0, 6) == "\x1B[IMG:") {
+                                isImage = true;
+                                imagePath = str.substr(6, str.length() - 7);
+                                str = "";
+                              }
+                              history.push_back({TextBlock(str), isOld > 0,
+                                                 isImage, imagePath,
+                                                 isImage
+                                                     ? engine->getImageHeight(
+                                                           imagePath.c_str())
+                                                     : 0});
+                              delete[] lineBuf;
+                            } else {
+                              break;
+                            }
+                          }
+                          engine->setHistory(history);
+                        }
+                      } else {
+                        Serial.println("Failed to load save file.");
+                        errorMessage = "Failed to load save file.";
+                        storyLoaded = false;
+                      }
+                      delete[] buf;
+                    } else {
+                      Serial.println("Out of memory reading save.");
+                      errorMessage = "Out of memory reading save.";
+                      storyLoaded = false;
+                    }
+                  } else {
+                    Serial.println("Save file snapshot too large.");
+                    errorMessage = "Save file corrupt (size).";
+                    storyLoaded = false;
+                  }
+                }
+              } else {
+                Serial.println("Save file is for an older version of the "
+                               "story. Starting fresh.");
+              }
+            } else {
+              Serial.println("Incompatible save file. Starting fresh.");
+              // It's an old save file. Just ignore it and start fresh.
+            }
+            saveFile.close();
+          }
+        }
       }
     } else {
       errorMessage = "No .bin stories found in /stories/ folder";
@@ -417,7 +421,7 @@ void setup() {
     if (errorMessage.length() == 0) {
       errorMessage = "No story available.";
     }
-    errorMessage += "\n\nPress CONFIRM or BACK to reboot to the menu.";
+    errorMessage += "\n\nPress any button to reboot to the menu.";
     Serial.printf("FATAL: %s\n", errorMessage.c_str());
 
     systemUI->showMessage("eenk SYSTEM ERROR", errorMessage.c_str());
@@ -431,7 +435,9 @@ void setup() {
         HalInit::prepareForSleep();
         esp_deep_sleep_start();
       } else if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::BACK ||
-                 ev == ButtonEvent::QUIT) {
+                 ev == ButtonEvent::QUIT || ev == ButtonEvent::LEFT ||
+                 ev == ButtonEvent::RIGHT || ev == ButtonEvent::UP ||
+                 ev == ButtonEvent::DOWN) {
         Serial.println("Rebooting to MENU requested by user...");
         BootManager::setBootMode(BootMode::MENU);
         delay(500);

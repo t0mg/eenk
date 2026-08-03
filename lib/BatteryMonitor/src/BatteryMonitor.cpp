@@ -13,6 +13,10 @@ constexpr uint8_t BQ27220_VOLT_REG = 0x08;  // 16-bit LE, mV
 constexpr uint8_t BQ27220_CUR_REG = 0x0C;   // 16-bit LE, signed mA (positive = charging)
 constexpr uint16_t BQ27220_TIMEOUT_MS = 6;
 
+constexpr uint8_t I2C_ADDR_CW2017 = 0x62;
+constexpr uint8_t CW2017_VCELL_REG = 0x02;  // 16-bit BE, voltage (0.305 mV / LSB)
+constexpr uint8_t CW2017_SOC_REG = 0x04;    // 16-bit BE, SOC (high byte = integer %)
+
 bool readBq27220Reg16Le(uint8_t reg, uint16_t* out) {
   Wire.beginTransmission(I2C_ADDR_BQ27220);
   Wire.write(reg);
@@ -92,29 +96,66 @@ uint16_t BatteryMonitor::readBq27220Mv_() const {
 }
 
 uint16_t BatteryMonitor::readCw2017Soc_() const {
-  Wire.beginTransmission(0x63);
-  Wire.write(0x04);
-  if (Wire.endTransmission(false) == 0 && Wire.requestFrom(0x63, 1) == 1) {
-    int pct = Wire.read();
-    return pct > 100 ? 100 : pct;
+  const unsigned long now = millis();
+  if (_haveBqReading && _lastSocPollMs != 0 && (now - _lastSocPollMs) < kBqPollIntervalMs) {
+    return _lastGoodSoc;
   }
-  return 100;
+
+  Wire.begin(_i2c.cw.sdaPin, _i2c.cw.sclPin, _i2c.cw.freq);
+  Wire.setTimeOut(BQ27220_TIMEOUT_MS);
+  Wire.beginTransmission(I2C_ADDR_CW2017);
+  Wire.write(CW2017_SOC_REG);
+  bool ok = false;
+  uint16_t soc = 100;
+  if (Wire.endTransmission(true) == 0 && Wire.requestFrom(static_cast<int>(I2C_ADDR_CW2017), 2) == 2) {
+    uint8_t socInt = Wire.read();
+    uint8_t socDec = Wire.read();
+    (void)socDec;
+    soc = socInt;
+    ok = (soc <= 100);
+  }
+
+  _lastSocPollMs = now;
+  if (!ok) {
+    return _haveBqReading ? _lastGoodSoc : 100;
+  }
+  _lastGoodSoc = soc;
+  _haveBqReading = true;
+  return soc;
 }
 
 uint16_t BatteryMonitor::readCw2017Mv_() const {
-  Wire.beginTransmission(0x63);
-  Wire.write(0x02);
-  if (Wire.endTransmission(false) == 0 && Wire.requestFrom(0x63, 2) == 2) {
-    uint16_t val = (Wire.read() << 8) | Wire.read();
-    return (val * 305) / 1000;
+  const unsigned long now = millis();
+  if (_haveBqReading && _lastMvPollMs != 0 && (now - _lastMvPollMs) < kBqPollIntervalMs) {
+    return _lastGoodMv;
   }
-  return 4200;
+
+  Wire.begin(_i2c.cw.sdaPin, _i2c.cw.sclPin, _i2c.cw.freq);
+  Wire.setTimeOut(BQ27220_TIMEOUT_MS);
+  Wire.beginTransmission(I2C_ADDR_CW2017);
+  Wire.write(CW2017_VCELL_REG);
+  bool ok = false;
+  uint16_t mv = 4100;
+  if (Wire.endTransmission(true) == 0 && Wire.requestFrom(static_cast<int>(I2C_ADDR_CW2017), 2) == 2) {
+    uint8_t hi = Wire.read();
+    uint8_t lo = Wire.read();
+    uint16_t raw = (static_cast<uint16_t>(hi) << 8) | lo;
+    mv = static_cast<uint16_t>((static_cast<uint32_t>(raw) * 305UL) / 1000UL);
+    ok = (mv >= 2500 && mv <= 5000);
+  }
+
+  _lastMvPollMs = now;
+  if (!ok) {
+    return _haveBqReading ? _lastGoodMv : 4100;
+  }
+  _lastGoodMv = mv;
+  _haveBqReading = true;
+  return mv;
 }
 
 uint16_t BatteryMonitor::readPercentage() const {
   if (_mode == Mode::Bq27220) return readBq27220Soc_();
   if (_mode == Mode::Cw2017) return readCw2017Soc_();
-  if (_mode == Mode::Adc && _adcPin == 1) return 100; // Dummy mode for X4 Pro phase 1
   return percentageFromMillivolts(readMillivolts());
 }
 
@@ -181,9 +222,16 @@ bool BatteryMonitor::readBq27220Current_(int16_t* outMa) const {
   return true;
 }
 
+#if defined(PLATFORM_ESP32) && (CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32S3)
+#include <HWCDC.h>
+#endif
+
 bool BatteryMonitor::isCharging() const {
   if (_mode == Mode::Cw2017) {
-#if defined(PLATFORM_ESP32) && defined(ARDUINO_USB_CDC_ON_BOOT) && ARDUINO_USB_CDC_ON_BOOT
+#if defined(PLATFORM_ESP32)
+#if CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32S3
+    if (HWCDC::isPlugged()) return true;
+#endif
     if (Serial) return true;
 #endif
     return false;
