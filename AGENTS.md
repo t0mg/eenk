@@ -322,12 +322,11 @@ Shortcuts are defined in `app/main-process/appmenus.js`. Key shortcuts include `
 ### Build Verification Checklist
 
 After making firmware changes in eenk:
-- [ ] `pio run -e native` builds successfully
+- [ ] `pio run -e native; Copy-Item -Path ".pio\build\native\program.exe" -Destination "tools\eenky\app\main-process\ink\win\eenk-sim.exe" -Force` builds successfully
 - [ ] `pio run -e esp32c3` builds successfully
 - [ ] `pio run -e esp32s3` builds successfully
 - [ ] `pio test -e native` passes (golden screenshots match or are intentionally updated)
 - [ ] If updater was touched: `pio run -e esp32c3_updater` builds and binary fits in 1 MB
-- [ ] If the builds are good, copy the new native build to eenky: `Copy-Item -Path ".pio\build\native\program.exe" -Destination "tools\eenky\app\main-process\ink\win\eenk-sim.exe" -Force`
 
 ### Commit Workflow
 
