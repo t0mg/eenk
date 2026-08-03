@@ -51,6 +51,8 @@ AppSettings AppSettings::defaults() {
     s.inputLayoutIndex = 0;
     s.refreshInterval  = 10;
     s.overrideStoryFont = false;
+    s.choiceCascadeMs   = 350;
+    s.choiceFocusDelayMs = 700;
     return s;
 }
 
@@ -68,6 +70,8 @@ static constexpr char kKeySleep[]        = "sleep";
 static constexpr char kKeyLayout[]       = "layout";
 static constexpr char kKeyRefresh[]      = "refresh";
 static constexpr char kKeyFontOverride[] = "sfont_ovr";
+static constexpr char kKeyCascadeMs[]    = "casc_ms";
+static constexpr char kKeyFocusMs[]      = "foc_ms";
 
 AppSettings AppSettings::load() {
     AppSettings s = defaults();
@@ -88,6 +92,8 @@ AppSettings AppSettings::load() {
     s.inputLayoutIndex = prefs.getUChar(kKeyLayout, s.inputLayoutIndex);
     s.refreshInterval  = prefs.getUChar(kKeyRefresh, s.refreshInterval);
     s.overrideStoryFont = prefs.getUChar(kKeyFontOverride, 0) != 0;
+    s.choiceCascadeMs   = prefs.getUShort(kKeyCascadeMs, s.choiceCascadeMs);
+    s.choiceFocusDelayMs = prefs.getUShort(kKeyFocusMs, s.choiceFocusDelayMs);
 
     prefs.end();
 
@@ -113,6 +119,8 @@ void AppSettings::save() const {
     prefs.putUChar(kKeyLayout,     inputLayoutIndex);
     prefs.putUChar(kKeyRefresh,    refreshInterval);
     prefs.putUChar(kKeyFontOverride, overrideStoryFont ? 1 : 0);
+    prefs.putUShort(kKeyCascadeMs,   choiceCascadeMs);
+    prefs.putUShort(kKeyFocusMs,     choiceFocusDelayMs);
 
     prefs.end();
 }

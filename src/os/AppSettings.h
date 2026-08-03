@@ -12,6 +12,8 @@ struct AppSettings {
     uint8_t  inputLayoutIndex;  // which button layout
     uint8_t  refreshInterval;   // full refresh every N partials: 5, 10, 15, 20
     bool     overrideStoryFont; // if true, storyFontIndex always wins over story @font hint
+    uint16_t choiceCascadeMs;   // delay per choice item in ms (default 350, can be 0)
+    uint16_t choiceFocusDelayMs; // delay before initial selection focus in ms (default 700, can be 0)
 
     // ── Human-readable option lists (for UI display) ──────────────────────────
 

@@ -327,6 +327,7 @@ After making firmware changes in eenk:
 - [ ] `pio run -e esp32s3` builds successfully
 - [ ] `pio test -e native` passes (golden screenshots match or are intentionally updated)
 - [ ] If updater was touched: `pio run -e esp32c3_updater` builds and binary fits in 1 MB
+- [ ] If the builds are good, copy the new native build to eenky: `Copy-Item -Path ".pio\build\native\program.exe" -Destination "tools\eenky\app\main-process\ink\win\eenk-sim.exe" -Force`
 
 ### Commit Workflow
 

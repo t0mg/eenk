@@ -884,6 +884,19 @@ void test_image_widget_screenshot(void) {
 
   TEST_ASSERT_EQUAL(1, 1);
 }
+void test_zero_delay_choice_reveal(void) {
+  TestDisplay display;
+  MockInput input;
+  SDLStorage storage;
+  InkEngine engine(display, input, storage);
+
+  engine.setChoiceDelays(0, 0);
+  TEST_ASSERT_EQUAL_UINT32(0, engine.getCascadeOffsetMs());
+  TEST_ASSERT_EQUAL_UINT32(0, engine.getFocusDelayMs());
+
+  engine.loadStory("test/story/story.bin");
+  engine.update();
+}
 #endif
 
 int main(int argc, char **argv) {
@@ -904,6 +917,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_sleep_cover_image_screenshot);
   RUN_TEST(test_story_player_screenshot);
   RUN_TEST(test_image_widget_screenshot);
+  RUN_TEST(test_zero_delay_choice_reveal);
   // StreamingEpdFontFamily unit tests
   RUN_TEST(test_streaming_epd_font_family_load_plain);
   RUN_TEST(test_streaming_epd_font_family_load_regular_suffix);

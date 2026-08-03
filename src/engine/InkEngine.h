@@ -84,6 +84,13 @@ public:
 
     int getImageHeight(const char* imagePath) const;
 
+    void setChoiceDelays(uint32_t cascadeMs, uint32_t focusMs) {
+        _cascadeOffsetMs = cascadeMs;
+        _focusDelayMs = focusMs;
+    }
+    uint32_t getCascadeOffsetMs() const { return _cascadeOffsetMs; }
+    uint32_t getFocusDelayMs() const { return _focusDelayMs; }
+
 private:
     IDisplay&  _display;
     IInput&    _input;
@@ -136,8 +143,8 @@ private:
     int      _revealStep = 0;
     bool     _revealStarted = false;
 
-    static constexpr uint32_t kCascadeOffsetMs = 350;
-    static constexpr uint32_t kFocusDelayMs    = 700;
+    uint32_t _cascadeOffsetMs = 350;
+    uint32_t _focusDelayMs    = 700;
 
     ChoiceVisualState getChoiceVisualState(int index) const;
     bool isChoicesVisible() const;

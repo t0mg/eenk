@@ -248,6 +248,8 @@ void InkEngine::applySettings(const AppSettings &settings) {
   g_marginPx = settings.marginPx;
   g_refreshInterval = settings.refreshInterval;
   _settings = settings;
+  _cascadeOffsetMs = settings.choiceCascadeMs;
+  _focusDelayMs = settings.choiceFocusDelayMs;
 
   // Wire choice font to the renderer (narrative font is resolved at story load
   // time via FontResolver; choice font always follows the user setting).
@@ -548,13 +550,29 @@ void InkEngine::update() {
         _revealStarted = true;
         _revealStartMs = now;
         _lastAnimFrameMs = now;
-        _revealStep = 1;
+        if (_cascadeOffsetMs == 0 && _focusDelayMs == 0) {
+          _revealStep = _numChoices + 1;
+        } else if (_cascadeOffsetMs == 0) {
+          _revealStep = _numChoices;
+        } else {
+          _revealStep = 1;
+        }
         redraw();
       }
     } else if (_revealStep <= _numChoices) {
       uint32_t delay =
-          (_revealStep == _numChoices) ? kFocusDelayMs : kCascadeOffsetMs;
-      if (now - _lastAnimFrameMs >= delay) {
+          (_revealStep == _numChoices) ? _focusDelayMs : _cascadeOffsetMs;
+      if (delay == 0) {
+        if (_revealStep == _numChoices) {
+          _revealStep = _numChoices + 1;
+        } else if (_cascadeOffsetMs == 0) {
+          _revealStep = _numChoices;
+        } else {
+          _revealStep++;
+        }
+        _lastAnimFrameMs = now;
+        redraw();
+      } else if (now - _lastAnimFrameMs >= delay) {
         _lastAnimFrameMs = now;
         _revealStep++;
         redraw();
@@ -571,13 +589,29 @@ void InkEngine::update() {
         _revealStarted = true;
         _revealStartMs = now;
         _lastAnimFrameMs = now;
-        _revealStep = 1;
+        if (_cascadeOffsetMs == 0 && _focusDelayMs == 0) {
+          _revealStep = _numChoices + 1;
+        } else if (_cascadeOffsetMs == 0) {
+          _revealStep = _numChoices;
+        } else {
+          _revealStep = 1;
+        }
         redraw();
       }
     } else if (_revealStep <= _numChoices) {
       uint32_t delay =
-          (_revealStep == _numChoices) ? kFocusDelayMs : kCascadeOffsetMs;
-      if (now - _lastAnimFrameMs >= delay) {
+          (_revealStep == _numChoices) ? _focusDelayMs : _cascadeOffsetMs;
+      if (delay == 0) {
+        if (_revealStep == _numChoices) {
+          _revealStep = _numChoices + 1;
+        } else if (_cascadeOffsetMs == 0) {
+          _revealStep = _numChoices;
+        } else {
+          _revealStep++;
+        }
+        _lastAnimFrameMs = now;
+        redraw();
+      } else if (now - _lastAnimFrameMs >= delay) {
         _lastAnimFrameMs = now;
         _revealStep++;
         redraw();
