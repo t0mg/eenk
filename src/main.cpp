@@ -356,8 +356,10 @@ void setup() {
                             if (lineBuf) {
                               saveFile.read((uint8_t *)lineBuf, lineLen);
                               lineBuf[lineLen] = '\0';
-                              uint8_t isOld;
-                              saveFile.read(&isOld, 1);
+                              uint8_t flags = 0;
+                              saveFile.read(&flags, 1);
+                              bool isOld = (flags & 1) != 0;
+                              bool endOfParagraph = (flags & 2) != 0;
                               std::string str(lineBuf);
                               bool isImage = false;
                               std::string imagePath = "";
@@ -367,12 +369,16 @@ void setup() {
                                 imagePath = str.substr(6, str.length() - 7);
                                 str = "";
                               }
-                              history.push_back({TextBlock(str), isOld > 0,
-                                                 isImage, imagePath,
-                                                 isImage
-                                                     ? engine->getImageHeight(
-                                                           imagePath.c_str())
-                                                     : 0});
+                              InkEngine::WrappedLine wl;
+                              wl.block = TextBlock(str);
+                              wl.isOld = isOld;
+                              wl.isImage = isImage;
+                              wl.imagePath = imagePath;
+                              wl.imageHeight = isImage
+                                  ? engine->getImageHeight(imagePath.c_str())
+                                  : 0;
+                              wl.endOfParagraph = endOfParagraph;
+                              history.push_back(wl);
                               delete[] lineBuf;
                             } else {
                               break;
@@ -485,8 +491,8 @@ void saveProgress() {
         uint16_t len = text.length();
         f.write((const uint8_t *)&len, 2);
         f.write((const uint8_t *)text.c_str(), len);
-        uint8_t isOld = line.isOld ? 1 : 0;
-        f.write(&isOld, 1);
+        uint8_t flags = (line.isOld ? 1 : 0) | (line.endOfParagraph ? 2 : 0);
+        f.write(&flags, 1);
       }
 
       f.close();

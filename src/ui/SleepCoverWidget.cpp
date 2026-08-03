@@ -12,7 +12,7 @@ void SleepCoverWidget::show(IDisplay &display, const char *msg,
   if (renderer) {
     display.clear();
 
-#if defined(PLATFORM_ESP32) || defined(PIO_UNIT_TESTING)
+#if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE) || defined(PIO_UNIT_TESTING)
     static auto sleepcover_fnv1a_32 = [](const char *str) -> uint32_t {
       uint32_t hash = 2166136261u;
       while (*str) {

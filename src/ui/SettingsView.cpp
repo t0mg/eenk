@@ -31,18 +31,20 @@
 // Builtin font table (for display names in the font picker)
 #include <BuiltinFonts.h>
 
-#ifdef PLATFORM_ESP32
-#include <Arduino.h>
 #include <EpdFont.h>
 #include <EpdFontFamily.h>
 #include <GfxRenderer.h>
-#include <InputManager.h>
 #include <builtinFonts/small14.h>
 #include <builtinFonts/syne_bold_10.h>
 #include <builtinFonts/ui_10.h>
 #include <builtinFonts/ui_12.h>
 #include <builtinFonts/ui_bold_12.h>
+
+#ifdef PLATFORM_ESP32
+#include <Arduino.h>
+#include <InputManager.h>
 #include <esp_sleep.h>
+#endif
 
 static EpdFont s_font12(&ui_12);
 static EpdFontFamily s_fam12(&s_font12);
@@ -58,9 +60,6 @@ static EpdFontFamily s_fam10(&s_font10);
 
 static EpdFont s_fontHeading(&syne_bold_10);
 static EpdFontFamily s_famHeading(&s_fontHeading);
-#else
-#include <GfxRenderer.h>
-#endif
 
 static constexpr int kFontNormal = 30;
 static constexpr int kFontBold = 31;
@@ -132,7 +131,7 @@ void SettingsView::run() {
   // Register fonts once
   auto *r = _display.getRenderer();
   if (r) {
-#ifdef PLATFORM_ESP32
+#if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE)
     r->insertFont(kFontNormal, s_fam12);
     r->insertFont(kFontBold, s_famBold12);
     r->insertFont(kFontDiagram, s_famSmall14);

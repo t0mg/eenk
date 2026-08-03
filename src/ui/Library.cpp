@@ -18,19 +18,25 @@
 #include <cstdio>
 #include <cstring>
 
-#ifdef PLATFORM_ESP32
-#include "HalTypes.h"
-#include "HalInit.h"
-#include <Arduino.h>
 #include <EpdFont.h>
 #include <EpdFontFamily.h>
-#include <InputManager.h>
-#include <SPI.h>
 #include <builtinFonts/syne_bold_10.h>
 #include <builtinFonts/ui_10.h>
 #include <builtinFonts/ui_12.h>
 #include <builtinFonts/ui_bold_12.h>
+
+#if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE)
+#ifdef PLATFORM_ESP32
+#include "HalTypes.h"
+#include "HalInit.h"
+#include <Arduino.h>
+#include <InputManager.h>
+#include <SPI.h>
 #include <esp_sleep.h>
+#else
+#include <dirent.h>
+#include <sys/stat.h>
+#endif
 
 static EpdFont s_glNormal(&ui_12);
 static EpdFontFamily s_glFamilyNormal(&s_glNormal);
@@ -130,7 +136,7 @@ void Library::parseThumbMetadata(Library::StoryEntry &e) {
 void Library::ensureFonts() {
   if (_fontsLoaded)
     return;
-#ifdef PLATFORM_ESP32
+#if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE)
   auto *r = _display.getRenderer();
   if (r) {
     r->insertFont(FONT_NORMAL, s_glFamilyNormal);
@@ -457,7 +463,7 @@ void Library::renderEntry(int index, int yPos, bool selected) {
   if (!r)
     return;
 
-#if defined(PLATFORM_ESP32) || defined(PIO_UNIT_TESTING)
+#if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE) || defined(PIO_UNIT_TESTING)
   const StoryEntry &e = _entries[index];
 
   int cardX = 24;
@@ -595,7 +601,7 @@ void Library::renderEmpty() {
   if (!r)
     return;
 
-#if defined(PLATFORM_ESP32) || defined(PIO_UNIT_TESTING)
+#if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE) || defined(PIO_UNIT_TESTING)
   static const char *kLine1 = "No stories found.";
   static const char *kLine2 = "Copy .bin files to";
   static const char *kLine3 = "/stories/ on the SD card.";

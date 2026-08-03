@@ -124,6 +124,25 @@ private:
     int   _numChoices     = 0;
     int   _selectedChoice = 0;
 
+    enum class ChoiceVisualState {
+        HIDDEN,
+        FULL
+    };
+
+    uint32_t _choiceTurnStartMs = 0;
+    uint32_t _initialChoiceDelayMs = 0;
+    uint32_t _revealStartMs = 0;
+    uint32_t _lastAnimFrameMs = 0;
+    int      _revealStep = 0;
+    bool     _revealStarted = false;
+
+    static constexpr uint32_t kCascadeOffsetMs = 350;
+    static constexpr uint32_t kFocusDelayMs    = 700;
+
+    ChoiceVisualState getChoiceVisualState(int index) const;
+    bool isChoicesVisible() const;
+    bool isRevealComplete() const;
+
     enum class State {
         IDLE,
         RUNNING_TEXT,

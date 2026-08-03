@@ -10,7 +10,7 @@ void HeaderWidget::render(const char *title, int fontIndex) const {
   if (!r)
     return;
 
-#if defined(PLATFORM_ESP32) || defined(PIO_UNIT_TESTING)
+#if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE) || defined(PIO_UNIT_TESTING)
   // Poll battery so the widget shows a fresh reading on first render.
   _battery.tick();
 

@@ -90,7 +90,7 @@ void BatteryWidget::draw(int x, int y, bool inverted) {
     snprintf(label, sizeof(label), "%d%%", pct);
   }
 
-#if defined(PLATFORM_ESP32) || defined(PIO_UNIT_TESTING)
+#if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE) || defined(PIO_UNIT_TESTING)
   static constexpr int kLabelGap = 4;
   int textW = _renderer.getTextWidth(NeuStyle::FONT_HEADING, label);
   int labelX = x - kLabelGap - textW;

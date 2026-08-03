@@ -1,7 +1,7 @@
 // Include <cmath> FIRST so GCC 15's specfun.h special-math functions are
 // emitted at global scope rather than inside ink::runtime namespace.
-#include <cmath>
 #include <SDCardManager.h>
+#include <cmath>
 #include <string>
 
 #include "engine/InkEngine.h"
@@ -9,18 +9,18 @@
 // InkCPP public API (already via InkEngine.h, but choice.h is also needed)
 #include <choice.h>
 
-#include "engine/InkEngine.h"
 #include "GfxRenderer.h"
 #include "InkRichTextParser.h"
+#include "engine/InkEngine.h"
 #include "os/AppSettings.h"
-#include "ui/SystemUI.h"
+#include "ui/ImageWidget.h"
 #include "ui/QuickMenuWidget.h"
 #include "ui/SettingsView.h"
+#include "ui/SystemUI.h"
 #include <cctype>
-#include <cstring>
 #include <cstdio>
+#include <cstring>
 #include <snapshot.h>
-#include "ui/ImageWidget.h"
 #ifdef PLATFORM_NATIVE
 #include "hal/sdl/mock/FS.h"
 #endif
@@ -42,14 +42,14 @@
 #include <builtinFonts/reader_bold_2b.h>
 #include <builtinFonts/reader_italic_2b.h>
 #include <builtinFonts/reader_medium_2b.h>
-#include <builtinFonts/reader_medium_italic_2b.h>
 #include <builtinFonts/reader_medium_bold_2b.h>
+#include <builtinFonts/reader_medium_italic_2b.h>
 // UI/choice fonts
-#include <builtinFonts/ui_10.h>
-#include <builtinFonts/ui_bold_10.h>
-#include <builtinFonts/ui_12.h>
-#include <builtinFonts/ui_bold_12.h>
 #include <builtinFonts/small14.h>
+#include <builtinFonts/ui_10.h>
+#include <builtinFonts/ui_12.h>
+#include <builtinFonts/ui_bold_10.h>
+#include <builtinFonts/ui_bold_12.h>
 // Note: reader_xsmall_*.h and reader_large_*.h are NOT included in flash.
 // Those sizes are served as .epdfont files from the SD card /fonts/ directory.
 
@@ -62,25 +62,29 @@
 extern const BuiltinFontEntry kBuiltinFonts[] = {
     // ── Sans-serif (Reader family) ───────────────────────────────────────────
 
-    { "sans-medium",  "Sans M",   // index 0 — default story font
-      &reader_medium_2b,         &reader_medium_bold_2b,  &reader_medium_italic_2b,  nullptr },
+    {"sans-medium", "Sans M", // index 0 — default story font
+     &reader_medium_2b, &reader_medium_bold_2b, &reader_medium_italic_2b,
+     nullptr},
 
-    { "sans-small",   "Sans S",   // index 1 — 14pt
-      &reader_2b,                &reader_bold_2b,          &reader_italic_2b,          nullptr },
+    {"sans-small", "Sans S", // index 1 — 14pt
+     &reader_2b, &reader_bold_2b, &reader_italic_2b, nullptr},
 
-    // ── Serif (Literata) — compiled in only when eenk_HAS_LITERATA is set ────
+// ── Serif (Literata) — compiled in only when eenk_HAS_LITERATA is set ────
 #ifdef eenk_HAS_LITERATA
-    { "serif-medium", "Serif M",
-      &literata_medium_2b, &literata_medium_bold_2b, &literata_medium_italic_2b, nullptr },
+    {"serif-medium", "Serif M", &literata_medium_2b, &literata_medium_bold_2b,
+     &literata_medium_italic_2b, nullptr},
 
-    { "serif-large",  "Serif L",
-      &literata_large_2b,  &literata_large_bold_2b,  &literata_large_italic_2b,  nullptr },
+    {"serif-large", "Serif L", &literata_large_2b, &literata_large_bold_2b,
+     &literata_large_italic_2b, nullptr},
 #endif
 
-    // ── Short aliases (resolve to medium size) ────────────────────────────────
-    { "sans",  "Sans",  &reader_medium_2b, &reader_medium_bold_2b, &reader_medium_italic_2b, nullptr },
+    // ── Short aliases (resolve to medium size)
+    // ────────────────────────────────
+    {"sans", "Sans", &reader_medium_2b, &reader_medium_bold_2b,
+     &reader_medium_italic_2b, nullptr},
 #ifdef eenk_HAS_LITERATA
-    { "serif", "Serif", &literata_medium_2b, &literata_medium_bold_2b, &literata_medium_italic_2b, nullptr },
+    {"serif", "Serif", &literata_medium_2b, &literata_medium_bold_2b,
+     &literata_medium_italic_2b, nullptr},
 #endif
 };
 
@@ -91,27 +95,24 @@ extern const size_t kBuiltinFontCount =
 #include "ui/StoryMetadata.h"
 
 static constexpr int FONT_NARRATIVE = 1;
-static constexpr int FONT_CHOICE    = 2;
+static constexpr int FONT_CHOICE = 2;
 
 // ── Choice font pool ─────────────────────────────────────────────────────────
-// UI fonts used for the choice list. Index matches AppSettings::choiceFontIndex.
-static const EpdFontData* const kChoiceFontData[] = {
-    &ui_10,
-    &ui_bold_10,
-    &ui_12,
-    &ui_bold_12,
-    &small14,
+// UI fonts used for the choice list. Index matches
+// AppSettings::choiceFontIndex.
+static const EpdFontData *const kChoiceFontData[] = {
+    &ui_10, &ui_bold_10, &ui_12, &ui_bold_12, &small14,
 };
 static constexpr int kChoiceFontCount =
     static_cast<int>(sizeof(kChoiceFontData) / sizeof(kChoiceFontData[0]));
 
-static int g_marginPx        = 16;
+static int g_marginPx = 16;
 static int g_refreshInterval = 10;
 
-
 // ─────────────────────────────────────────────────────────────────────────────
-int InkEngine::WrappedLine::getHeight(GfxRenderer* renderer) const {
-  if (!renderer) return 0;
+int InkEngine::WrappedLine::getHeight(GfxRenderer *renderer) const {
+  if (!renderer)
+    return 0;
   int h = isImage ? imageHeight : renderer->getLineHeight(FONT_NARRATIVE);
   if (endOfParagraph) {
     h += (renderer->getLineHeight(FONT_NARRATIVE) / 2);
@@ -160,14 +161,15 @@ InkEngine::~InkEngine() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Build EpdFontFamily from a BuiltinFontEntry using caller-supplied storage.
-// The four EpdFont slots (r,b,it,bi) must outlive the returned family reference.
-static void buildFamilyFromEntry(const BuiltinFontEntry* e,
-                                  EpdFont& r, EpdFont& b, EpdFont& it, EpdFont& bi,
-                                  EpdFontFamily& family) {
-  const EpdFontData* reg = e->regular;
-  r  = EpdFont(reg);
-  b  = EpdFont(e->bold       ? e->bold       : reg);
-  it = EpdFont(e->italic     ? e->italic     : reg);
+// The four EpdFont slots (r,b,it,bi) must outlive the returned family
+// reference.
+static void buildFamilyFromEntry(const BuiltinFontEntry *e, EpdFont &r,
+                                 EpdFont &b, EpdFont &it, EpdFont &bi,
+                                 EpdFontFamily &family) {
+  const EpdFontData *reg = e->regular;
+  r = EpdFont(reg);
+  b = EpdFont(e->bold ? e->bold : reg);
+  it = EpdFont(e->italic ? e->italic : reg);
   bi = EpdFont(e->boldItalic ? e->boldItalic : (e->bold ? e->bold : reg));
   family = EpdFontFamily(&r, &b, &it, &bi);
 }
@@ -182,7 +184,7 @@ bool InkEngine::loadStory(const char *path) {
     return false;
   }
 
-  const unsigned char* dataToLoad = _storyBuf;
+  const unsigned char *dataToLoad = _storyBuf;
   std::size_t sizeToLoad = size;
 
   // Parse eenk header if present.
@@ -203,23 +205,25 @@ bool InkEngine::loadStory(const char *path) {
   }
 
   _globals = _story->new_globals();
-  _runner  = _story->new_runner(_globals);
+  _runner = _story->new_runner(_globals);
 
   printf("[InkEngine] Story loaded — %zu bytes\n", size);
 
   // Derive story base name from path for sidecar font lookup.
   char storyBase[64] = {};
-  const char* lastSlash = strrchr(path, '/');
+  const char *lastSlash = strrchr(path, '/');
 #ifdef _WIN32
-  const char* lastBackslash = strrchr(path, '\\');
-  if (lastBackslash > lastSlash) lastSlash = lastBackslash;
+  const char *lastBackslash = strrchr(path, '\\');
+  if (lastBackslash > lastSlash)
+    lastSlash = lastBackslash;
 #endif
-  const char* fname = lastSlash ? lastSlash + 1 : path;
+  const char *fname = lastSlash ? lastSlash + 1 : path;
   strncpy(storyBase, fname, sizeof(storyBase) - 1);
   // strip .bin extension
-  char* dot = strrchr(storyBase, '.');
-  if (dot) *dot = '\0';
-  
+  char *dot = strrchr(storyBase, '.');
+  if (dot)
+    *dot = '\0';
+
   char storyDir[512] = {};
   if (lastSlash) {
     size_t dirLen = lastSlash - path;
@@ -233,39 +237,39 @@ bool InkEngine::loadStory(const char *path) {
   loadMediaSidecar((meta.flags & 1) != 0, path);
 
   _wrappedLines.clear();
-  _scrollY    = 0;
+  _scrollY = 0;
   _maxScrollY = 0;
-  _state      = State::RUNNING_TEXT;
+  _state = State::RUNNING_TEXT;
   return true;
 }
 #endif
 
-void InkEngine::applySettings(const AppSettings& settings) {
-  g_marginPx        = settings.marginPx;
+void InkEngine::applySettings(const AppSettings &settings) {
+  g_marginPx = settings.marginPx;
   g_refreshInterval = settings.refreshInterval;
-  _settings         = settings;
+  _settings = settings;
 
   // Wire choice font to the renderer (narrative font is resolved at story load
   // time via FontResolver; choice font always follows the user setting).
-  GfxRenderer* renderer = _display.getRenderer();
+  GfxRenderer *renderer = _display.getRenderer();
   if (renderer) {
     int idx = settings.choiceFontIndex;
-    if (idx < 0 || idx >= kChoiceFontCount) idx = 2; // default ui_12
-    static EpdFont        choiceFont(kChoiceFontData[idx]);
-    static EpdFontFamily  choiceFamily(&choiceFont);
-    choiceFont   = EpdFont(kChoiceFontData[idx]);
+    if (idx < 0 || idx >= kChoiceFontCount)
+      idx = 2; // default ui_12
+    static EpdFont choiceFont(kChoiceFontData[idx]);
+    static EpdFontFamily choiceFamily(&choiceFont);
+    choiceFont = EpdFont(kChoiceFontData[idx]);
     choiceFamily = EpdFontFamily(&choiceFont);
     renderer->insertFont(FONT_CHOICE, choiceFamily);
   }
 }
 
 #ifndef PLATFORM_NATIVE
-bool InkEngine::loadStory(const unsigned char *data,
-                          std::size_t size,
+bool InkEngine::loadStory(const unsigned char *data, std::size_t size,
                           const char *storyPath) {
   // NOTE: _storyBuf is NOT set — we don't own this memory (it's mmap'd)
 
-  const unsigned char* dataToLoad = data;
+  const unsigned char *dataToLoad = data;
   std::size_t sizeToLoad = size;
 
   // Parse eenk header if present.
@@ -284,18 +288,20 @@ bool InkEngine::loadStory(const unsigned char *data,
   }
 
   _globals = _story->new_globals();
-  _runner  = _story->new_runner(_globals);
+  _runner = _story->new_runner(_globals);
 
   printf("[InkEngine] Story loaded from memory — %zu bytes\n", size);
 
-  // Derive story base name and story directory from storyPath for sidecar font lookup.
+  // Derive story base name and story directory from storyPath for sidecar font
+  // lookup.
   char storyBase[64] = {};
   char storyDir[512] = {};
   if (storyPath && storyPath[0]) {
-    const char* lastSlash = strrchr(storyPath, '/');
+    const char *lastSlash = strrchr(storyPath, '/');
 #ifdef _WIN32
-    const char* lastBackslash = strrchr(storyPath, '\\');
-    if (lastBackslash > lastSlash) lastSlash = lastBackslash;
+    const char *lastBackslash = strrchr(storyPath, '\\');
+    if (lastBackslash > lastSlash)
+      lastSlash = lastBackslash;
 #endif
     if (lastSlash) {
       size_t dirLen = lastSlash - storyPath;
@@ -304,10 +310,11 @@ bool InkEngine::loadStory(const unsigned char *data,
         storyDir[dirLen] = '\0';
       }
     }
-    const char* fname = lastSlash ? lastSlash + 1 : storyPath;
+    const char *fname = lastSlash ? lastSlash + 1 : storyPath;
     strncpy(storyBase, fname, sizeof(storyBase) - 1);
-    char* dot = strrchr(storyBase, '.');
-    if (dot) *dot = '\0';
+    char *dot = strrchr(storyBase, '.');
+    if (dot)
+      *dot = '\0';
   }
 
   _storyDir = storyDir;
@@ -315,9 +322,9 @@ bool InkEngine::loadStory(const unsigned char *data,
   loadMediaSidecar((meta.flags & 1) != 0, storyPath);
 
   _wrappedLines.clear();
-  _scrollY    = 0;
+  _scrollY = 0;
   _maxScrollY = 0;
-  _state      = State::RUNNING_TEXT;
+  _state = State::RUNNING_TEXT;
   return true;
 }
 #endif
@@ -356,7 +363,8 @@ bool InkEngine::loadSnapshot(const unsigned char *data, std::size_t length) {
 
   _globals = _story->new_globals_from_snapshot(*snap);
   if (!_globals) {
-    printf("[InkEngine] Failed to load globals from snapshot (corrupt or incompatible save)\n");
+    printf("[InkEngine] Failed to load globals from snapshot (corrupt or "
+           "incompatible save)\n");
     delete snap;
     return false;
   }
@@ -383,24 +391,26 @@ bool InkEngine::loadSnapshot(const unsigned char *data, std::size_t length) {
 // FontResolver implementation
 // ─────────────────────────────────────────────────────────────────────────────
 
-void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* storyBase, const char* storyDir) {
+void InkEngine::_resolveAndApplyFont(const StoryMetadata &meta,
+                                     const char *storyBase,
+                                     const char *storyDir) {
   // Clean up any previously active SD font family.
   if (_streamingFamily) {
     delete _streamingFamily;
     _streamingFamily = nullptr;
   }
 
-  GfxRenderer* renderer = _display.getRenderer();
+  GfxRenderer *renderer = _display.getRenderer();
 
   // Static storage for the active narrative builtin font family.
   // Initialised to reader_medium_2b so they are never truly "empty".
-  static EpdFont       s_r(&reader_medium_2b),  s_b(&reader_medium_2b),
-                       s_it(&reader_medium_2b), s_bi(&reader_medium_2b);
+  static EpdFont s_r(&reader_medium_2b), s_b(&reader_medium_2b),
+      s_it(&reader_medium_2b), s_bi(&reader_medium_2b);
   static EpdFontFamily s_narrFamily(&s_r, &s_b, &s_it, &s_bi);
 
   // ── Helper: apply a builtin font entry ──────────────────────────────────
   auto applyBuiltin = [&](size_t index) {
-    const BuiltinFontEntry* e = getBuiltinByIndex(index);
+    const BuiltinFontEntry *e = getBuiltinByIndex(index);
     buildFamilyFromEntry(e, s_r, s_b, s_it, s_bi, s_narrFamily);
     if (renderer) {
       renderer->removeStreamingFont(FONT_NARRATIVE);
@@ -424,14 +434,16 @@ void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* stor
 #endif
   }
 
-  const char* dirs[4];
+  const char *dirs[4];
   int ndirs = 0;
-  if (sidecarDir1[0]) dirs[ndirs++] = sidecarDir1;
-  if (sidecarDir2[0] && strcmp(sidecarDir2, sidecarDir1) != 0) dirs[ndirs++] = sidecarDir2;
+  if (sidecarDir1[0])
+    dirs[ndirs++] = sidecarDir1;
+  if (sidecarDir2[0] && strcmp(sidecarDir2, sidecarDir1) != 0)
+    dirs[ndirs++] = sidecarDir2;
   dirs[ndirs++] = "/fonts";
-  dirs[ndirs]   = nullptr;
+  dirs[ndirs] = nullptr;
 
-  auto applySdFont = [&](const char* stemName) {
+  auto applySdFont = [&](const char *stemName) {
     if (_streamingFamily) {
       delete _streamingFamily;
       _streamingFamily = nullptr;
@@ -439,10 +451,10 @@ void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* stor
     _streamingFamily = new StreamingEpdFontFamily();
     if (_streamingFamily->load(stemName, dirs)) {
       if (renderer) {
-        static EpdFont       s_sdR(&ui_12);
-        static EpdFont       s_sdB(&ui_12);
-        static EpdFont       s_sdI(&ui_12);
-        static EpdFont       s_sdBI(&ui_12);
+        static EpdFont s_sdR(&ui_12);
+        static EpdFont s_sdB(&ui_12);
+        static EpdFont s_sdI(&ui_12);
+        static EpdFont s_sdBI(&ui_12);
         static EpdFontFamily s_sdFamily(&s_sdR);
         s_sdR = EpdFont(_streamingFamily->getData(EpdFontFamily::REGULAR));
         s_sdB = EpdFont(_streamingFamily->getData(EpdFontFamily::BOLD));
@@ -455,7 +467,8 @@ void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* stor
         for (int i = 0; i < 4; ++i) {
           auto st = static_cast<EpdFontFamily::Style>(i);
           if (_streamingFamily->slot(st)) {
-            renderer->setStreamingFont(FONT_NARRATIVE, st, _streamingFamily->slot(st));
+            renderer->setStreamingFont(FONT_NARRATIVE, st,
+                                       _streamingFamily->slot(st));
           }
         }
       }
@@ -468,19 +481,20 @@ void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* stor
   };
 
   auto applyUserSetting = [&]() {
-    const char* fontName = _settings.storyFont;
-    
-    const BuiltinFontEntry* e = findBuiltinByToken(fontName);
+    const char *fontName = _settings.storyFont;
+
+    const BuiltinFontEntry *e = findBuiltinByToken(fontName);
     if (e) {
       applyBuiltin(e - kBuiltinFonts);
       return;
     }
-    
+
     if (applySdFont(fontName)) {
       return;
     }
 
-    printf("[InkEngine] Font: Setting '%s' failed, falling back to default\n", fontName);
+    printf("[InkEngine] Font: Setting '%s' failed, falling back to default\n",
+           fontName);
     applyBuiltin(0);
   };
 
@@ -498,7 +512,7 @@ void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* stor
   }
 
   // ── 2. Builtin token lookup (case-insensitive) ─────────────────────────
-  const BuiltinFontEntry* e = findBuiltinByToken(stem);
+  const BuiltinFontEntry *e = findBuiltinByToken(stem);
   if (e) {
     applyBuiltin(e - kBuiltinFonts);
     return;
@@ -510,10 +524,11 @@ void InkEngine::_resolveAndApplyFont(const StoryMetadata& meta, const char* stor
   }
 
   // ── 4. Fallback to user setting ────────────────────────────────────────
-  printf("[InkEngine] Font: SD family '%s' not found, falling back to user setting\n", stem);
+  printf("[InkEngine] Font: SD family '%s' not found, falling back to user "
+         "setting\n",
+         stem);
   applyUserSetting();
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 void InkEngine::update() {
@@ -525,12 +540,52 @@ void InkEngine::update() {
     _state = State::WAITING_INPUT;
     redraw();
     break;
-  case State::WAITING_INPUT:
+  case State::WAITING_INPUT: {
+    uint32_t now = millis();
+    if (!_revealStarted) {
+      if ((now - _choiceTurnStartMs >= _initialChoiceDelayMs) &&
+          isChoicesVisible()) {
+        _revealStarted = true;
+        _revealStartMs = now;
+        _lastAnimFrameMs = now;
+        _revealStep = 1;
+        redraw();
+      }
+    } else if (_revealStep <= _numChoices) {
+      uint32_t delay =
+          (_revealStep == _numChoices) ? kFocusDelayMs : kCascadeOffsetMs;
+      if (now - _lastAnimFrameMs >= delay) {
+        _lastAnimFrameMs = now;
+        _revealStep++;
+        redraw();
+      }
+    }
     tickWaitingInput();
     break;
-  case State::STORY_ENDED:
+  }
+  case State::STORY_ENDED: {
+    uint32_t now = millis();
+    if (!_revealStarted) {
+      if ((now - _choiceTurnStartMs >= _initialChoiceDelayMs) &&
+          isChoicesVisible()) {
+        _revealStarted = true;
+        _revealStartMs = now;
+        _lastAnimFrameMs = now;
+        _revealStep = 1;
+        redraw();
+      }
+    } else if (_revealStep <= _numChoices) {
+      uint32_t delay =
+          (_revealStep == _numChoices) ? kFocusDelayMs : kCascadeOffsetMs;
+      if (now - _lastAnimFrameMs >= delay) {
+        _lastAnimFrameMs = now;
+        _revealStep++;
+        redraw();
+      }
+    }
     tickStoryEnded();
     break;
+  }
   case State::SAVE_STUB:
     _state = State::WAITING_INPUT;
     redraw();
@@ -547,57 +602,63 @@ void InkEngine::update() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 void InkEngine::loadMediaSidecar(bool hasMediaFlag, const char *storyPath) {
-    _mediaDict.clear();
-    if (!hasMediaFlag || !storyPath || !storyPath[0]) return;
-    if (_mediaFile) _mediaFile.close();
-    
-    char mediaPath[512] = {};
-    snprintf(mediaPath, sizeof(mediaPath), "%s", storyPath);
-    char* dot = strrchr(mediaPath, '.');
-    if (dot) {
-        strcpy(dot, ".media");
-    } else {
-        strcat(mediaPath, ".media");
-    }
+  _mediaDict.clear();
+  if (!hasMediaFlag || !storyPath || !storyPath[0])
+    return;
+  if (_mediaFile)
+    _mediaFile.close();
 
-    _mediaFile = SDCardManager::getInstance().openFile(mediaPath);
-    if (!_mediaFile) {
-        printf("[InkEngine] Media sidecar expected but not found at %s\n", mediaPath);
-        return;
-    }
-    
-    uint8_t magic[4];
-    if (_mediaFile.read(magic, 4) != 4 || memcmp(magic, "ENKM", 4) != 0) {
-        printf("[InkEngine] Media sidecar has invalid magic\n");
-        return;
-    }
-    
-    uint32_t count = 0;
-    if (_mediaFile.read(reinterpret_cast<uint8_t*>(&count), 4) != 4) return;
-    
-    for (uint32_t i = 0; i < count; i++) {
-        uint8_t buf[20];
-        if (_mediaFile.read(buf, 20) != 20) break;
-        
-        uint32_t hash = buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
-        ImageMeta meta;
-        meta.offset = buf[4] | (buf[5] << 8) | (buf[6] << 16) | (buf[7] << 24);
-        meta.size = buf[8] | (buf[9] << 8) | (buf[10] << 16) | (buf[11] << 24);
-        meta.width = buf[12] | (buf[13] << 8) | (buf[14] << 16) | (buf[15] << 24);
-        meta.height = buf[16] | (buf[17] << 8) | (buf[18] << 16) | (buf[19] << 24);
-        _mediaDict[hash] = meta;
-    }
-    
-    printf("[InkEngine] Loaded %zu media dictionary entries\n", _mediaDict.size());
+  char mediaPath[512] = {};
+  snprintf(mediaPath, sizeof(mediaPath), "%s", storyPath);
+  char *dot = strrchr(mediaPath, '.');
+  if (dot) {
+    strcpy(dot, ".media");
+  } else {
+    strcat(mediaPath, ".media");
+  }
+
+  _mediaFile = SDCardManager::getInstance().openFile(mediaPath);
+  if (!_mediaFile) {
+    printf("[InkEngine] Media sidecar expected but not found at %s\n",
+           mediaPath);
+    return;
+  }
+
+  uint8_t magic[4];
+  if (_mediaFile.read(magic, 4) != 4 || memcmp(magic, "ENKM", 4) != 0) {
+    printf("[InkEngine] Media sidecar has invalid magic\n");
+    return;
+  }
+
+  uint32_t count = 0;
+  if (_mediaFile.read(reinterpret_cast<uint8_t *>(&count), 4) != 4)
+    return;
+
+  for (uint32_t i = 0; i < count; i++) {
+    uint8_t buf[20];
+    if (_mediaFile.read(buf, 20) != 20)
+      break;
+
+    uint32_t hash = buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
+    ImageMeta meta;
+    meta.offset = buf[4] | (buf[5] << 8) | (buf[6] << 16) | (buf[7] << 24);
+    meta.size = buf[8] | (buf[9] << 8) | (buf[10] << 16) | (buf[11] << 24);
+    meta.width = buf[12] | (buf[13] << 8) | (buf[14] << 16) | (buf[15] << 24);
+    meta.height = buf[16] | (buf[17] << 8) | (buf[18] << 16) | (buf[19] << 24);
+    _mediaDict[hash] = meta;
+  }
+
+  printf("[InkEngine] Loaded %zu media dictionary entries\n",
+         _mediaDict.size());
 }
 
-int InkEngine::getImageHeight(const char* imagePath) const {
-    uint32_t hash = fnv1a_32(imagePath);
-    auto it = _mediaDict.find(hash);
-    if (it != _mediaDict.end()) {
-        return it->second.height;
-    }
-    return 280; // fallback if not found
+int InkEngine::getImageHeight(const char *imagePath) const {
+  uint32_t hash = fnv1a_32(imagePath);
+  auto it = _mediaDict.find(hash);
+  if (it != _mediaDict.end()) {
+    return it->second.height;
+  }
+  return 280; // fallback if not found
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -613,7 +674,8 @@ void InkEngine::tickRunningText() {
       newLinesCount++;
     } else if (renderer) {
       std::vector<TextRun> runs = InkRichTextParser::parse(str.c_str());
-      auto wraps = renderer->wrapRichText(FONT_NARRATIVE, runs, narrativeWidth, 100);
+      auto wraps =
+          renderer->wrapRichText(FONT_NARRATIVE, runs, narrativeWidth, 100);
       for (size_t i = 0; i < wraps.size(); ++i) {
         bool eop = (i == wraps.size() - 1);
         _wrappedLines.push_back({wraps[i], false, false, "", 0, eop});
@@ -635,32 +697,38 @@ void InkEngine::tickRunningText() {
       if (!s.empty() && s.back() == '\n') {
         s.pop_back();
       }
-      printf("[InkEngine] getline_alloc returned '%s'. s.empty()=%d, has_tags=%d, num_tags=%d\n", s.c_str(), s.empty(), _runner->has_tags(), _runner->num_tags());
-      
+      printf("[InkEngine] getline_alloc returned '%s'. s.empty()=%d, "
+             "has_tags=%d, num_tags=%d\n",
+             s.c_str(), s.empty(), _runner->has_tags(), _runner->num_tags());
+
       // Parse IMAGE tags attached to this line
       if (_runner->has_tags()) {
         for (size_t i = 0; i < _runner->num_tags(); i++) {
-          const char* tag = _runner->get_tag(i);
+          const char *tag = _runner->get_tag(i);
           if (tag && strncasecmp(tag, "IMAGE:", 6) == 0) {
-            const char* pathStr = tag + 6;
-            while (*pathStr == ' ') pathStr++; // trim leading space
-            
+            const char *pathStr = tag + 6;
+            while (*pathStr == ' ')
+              pathStr++; // trim leading space
+
             WrappedLine wl;
             wl.isImage = true;
             wl.imagePath = pathStr;
             wl.imageHeight = 0;
             wl.endOfParagraph = true;
-            
+
             uint32_t hash = fnv1a_32(wl.imagePath.c_str());
             auto it = _mediaDict.find(hash);
             if (it != _mediaDict.end()) {
-                wl.imageHeight = it->second.height;
-                printf("[InkEngine] Found image tag '%s', height=%d\n", pathStr, wl.imageHeight);
+              wl.imageHeight = it->second.height;
+              printf("[InkEngine] Found image tag '%s', height=%d\n", pathStr,
+                     wl.imageHeight);
             } else {
-                printf("[InkEngine] Image tag '%s' not found in media dict (hash: %u)\n", pathStr, hash);
-                wl.imageHeight = 100; // FORCE HEIGHT FOR TESTING
+              printf("[InkEngine] Image tag '%s' not found in media dict "
+                     "(hash: %u)\n",
+                     pathStr, hash);
+              wl.imageHeight = 100; // FORCE HEIGHT FOR TESTING
             }
-            
+
             _wrappedLines.push_back(wl);
             newLinesCount++;
           }
@@ -668,8 +736,9 @@ void InkEngine::tickRunningText() {
       }
 
       if (s.empty() && _runner->has_tags()) {
-        // Skip pushing a blank text line if this line only contained tags (e.g. #IMAGE)
-        // so invisible tags or image tags don't introduce unwanted extra text lines.
+        // Skip pushing a blank text line if this line only contained tags (e.g.
+        // #IMAGE) so invisible tags or image tags don't introduce unwanted
+        // extra text lines.
       } else {
         pushLine(s);
       }
@@ -696,7 +765,7 @@ void InkEngine::tickRunningText() {
     for (const auto &w : _wrappedLines) {
       documentHeight += w.getHeight(renderer);
     }
-    
+
     int availableHeight = height - (2 * marginY);
 
     _maxScrollY = std::max(0, documentHeight - availableHeight);
@@ -726,6 +795,13 @@ void InkEngine::tickRunningText() {
   if (_runner->has_choices()) {
     collectChoices();
     doAutoScroll();
+    _choiceTurnStartMs = millis();
+    _initialChoiceDelayMs =
+        std::min((uint32_t)4000, (uint32_t)(newLinesCount * 200));
+    _revealStartMs = 0;
+    _lastAnimFrameMs = 0;
+    _revealStep = 0;
+    _revealStarted = false;
     _state = State::SHOWING_CHOICES;
     redraw();
   } else {
@@ -743,14 +819,23 @@ void InkEngine::tickRunningText() {
       if (narrativeWidth > indicatorWidth) {
         int wrapWidth = narrativeWidth - indicatorWidth;
         _wrappedChoices[0] = renderer->wrapRichText(
-            FONT_CHOICE, {TextRun(_choiceText[0], EpdFontFamily::Style::REGULAR)},
-            wrapWidth, 2);
+            FONT_CHOICE,
+            {TextRun(_choiceText[0], EpdFontFamily::Style::REGULAR)}, wrapWidth,
+            2);
         _wrappedChoices[1] = renderer->wrapRichText(
-            FONT_CHOICE, {TextRun(_choiceText[1], EpdFontFamily::Style::REGULAR)},
-            wrapWidth, 2);
+            FONT_CHOICE,
+            {TextRun(_choiceText[1], EpdFontFamily::Style::REGULAR)}, wrapWidth,
+            2);
       }
     }
     doAutoScroll();
+    _choiceTurnStartMs = millis();
+    _initialChoiceDelayMs =
+        std::min((uint32_t)4000, (uint32_t)(newLinesCount * 200));
+    _revealStartMs = 0;
+    _lastAnimFrameMs = 0;
+    _revealStep = 0;
+    _revealStarted = false;
     _state = State::STORY_ENDED;
     redraw();
   }
@@ -783,7 +868,8 @@ void InkEngine::collectChoices() {
     _wrappedChoices[_numChoices].clear();
     if (renderer && narrativeWidth > 0) {
       int indicatorWidth = 24;
-      std::vector<TextRun> runs = InkRichTextParser::parse(_choiceText[_numChoices]);
+      std::vector<TextRun> runs =
+          InkRichTextParser::parse(_choiceText[_numChoices]);
       _wrappedChoices[_numChoices] = renderer->wrapRichText(
           FONT_CHOICE, runs, narrativeWidth - indicatorWidth, 100);
       if (_wrappedChoices[_numChoices].empty()) {
@@ -811,29 +897,54 @@ int InkEngine::getChoicesHeight(GfxRenderer *renderer) const {
          ((_numChoices - 1) * choicePadding);
 }
 
+bool InkEngine::isChoicesVisible() const {
+  if (_numChoices == 0)
+    return true;
+  GfxRenderer *renderer = _display.getRenderer();
+  if (!renderer)
+    return true;
+  return (_scrollY >= _maxScrollY - 2);
+}
+
+bool InkEngine::isRevealComplete() const {
+  if (_numChoices == 0)
+    return true;
+  if (!_revealStarted)
+    return false;
+  return (_revealStep > _numChoices);
+}
+
+InkEngine::ChoiceVisualState InkEngine::getChoiceVisualState(int index) const {
+  if (index < 0 || index >= _numChoices)
+    return ChoiceVisualState::FULL;
+  if (!_revealStarted)
+    return ChoiceVisualState::HIDDEN;
+
+  if (index < _revealStep) {
+    return ChoiceVisualState::FULL;
+  } else {
+    return ChoiceVisualState::HIDDEN;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 void InkEngine::tickWaitingInput() {
   ButtonEvent ev = _input.pollInput();
-  if (ev == ButtonEvent::NONE) return;
+  if (ev == ButtonEvent::NONE)
+    return;
 
   GfxRenderer *renderer = _display.getRenderer();
   int marginY = g_marginPx;
-  int choiceHeight = (renderer && _numChoices > 0) ? getChoicesHeight(renderer) : 0;
-  bool choicesVisible = false;
-  if (_numChoices > 0) {
-    if (_scrollY >= _maxScrollY - choiceHeight - marginY) {
-      choicesVisible = true;
-    }
-  } else {
-    choicesVisible = true;
-  }
+  int choiceHeight =
+      (renderer && _numChoices > 0) ? getChoicesHeight(renderer) : 0;
+  bool choicesVisible = isChoicesVisible();
 
   int scrollAmount = _display.getHeight() * 3 / 4;
 
   // Handle touch tap on choice rows or text scroll
   int touchX = -1, touchY = -1;
   if (_input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >= 0) {
-    if (choicesVisible && _numChoices > 0 && renderer) {
+    if (choicesVisible && _numChoices > 0 && renderer && isRevealComplete()) {
       int choicesTop = _display.getHeight() - marginY - choiceHeight;
       if (touchY >= choicesTop && touchY < _display.getHeight() - marginY) {
         int relY = touchY - choicesTop;
@@ -842,7 +953,8 @@ void InkEngine::tickWaitingInput() {
         int clickedIdx = relY / (choiceLineH + choicePadding);
         if (clickedIdx >= 0 && clickedIdx < _numChoices) {
           _selectedChoice = clickedIdx;
-          for (auto &l : _wrappedLines) l.isOld = true;
+          for (auto &l : _wrappedLines)
+            l.isOld = true;
           _runner->choose(static_cast<std::size_t>(_selectedChoice));
           _refreshCount++;
           _state = State::RUNNING_TEXT;
@@ -851,15 +963,18 @@ void InkEngine::tickWaitingInput() {
         }
       }
     }
-    // Touch tap on upper/lower narrative text area ONLY scrolls back and forth (does NOT cycle options!)
+    // Touch tap on upper/lower narrative text area ONLY scrolls back and forth
+    // (does NOT cycle options!)
     if (touchY < _display.getHeight() / 2) {
       _scrollY -= scrollAmount;
-      if (_scrollY < 0) _scrollY = 0;
+      if (_scrollY < 0)
+        _scrollY = 0;
       redraw();
       return;
     } else {
       _scrollY += scrollAmount;
-      if (_scrollY > _maxScrollY) _scrollY = _maxScrollY;
+      if (_scrollY > _maxScrollY)
+        _scrollY = _maxScrollY;
       redraw();
       return;
     }
@@ -883,38 +998,47 @@ void InkEngine::tickWaitingInput() {
     return;
   }
 
-  // Handle SWIPE gestures: strictly scroll back & forth in history (never cycle options!)
+  // Handle SWIPE gestures: strictly scroll back & forth in history (never cycle
+  // options!)
   if (ev == ButtonEvent::SWIPE_DOWN) {
     _scrollY -= scrollAmount;
-    if (_scrollY < 0) _scrollY = 0;
+    if (_scrollY < 0)
+      _scrollY = 0;
     redraw();
     return;
   } else if (ev == ButtonEvent::SWIPE_UP) {
     _scrollY += scrollAmount;
-    if (_scrollY > _maxScrollY) _scrollY = _maxScrollY;
+    if (_scrollY > _maxScrollY)
+      _scrollY = _maxScrollY;
     redraw();
     return;
   }
 
-  // Handle Hardware Buttons (UP/LEFT move choice up or scroll back in history; DOWN/RIGHT move choice down or scroll forward)
+  bool revealDone = isRevealComplete();
+
+  // Handle Hardware Buttons (UP/LEFT move choice up or scroll back in history;
+  // DOWN/RIGHT move choice down or scroll forward)
   switch (ev) {
   case ButtonEvent::LEFT:
   case ButtonEvent::UP: {
-    if (choicesVisible && _numChoices > 0 && _selectedChoice > 0) {
+    if (choicesVisible && revealDone && _numChoices > 0 &&
+        _selectedChoice > 0) {
       --_selectedChoice;
       redraw();
     } else {
       _scrollY -= scrollAmount;
-      if (_scrollY < 0) _scrollY = 0;
+      if (_scrollY < 0)
+        _scrollY = 0;
       redraw();
     }
     break;
   }
   case ButtonEvent::RIGHT:
   case ButtonEvent::DOWN: {
-    if (!choicesVisible) {
+    if (!choicesVisible || !revealDone) {
       _scrollY += scrollAmount;
-      if (_scrollY > _maxScrollY) _scrollY = _maxScrollY;
+      if (_scrollY > _maxScrollY)
+        _scrollY = _maxScrollY;
       redraw();
     } else if (_numChoices > 0) {
       _selectedChoice = (_selectedChoice + 1) % _numChoices;
@@ -923,12 +1047,14 @@ void InkEngine::tickWaitingInput() {
     break;
   }
   case ButtonEvent::CONFIRM: {
-    if (!choicesVisible) {
+    if (!choicesVisible || !revealDone) {
       _scrollY += scrollAmount;
-      if (_scrollY > _maxScrollY) _scrollY = _maxScrollY;
+      if (_scrollY > _maxScrollY)
+        _scrollY = _maxScrollY;
       redraw();
     } else if (_numChoices > 0) {
-      for (auto &l : _wrappedLines) l.isOld = true;
+      for (auto &l : _wrappedLines)
+        l.isOld = true;
       _runner->choose(static_cast<std::size_t>(_selectedChoice));
       _refreshCount++;
       _state = State::RUNNING_TEXT;
@@ -978,7 +1104,8 @@ void InkEngine::tickStoryEnded() {
 #endif
     } else if (_selectedChoice == 1) {
       SystemUI ui(_display);
-      if (ui.showConfirmDialog(_input, "Restart Story", "Begin the story again?")) {
+      if (ui.showConfirmDialog(_input, "Restart Story",
+                               "Begin the story again?")) {
         _globals = _story->new_globals();
         _runner = _story->new_runner(_globals);
         _wrappedLines.clear();
@@ -1048,7 +1175,8 @@ void InkEngine::redraw() {
     // ── Text-mode (e.g. EspSerialDisplay) ───────────────────────────────
     for (const auto &line : _wrappedLines) {
       std::string s;
-      for (const auto& r : line.block.runs) s += r.text;
+      for (const auto &r : line.block.runs)
+        s += r.text;
       _display.drawNarrativeLine(s.c_str());
     }
     if (_numChoices > 0) {
@@ -1057,9 +1185,11 @@ void InkEngine::redraw() {
         _display.drawChoiceLine(i, _choiceText[i], i == _selectedChoice);
       }
     }
-    if (_settings.refreshInterval > 0 && _refreshCount >= _settings.refreshInterval) {
+    if (_settings.refreshInterval > 0 &&
+        _refreshCount >= _settings.refreshInterval) {
       _refreshCount = 0;
-      printf("[InkEngine] fullRefresh (interval reached, %d)\n", _settings.refreshInterval);
+      printf("[InkEngine] fullRefresh (interval reached, %d)\n",
+             _settings.refreshInterval);
       _display.fullRefresh();
     } else {
       _display.present();
@@ -1074,7 +1204,6 @@ void InkEngine::redraw() {
   int marginY = g_marginPx;
   int narrativeWidth = width - (2 * marginX);
 
-  int lineHeight = renderer->getLineHeight(FONT_NARRATIVE);
   int choiceLineHeight = renderer->getLineHeight(FONT_CHOICE);
 
   int y = marginY - _scrollY;
@@ -1088,10 +1217,13 @@ void InkEngine::redraw() {
           auto it = _mediaDict.find(hash);
           if (it != _mediaDict.end()) {
             if (_mediaFile) {
-              const ImageMeta& meta = it->second;
-              ImageWidget::draw(*renderer, _mediaFile, meta.offset, meta.size, meta.width, meta.height, marginX, y, narrativeWidth, w.imageHeight);
+              const ImageMeta &meta = it->second;
+              ImageWidget::draw(*renderer, _mediaFile, meta.offset, meta.size,
+                                meta.width, meta.height, marginX, y,
+                                narrativeWidth, w.imageHeight);
             } else {
-              printf("[InkEngine] Media sidecar not open for image: %s\n", w.imagePath.c_str());
+              printf("[InkEngine] Media sidecar not open for image: %s\n",
+                     w.imagePath.c_str());
             }
           } else {
             renderer->setHalftone(true);
@@ -1121,18 +1253,18 @@ void InkEngine::redraw() {
 
     for (int i = 0; i < _numChoices; ++i) {
       if (i > 0) {
-        // int lineY = y + (choicePadding / 2);
-        // if (lineY > 0 && lineY < height) {
-        //   renderer->setHalftone(true);
-        //   renderer->fillRect(marginX, lineY, narrativeWidth, 1, true);
-        //   renderer->setHalftone(false);
-        // }
         y += choicePadding;
       }
 
-      bool selected = (i == _selectedChoice);
+      bool selected = (i == _selectedChoice) && isRevealComplete();
       int choiceBlockLines = std::max((size_t)1, _wrappedChoices[i].size());
       int choiceBlockHeight = choiceBlockLines * choiceLineHeight;
+
+      ChoiceVisualState state = getChoiceVisualState(i);
+      if (state == ChoiceVisualState::HIDDEN) {
+        y += choiceBlockHeight;
+        continue;
+      }
 
       if ((y + choiceBlockHeight > 0) && (y < height)) {
         if (selected) {
@@ -1153,7 +1285,7 @@ void InkEngine::redraw() {
               renderer->drawText(FONT_CHOICE, marginX, y, ">", !selected);
             }
             renderer->drawRichText(FONT_CHOICE, marginX + indicatorWidth, y,
-                               _wrappedChoices[i][l], !selected);
+                                   _wrappedChoices[i][l], !selected);
           }
           y += choiceLineHeight;
         }
@@ -1161,9 +1293,11 @@ void InkEngine::redraw() {
     }
   }
 
-  if (_settings.refreshInterval > 0 && _refreshCount >= _settings.refreshInterval) {
+  if (_settings.refreshInterval > 0 &&
+      _refreshCount >= _settings.refreshInterval) {
     _refreshCount = 0;
-    printf("[InkEngine] fullRefresh (interval reached, %d)\n", _settings.refreshInterval);
+    printf("[InkEngine] fullRefresh (interval reached, %d)\n",
+           _settings.refreshInterval);
     _display.fullRefresh();
   } else {
     _display.present();
