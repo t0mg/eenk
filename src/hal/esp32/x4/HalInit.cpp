@@ -8,6 +8,7 @@
 #include <SD.h>
 #include <SPI.h>
 #include <PowerManager.h>
+#include <XteinkDetect.h>
 
 namespace HalInit {
 
@@ -44,7 +45,12 @@ void earlyBootCheck() {
 }
 
 void initHardware() {
-  // No special power rails on X4
+  bool isX3 = freeink::selectXteinkDevice();
+  if (isX3) {
+    Serial.println("[HalInit] Xteink X3 detected and profile selected.");
+  } else {
+    Serial.println("[HalInit] Xteink X4 detected and profile selected.");
+  }
 }
 
 bool mountSdForUpdater() {

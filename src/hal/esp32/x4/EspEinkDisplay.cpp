@@ -17,7 +17,9 @@ EspEinkDisplay::EspEinkDisplay()
     : _eink(EPD_SCLK, EPD_MOSI, EPD_CS, EPD_DC, EPD_RST, EPD_BUSY)
     , _gfxRenderer(_eink)
 {
-    BoardConfig::selectDevice(BoardConfig::Board::XteinkX4);
+    if (BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX3) {
+        _eink.setDisplayX3();
+    }
     SPI.begin(EPD_SCLK, 7, EPD_MOSI, EPD_CS);
     _eink.begin();
 

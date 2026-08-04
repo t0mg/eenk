@@ -5,27 +5,25 @@
 #include <EInkDisplay.h>
 #include <GfxRenderer.h>
 
-class EspEinkDisplay : public IDisplay
-{
+class EspEinkDisplay : public IDisplay {
 public:
-    EspEinkDisplay();
-    ~EspEinkDisplay() override = default;
+  EspEinkDisplay();
+  ~EspEinkDisplay() override = default;
 
-    void clear() override;
-    void present() override;
-    void fullRefresh() override;
+  void clear() override;
+  void present() override;
+  void fullRefresh() override;
 
-    int getWidth() const override { return WIN_W; }
-    int getHeight() const override { return WIN_H; }
+  // Height and width are swapped on X4 (landscape)
+  // TODO: verify on X3.
+  int getWidth() const override { return _eink.getDisplayHeight(); }
+  int getHeight() const override { return _eink.getDisplayWidth(); }
 
-    GfxRenderer* getRenderer() override { return &_gfxRenderer; }
+  GfxRenderer *getRenderer() override { return &_gfxRenderer; }
 
 private:
-    EInkDisplay _eink;
-    GfxRenderer _gfxRenderer;
-
-    static constexpr int WIN_W = 480;
-    static constexpr int WIN_H = 800;
+  EInkDisplay _eink;
+  GfxRenderer _gfxRenderer;
 };
 
 #endif // PLATFORM_ESP32
