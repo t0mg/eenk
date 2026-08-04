@@ -66,12 +66,13 @@ void prepareForSleep() {
   digitalWrite(5, HIGH); // SD power off
 
   // Wake up on Power button press (GPIO3, active LOW)
+  // Note: Use ext1 directly — PowerManager requires SOC_PM_SUPPORT_EXT1_WAKEUP
+  // (IDF ≥5.x) but this framework version only defines SOC_PM_SUPPORT_EXT_WAKEUP.
   rtc_gpio_init(GPIO_NUM_3);
   rtc_gpio_set_direction(GPIO_NUM_3, RTC_GPIO_MODE_INPUT_ONLY);
   rtc_gpio_pullup_en(GPIO_NUM_3);
   rtc_gpio_pulldown_dis(GPIO_NUM_3);
-
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_3, 0);
+  esp_sleep_enable_ext1_wakeup(1ULL << 3, ESP_EXT1_WAKEUP_ANY_LOW);
 }
 
 BatteryMonitor *createBatteryMonitor() { return new BatteryMonitor(); }

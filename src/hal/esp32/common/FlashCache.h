@@ -8,7 +8,11 @@
 #include "esp_partition.h"
 
 // Forward declarations for ESP-IDF types
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+#include "esp_partition.h"
+#else
 typedef uint32_t esp_partition_mmap_handle_t;
+#endif
 
 class EspSdStorage; // Forward declaration
 

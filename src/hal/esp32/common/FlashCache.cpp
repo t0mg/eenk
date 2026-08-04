@@ -31,7 +31,11 @@ FlashCache::~FlashCache()
 void FlashCache::unload()
 {
     if (_mapped) {
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+        esp_partition_munmap(_mmapHandle);
+#else
         spi_flash_munmap(_mmapHandle);
+#endif
         _mappedPtr = nullptr;
         _mmapHandle = 0;
         _mapped = false;
@@ -50,7 +54,11 @@ bool FlashCache::mapFromFlash(std::size_t size)
     if (!_partition) return false;
     esp_err_t err = esp_partition_mmap(
         _partition, 0, size,
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+        ESP_PARTITION_MMAP_DATA,
+#else
         SPI_FLASH_MMAP_DATA,
+#endif
         &_mappedPtr, &_mmapHandle);
     
     if (err == ESP_OK) {

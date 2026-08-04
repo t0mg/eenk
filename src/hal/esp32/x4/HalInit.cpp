@@ -7,7 +7,7 @@
 #include <InputManager.h>
 #include <SD.h>
 #include <SPI.h>
-#include <esp_sleep.h>
+#include <PowerManager.h>
 
 namespace HalInit {
 
@@ -53,8 +53,7 @@ bool mountSdForUpdater() {
 }
 
 void prepareForSleep() {
-  esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN,
-                                    ESP_GPIO_WAKEUP_GPIO_LOW);
+  freeink::PowerManager::armPowerButtonWakeup();
 }
 
 BatteryMonitor *createBatteryMonitor() { return new BatteryMonitor(); }
