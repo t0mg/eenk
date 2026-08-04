@@ -34,7 +34,7 @@ BatteryWidget::BatteryWidget(GfxRenderer &renderer, BatteryMonitor &battery)
 void BatteryWidget::tick() {
   unsigned long now = millis();
   if (_lastPollMs == 0 || (now - _lastPollMs) > POLL_INTERVAL_MS) {
-    _cachedPct = _battery.readSmoothedPercentage();
+    _cachedPct = _battery.readPercentage();
     _cachedCharging = _battery.isCharging();
     _lastPollMs = now;
   }

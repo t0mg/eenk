@@ -74,12 +74,7 @@ void prepareForSleep() {
   esp_sleep_enable_ext0_wakeup(GPIO_NUM_3, 0);
 }
 
-BatteryMonitor *createBatteryMonitor() {
-  BatteryMonitor::Cw2017Config cfg;
-  auto *bm = new BatteryMonitor(cfg);
-  bm->initCw2017();
-  return bm;
-}
+BatteryMonitor *createBatteryMonitor() { return new BatteryMonitor(); }
 
 IFrontlight *createFrontlight() { return new EspFrontlight(); }
 

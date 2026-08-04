@@ -11,31 +11,11 @@
 #define EPD_RST 14
 #define EPD_BUSY 6
 
-// Define the global ACTIVE configuration object that FreeInk SDK drivers use.
-BoardConfig::BoardProfile BoardConfig::ACTIVE = {
-    "X4 Pro",
-    BoardConfig::Board::XteinkX4Pro,
-    800, // width
-    480, // height
-    5000000, // SPI hz (X4 Pro panel requires 5MHz, anything higher will fail)
-    BoardConfig::DisplayController::UC8179, // Default to UC8179, will be probed
-    {false, false}, // mirrorX, mirrorY
-    {EPD_SCLK, EPD_MOSI, -1, EPD_CS, EPD_DC, EPD_RST, EPD_BUSY}, // display pins
-    {}, // sd
-    {}, // input
-    {}, // frontlight
-    {}, // audio
-    {}, // mic
-    {}, // sensors
-    {}, // leds
-    {}, // touch
-    {}  // power
-};
-
 EspEinkDisplay::EspEinkDisplay() 
     : _eink(EPD_SCLK, EPD_MOSI, EPD_CS, EPD_DC, EPD_RST, EPD_BUSY)
     , _gfxRenderer(_eink)
 {
+    BoardConfig::selectDevice(BoardConfig::Board::XteinkX4Pro);
     // Auto-detect the display controller by pulsing reset and reading the BUSY pin
     pinMode(EPD_RST, OUTPUT);
     pinMode(EPD_BUSY, INPUT);

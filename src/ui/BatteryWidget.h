@@ -14,7 +14,7 @@ class BatteryMonitor;
 #else
 class BatteryMonitor {
 public:
-  uint16_t readSmoothedPercentage() const { return 100; }
+  uint16_t readPercentage() const { return 100; }
   bool isCharging() const { return false; }
 };
 #endif
