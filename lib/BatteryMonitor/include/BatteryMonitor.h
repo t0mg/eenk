@@ -24,6 +24,9 @@ class BatteryMonitor {
   };
   explicit BatteryMonitor(const Cw2017Config& cfg);
 
+  // Initialize CW2017 fuel gauge profile (upload 80-byte profile if missing)
+  void initCw2017() const;
+
   // Read voltage and return percentage (0-100). On BQ27220, this is the chip's
   // calibrated SOC; on ADC, it's a polynomial curve fit to LiPo discharge.
   uint16_t readPercentage() const;

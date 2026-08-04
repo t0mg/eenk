@@ -57,7 +57,7 @@ void prepareForSleep() {
 }
 
 BatteryMonitor* createBatteryMonitor() {
-    return new BatteryMonitor(8 /*GPIO8*/);
+    return new BatteryMonitor(0 /*GPIO0*/);
 }
 
 IFrontlight* createFrontlight() {

@@ -964,7 +964,10 @@ InkEngine::ChoiceVisualState InkEngine::getChoiceVisualState(int index) const {
 // ─────────────────────────────────────────────────────────────────────────────
 void InkEngine::tickWaitingInput() {
   ButtonEvent ev = _input.pollInput();
-  if (ev == ButtonEvent::NONE)
+  int touchX = -1, touchY = -1;
+  bool hasTouchTap = _input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >= 0;
+
+  if (ev == ButtonEvent::NONE && !hasTouchTap)
     return;
 
   GfxRenderer *renderer = _display.getRenderer();
@@ -976,8 +979,7 @@ void InkEngine::tickWaitingInput() {
   int scrollAmount = _display.getHeight() * 3 / 4;
 
   // Handle touch tap on choice rows or text scroll
-  int touchX = -1, touchY = -1;
-  if (_input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >= 0) {
+  if (hasTouchTap) {
     if (choicesVisible && _numChoices > 0 && renderer && isRevealComplete()) {
       int choicesTop = _display.getHeight() - marginY - choiceHeight;
       if (touchY >= choicesTop && touchY < _display.getHeight() - marginY) {

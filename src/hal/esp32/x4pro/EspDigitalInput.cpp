@@ -62,40 +62,80 @@ ButtonEvent EspDigitalInput::pollInput() {
                 _isSwiping = true;
                 _swipeStartX = _lastTouch.x;
                 _swipeStartY = _lastTouch.y;
+                _swipeLastX = _lastTouch.x;
+                _swipeLastY = _lastTouch.y;
                 _swipeStartTime = millis();
+#ifdef TOUCH_DEBUG
+                Serial.printf("[Touch] DOWN at (%d, %d)\n", _swipeStartX, _swipeStartY);
+#endif
+            } else {
+                _swipeLastX = _lastTouch.x;
+                _swipeLastY = _lastTouch.y;
             }
             if (_lastTouch.y > 432) {
-                if (_lastTouch.x < 200) {
-                    ev = ButtonEvent::BACK;
-                    delay(200);
-                } else if (_lastTouch.x > 600) {
-                    ev = ButtonEvent::CONFIRM;
-                    delay(200);
+                int moveDx = abs(_lastTouch.x - _swipeStartX);
+                int moveDy = abs(_lastTouch.y - _swipeStartY);
+                if (moveDx < 30 && moveDy < 30) {
+                    if (_lastTouch.x < 200) {
+                        ev = ButtonEvent::BACK;
+                        delay(200);
+                    } else if (_lastTouch.x > 600) {
+                        ev = ButtonEvent::CONFIRM;
+                        delay(200);
+                    }
                 }
             }
         } else if (_isSwiping) {
             _isSwiping = false;
-            int dx = _lastTouch.x - _swipeStartX;
-            int dy = _lastTouch.y - _swipeStartY;
+            int dx = _swipeLastX - _swipeStartX;
+            int dy = _swipeLastY - _swipeStartY;
             uint32_t dt = millis() - _swipeStartTime;
+#ifdef TOUCH_DEBUG
+            Serial.printf("[Touch] UP at (%d, %d) | dx=%d dy=%d dt=%lums\n",
+                          _swipeLastX, _swipeLastY, dx, dy, (unsigned long)dt);
+#endif
             if (dt < 800) {
                 if (abs(dy) > abs(dx) && abs(dy) > 50) {
                     if (dy > 0) {
                         if (_swipeStartY < 60) {
                             ev = ButtonEvent::TOP_EDGE_SWIPE;
+#ifdef TOUCH_DEBUG
+                            Serial.println("[Touch] -> TOP_EDGE_SWIPE");
+#endif
                         } else {
                             ev = ButtonEvent::SWIPE_DOWN;
+#ifdef TOUCH_DEBUG
+                            Serial.println("[Touch] -> SWIPE_DOWN");
+#endif
                         }
                     } else {
                         ev = ButtonEvent::SWIPE_UP;
+#ifdef TOUCH_DEBUG
+                        Serial.println("[Touch] -> SWIPE_UP");
+#endif
                     }
                 } else if (abs(dx) > abs(dy) && abs(dx) > 50) {
                     ev = (dx > 0) ? ButtonEvent::SWIPE_RIGHT : ButtonEvent::SWIPE_LEFT;
+#ifdef TOUCH_DEBUG
+                    Serial.printf("[Touch] -> %s\n", dx > 0 ? "SWIPE_RIGHT" : "SWIPE_LEFT");
+#endif
                 } else if (abs(dx) < 30 && abs(dy) < 30 && dt < 400) {
                     _tapX = _swipeStartX;
                     _tapY = _swipeStartY;
                     _hasTap = true;
+#ifdef TOUCH_DEBUG
+                    Serial.printf("[Touch] -> TAP at (%d, %d)\n", _tapX, _tapY);
+#endif
+                } else {
+#ifdef TOUCH_DEBUG
+                    Serial.printf("[Touch] -> IGNORED (dt=%lu, dx=%d, dy=%d)\n",
+                                  (unsigned long)dt, dx, dy);
+#endif
                 }
+            } else {
+#ifdef TOUCH_DEBUG
+                Serial.printf("[Touch] -> TIMEOUT dt=%lu (>800ms), ignored\n", (unsigned long)dt);
+#endif
             }
         }
     }

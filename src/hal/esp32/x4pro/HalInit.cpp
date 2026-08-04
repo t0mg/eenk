@@ -76,7 +76,9 @@ void prepareForSleep() {
 
 BatteryMonitor *createBatteryMonitor() {
   BatteryMonitor::Cw2017Config cfg;
-  return new BatteryMonitor(cfg);
+  auto *bm = new BatteryMonitor(cfg);
+  bm->initCw2017();
+  return bm;
 }
 
 IFrontlight *createFrontlight() { return new EspFrontlight(); }

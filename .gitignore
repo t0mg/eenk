@@ -8,3 +8,4 @@ stories/*
 build.log
 sd_fonts/
 test_runs.txt
+freeink-sdk-main/*

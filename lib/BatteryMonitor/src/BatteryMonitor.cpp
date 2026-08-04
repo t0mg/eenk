@@ -14,8 +14,21 @@ constexpr uint8_t BQ27220_CUR_REG = 0x0C;   // 16-bit LE, signed mA (positive = 
 constexpr uint16_t BQ27220_TIMEOUT_MS = 6;
 
 constexpr uint8_t I2C_ADDR_CW2017 = 0x62;
-constexpr uint8_t CW2017_VCELL_REG = 0x02;  // 16-bit BE, voltage (0.305 mV / LSB)
-constexpr uint8_t CW2017_SOC_REG = 0x04;    // 16-bit BE, SOC (high byte = integer %)
+constexpr uint8_t CW2017_VERSION_REG = 0x00; // Running state check
+constexpr uint8_t CW2017_VCELL_REG = 0x02;   // 16-bit BE, voltage (0.305 mV / LSB)
+constexpr uint8_t CW2017_SOC_REG = 0x04;     // 16-bit BE, SOC (high byte = integer %)
+constexpr uint8_t CW2017_MODE_REG = 0x08;    // Soft-reset / mode control
+constexpr uint8_t CW2017_CONFIG_REG = 0x0B;  // Config / profile loaded status
+constexpr uint8_t CW2017_BATINFO_REG = 0x10; // 80-byte profile base address
+
+// 80-byte battery profile for X4 Pro cell
+constexpr uint8_t CW2017_BATINFO[80] = {
+    0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xaa, 0xbf, 0xb5, 0xb4, 0xa4, 0x9c, 0xeb, 0xe2,
+    0xdf, 0xe5, 0xca, 0xa0, 0x8a, 0x62, 0x53, 0x48, 0x40, 0x3a, 0x32, 0xb1, 0xae, 0xda, 0xb5, 0xff,
+    0xff, 0xff, 0xe8, 0xdb, 0xd9, 0xd6, 0xd4, 0xd2, 0xd0, 0xcb, 0xc3, 0xbc, 0x9e, 0x87, 0x7b, 0x71,
+    0x72, 0x7c, 0x8c, 0xa3, 0xb7, 0xc8, 0xa5, 0x4f, 0x00, 0x00, 0xab, 0x02, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23
+};
 
 bool readBq27220Reg16Le(uint8_t reg, uint16_t* out) {
   Wire.beginTransmission(I2C_ADDR_BQ27220);
@@ -26,6 +39,22 @@ bool readBq27220Reg16Le(uint8_t reg, uint16_t* out) {
   const uint8_t lo = Wire.read();
   const uint8_t hi = Wire.read();
   *out = (static_cast<uint16_t>(hi) << 8) | lo;
+  return true;
+}
+
+bool writeCw2017Reg8(uint8_t reg, uint8_t val) {
+  Wire.beginTransmission(I2C_ADDR_CW2017);
+  Wire.write(reg);
+  Wire.write(val);
+  return (Wire.endTransmission(true) == 0);
+}
+
+bool readCw2017Reg8(uint8_t reg, uint8_t* out) {
+  Wire.beginTransmission(I2C_ADDR_CW2017);
+  Wire.write(reg);
+  if (Wire.endTransmission(false) != 0) return false;
+  if (Wire.requestFrom(static_cast<int>(I2C_ADDR_CW2017), 1) != 1) return false;
+  *out = Wire.read();
   return true;
 }
 }  // namespace
@@ -95,14 +124,61 @@ uint16_t BatteryMonitor::readBq27220Mv_() const {
   return mv;
 }
 
+void BatteryMonitor::initCw2017() const {
+  if (_mode != Mode::Cw2017) return;
+
+  // Initialize the shared I2C bus (SDA=39, SCL=38) and leave it running.
+  // IMPORTANT: Do NOT call Wire.end() here. The CW2017 and the GT911 touch
+  // controller share this exact bus — tearing it down kills the GT911 session
+  // and causes the next readState() to hang on an un-configured peripheral.
+  Wire.begin(_i2c.cw.sdaPin, _i2c.cw.sclPin, _i2c.cw.freq);
+  Wire.setTimeOut(BQ27220_TIMEOUT_MS);
+
+  uint8_t ver = 0;
+  if (readCw2017Reg8(CW2017_VERSION_REG, &ver)) {
+    if ((ver & 0xFD) != 0x0D) {
+      writeCw2017Reg8(CW2017_MODE_REG, 0xF0);
+      delay(20);
+      writeCw2017Reg8(CW2017_MODE_REG, 0x30);
+      delay(20);
+      writeCw2017Reg8(CW2017_MODE_REG, 0x00);
+      delay(20);
+    }
+
+    uint8_t cfg = 0;
+    bool needUpload = true;
+    if (readCw2017Reg8(CW2017_CONFIG_REG, &cfg) && (cfg & 0x80)) {
+      // Profile already enabled, verify first byte
+      uint8_t firstByte = 0;
+      if (readCw2017Reg8(CW2017_BATINFO_REG, &firstByte) && firstByte == CW2017_BATINFO[0]) {
+        needUpload = false;
+      }
+    }
+
+    if (needUpload) {
+      for (size_t i = 0; i < sizeof(CW2017_BATINFO); i++) {
+        writeCw2017Reg8(CW2017_BATINFO_REG + i, CW2017_BATINFO[i]);
+      }
+      writeCw2017Reg8(CW2017_CONFIG_REG, 0x80);
+      delay(10);
+      Serial.println("[CW2017] Battery profile uploaded and enabled.");
+    } else {
+      Serial.println("[CW2017] Battery profile already resident.");
+    }
+  } else {
+    Serial.println("[CW2017] Warning: CW2017 gauge not responding at 0x62.");
+  }
+  // Bus stays open — GT911 and CW2017 share it.
+}
+
 uint16_t BatteryMonitor::readCw2017Soc_() const {
   const unsigned long now = millis();
   if (_haveBqReading && _lastSocPollMs != 0 && (now - _lastSocPollMs) < kBqPollIntervalMs) {
     return _lastGoodSoc;
   }
 
-  Wire.begin(_i2c.cw.sdaPin, _i2c.cw.sclPin, _i2c.cw.freq);
-  Wire.setTimeOut(BQ27220_TIMEOUT_MS);
+  // Bus is kept permanently active (initCw2017 called Wire.begin and left it
+  // running). Do NOT call Wire.end() — GT911 shares this bus.
   Wire.beginTransmission(I2C_ADDR_CW2017);
   Wire.write(CW2017_SOC_REG);
   bool ok = false;
@@ -130,8 +206,8 @@ uint16_t BatteryMonitor::readCw2017Mv_() const {
     return _lastGoodMv;
   }
 
-  Wire.begin(_i2c.cw.sdaPin, _i2c.cw.sclPin, _i2c.cw.freq);
-  Wire.setTimeOut(BQ27220_TIMEOUT_MS);
+  // Bus is kept permanently active (initCw2017 called Wire.begin and left it
+  // running). Do NOT call Wire.end() — GT911 shares this bus.
   Wire.beginTransmission(I2C_ADDR_CW2017);
   Wire.write(CW2017_VCELL_REG);
   bool ok = false;

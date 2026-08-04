@@ -24,9 +24,14 @@ private:
     Gt911Driver _touch;
     Gt911Driver::TouchState _lastTouch;
 
+// Uncomment to enable touch debug output to Serial
+#define TOUCH_DEBUG
+
     bool _isSwiping = false;
     int _swipeStartX = -1;
     int _swipeStartY = -1;
+    int _swipeLastX = -1;
+    int _swipeLastY = -1;
     uint32_t _swipeStartTime = 0;
 
     mutable bool _hasTap = false;

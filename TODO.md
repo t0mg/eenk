@@ -4,9 +4,8 @@
 
 ## Bugs
 
-* in the story player, swipe to scroll doesn't really work. while scrolling a simple tap on the screen scrolls all the way down. we need debounce and we need to properly identify swipes. can you please add a temporary touch debug message to the terminal? include touch coordinates and swipe detections.
-* battery measurement doesn't work on either X4 and X4Pro. Charging status works on X4Pro (but only after something triggers a display refresh).
-* save file name should be named after their story folder name if available, to avoid collisions. We can fall back to using the bin file name if there is no story folder (eg the bin is at root of stories/).
+* [x] in the story player, swipe to scroll doesn't really work. while scrolling a simple tap on the screen scrolls all the way down. (Resolved: tracked swipe end coordinates, fixed tap early-return bug, added gated TOUCH_DEBUG logs)
+* [x] battery measurement doesn't work on either X4 and X4Pro. (Resolved: fixed X4 ADC pin to GPIO 0, added CW2017 BATINFO initialization & I2C teardowns for X4 Pro)
 
 ## UI & UX
 
