@@ -46,7 +46,7 @@ protected:
     char title[64];         // From metadata or derived from filename
     char author[32];        // From metadata or empty
     uint32_t sizeBytes;     // File size in bytes
-    bool hasSave;           // Has a save in /.eenk_saves/<filename>.bin.save
+    bool hasSave;           // Has a save in /.eenk_saves/<stem>.sav
     bool isCurrentlyLoaded; // Path matches NVS boot.story_path
     bool hasMetadata;       // Whether eenk header was found
     uint32_t thumbOffset;   // Optional thumbnail offset in .media sidecar

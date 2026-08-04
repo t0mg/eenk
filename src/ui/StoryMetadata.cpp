@@ -25,15 +25,49 @@ bool StoryMetadata::readFromSD(const char* /*path*/, StoryMetadata* /*out*/) {
 }
 #endif
 
+static const char* findLastSep(const char* str, size_t len) {
+    const char* last = nullptr;
+    for (size_t i = 0; i < len; ++i) {
+        if (str[i] == '/' || str[i] == '\\') {
+            last = str + i;
+        }
+    }
+    return last;
+}
+
 void StoryMetadata::getSavePath(const char* storyBinPath, char* outSavePath, size_t maxLen) {
-    const char* lastSlash = strrchr(storyBinPath, '/');
-    const char* baseName = lastSlash ? lastSlash + 1 : storyBinPath;
+    if (!storyBinPath || !outSavePath || maxLen == 0) return;
 
-    char stem[128];
-    strncpy(stem, baseName, sizeof(stem) - 1);
-    stem[sizeof(stem) - 1] = '\0';
-    char* dot = strrchr(stem, '.');
-    if (dot) *dot = '\0';
+    size_t fullLen = strlen(storyBinPath);
+    const char* lastSep = findLastSep(storyBinPath, fullLen);
 
-    snprintf(outSavePath, maxLen, "/.eenk_saves/%s.sav", stem);
+    const char* baseName = lastSep ? lastSep + 1 : storyBinPath;
+
+    // Fallback to bin filename (e.g. "my_story.bin") if no story folder exists
+    const char* saveStem = baseName;
+    char folderName[128] = {0};
+
+    if (lastSep && lastSep > storyBinPath) {
+        size_t dirLen = lastSep - storyBinPath;
+        while (dirLen > 0 && (storyBinPath[dirLen - 1] == '/' || storyBinPath[dirLen - 1] == '\\')) {
+            dirLen--;
+        }
+
+        if (dirLen > 0) {
+            const char* prevSep = findLastSep(storyBinPath, dirLen);
+            const char* folderStart = prevSep ? prevSep + 1 : storyBinPath;
+            size_t folderLen = (storyBinPath + dirLen) - folderStart;
+
+            if (folderLen > 0 && folderLen < sizeof(folderName)) {
+                strncpy(folderName, folderStart, folderLen);
+                folderName[folderLen] = '\0';
+
+                if (strcasecmp(folderName, "stories") != 0) {
+                    saveStem = folderName;
+                }
+            }
+        }
+    }
+
+    snprintf(outSavePath, maxLen, "/.eenk_saves/%s.sav", saveStem);
 }

@@ -34,6 +34,7 @@
 #include "ui/Library.h"
 #include "ui/NeuStyle.h"
 #include "ui/SettingsView.h"
+#include "ui/StoryMetadata.h"
 #include "ui/SystemUI.h"
 #include <builtinFonts/reader_2b.h>
 #include <builtinFonts/reader_bold_2b.h>
@@ -897,6 +898,42 @@ void test_zero_delay_choice_reveal(void) {
   engine.loadStory("test/story/story.bin");
   engine.update();
 }
+
+void test_story_metadata_save_path(void) {
+  char saveBufFolder[256];
+  char saveBufRootFile[256];
+
+  // Story in a folder under /stories/ -> should use folder name (e.g. /.eenk_saves/my_story.sav)
+  StoryMetadata::getSavePath("/stories/my_story/game.bin", saveBufFolder, sizeof(saveBufFolder));
+  TEST_ASSERT_EQUAL_STRING("/.eenk_saves/my_story.sav", saveBufFolder);
+
+  // Story with main.bin name in folder -> should use folder name
+  StoryMetadata::getSavePath("/stories/interceptor/main.bin", saveBufFolder, sizeof(saveBufFolder));
+  TEST_ASSERT_EQUAL_STRING("/.eenk_saves/interceptor.sav", saveBufFolder);
+
+  // Relative path inside folder -> should use folder name
+  StoryMetadata::getSavePath("stories/my_story/story.bin", saveBufFolder, sizeof(saveBufFolder));
+  TEST_ASSERT_EQUAL_STRING("/.eenk_saves/my_story.sav", saveBufFolder);
+
+  // Windows backslash path inside folder -> should use folder name
+  StoryMetadata::getSavePath("stories\\my_story\\story.bin", saveBufFolder, sizeof(saveBufFolder));
+  TEST_ASSERT_EQUAL_STRING("/.eenk_saves/my_story.sav", saveBufFolder);
+
+  // Story directly at root of /stories/ -> fallback to bin filename (e.g. /.eenk_saves/my_story.bin.sav)
+  StoryMetadata::getSavePath("/stories/my_story.bin", saveBufRootFile, sizeof(saveBufRootFile));
+  TEST_ASSERT_EQUAL_STRING("/.eenk_saves/my_story.bin.sav", saveBufRootFile);
+
+  // VERIFY NO COLLISION: folder /stories/my_story/ and root file /stories/my_story.bin have distinct save paths!
+  TEST_ASSERT_NOT_EQUAL(0, strcmp(saveBufFolder, saveBufRootFile));
+
+  // Relative path directly at root of stories/ -> fallback to bin filename
+  StoryMetadata::getSavePath("stories/the_intercept.bin", saveBufRootFile, sizeof(saveBufRootFile));
+  TEST_ASSERT_EQUAL_STRING("/.eenk_saves/the_intercept.bin.sav", saveBufRootFile);
+
+  // Bin file without directory -> fallback to bin filename
+  StoryMetadata::getSavePath("the_intercept.bin", saveBufRootFile, sizeof(saveBufRootFile));
+  TEST_ASSERT_EQUAL_STRING("/.eenk_saves/the_intercept.bin.sav", saveBufRootFile);
+}
 #endif
 
 int main(int argc, char **argv) {
@@ -918,6 +955,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_story_player_screenshot);
   RUN_TEST(test_image_widget_screenshot);
   RUN_TEST(test_zero_delay_choice_reveal);
+  RUN_TEST(test_story_metadata_save_path);
   // StreamingEpdFontFamily unit tests
   RUN_TEST(test_streaming_epd_font_family_load_plain);
   RUN_TEST(test_streaming_epd_font_family_load_regular_suffix);
