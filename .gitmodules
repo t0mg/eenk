@@ -9,3 +9,9 @@
 	url = https://github.com/t0mg/eenky.git
 	branch = master
 	ignore = all
+
+[submodule "freeink-sdk"]
+	path = lib/freeink-sdk
+	url = https://github.com/Free-Ink/freeink-sdk.git
+	branch = master
+	ignore = all
