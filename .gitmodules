@@ -15,3 +15,6 @@
 	url = https://github.com/Free-Ink/freeink-sdk.git
 	branch = master
 	ignore = all
+[submodule "lib/freeink-sdk"]
+	path = lib/freeink-sdk
+	url = https://github.com/Free-Ink/freeink-sdk.git
