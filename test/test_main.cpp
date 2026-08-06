@@ -20,19 +20,19 @@
 #include "InkRichTextParser.h"
 #include "StreamingEpdFont.h"
 #include "StreamingEpdFontFamily.h"
+#include "engine/InkEngine.h"
 #include "hal/sdl/mock/EInkDisplay.h"
 #include "os/AppSettings.h"
 #include "os/BootManager.h"
 #include "os/SdFontCatalogue.h"
-#include "engine/InkEngine.h"
 #include "ui/BatteryWidget.h"
-
 
 #define FRAME_W 800
 #include "ui/FooterWidget.h"
 #include "ui/ImageWidget.h"
 #include "ui/Library.h"
 #include "ui/NeuStyle.h"
+#include "ui/QuickMenuWidget.h"
 #include "ui/SettingsView.h"
 #include "ui/StoryMetadata.h"
 #include "ui/SystemUI.h"
@@ -284,7 +284,8 @@ void test_battery_widget_screenshot(void) {
 static void ensure_test_story_media(bool forceRebuild = false) {
   FILE *f = fopen("test/story/story.media", "rb");
   if (!f || forceRebuild) {
-    if (f) fclose(f);
+    if (f)
+      fclose(f);
     int res = system("node test/build_test_story.js");
     (void)res;
   } else {
@@ -305,7 +306,8 @@ protected:
     snprintf(_entries[0].title, sizeof(_entries[0].title),
              "The Hitchhiker's Guide");
     snprintf(_entries[0].author, sizeof(_entries[0].author), "Douglas Adams");
-    snprintf(_entries[0].path, sizeof(_entries[0].path), "test/story/story.bin");
+    snprintf(_entries[0].path, sizeof(_entries[0].path),
+             "test/story/story.bin");
     _entries[0].sizeBytes = 1500000;
     _entries[0].hasMetadata = true;
     _entries[0].hasSave = true;
@@ -659,6 +661,39 @@ void test_story_player_screenshot(void) {
   TEST_ASSERT_EQUAL(1, 1);
 }
 
+class MockFrontlight : public IFrontlight {
+public:
+  MockFrontlight() = default;
+  ~MockFrontlight() override = default;
+
+  void on() override {}
+  void off() override {}
+  void setBrightness(uint8_t percent) override {}
+  void setColorTemperature(uint8_t percent) override {}
+  uint8_t getBrightness() const override { return 66; }
+  uint8_t getColorTemperature() const override { return 33; }
+};
+
+void test_quick_menu_screenshot(void) {
+  TestDisplay display;
+  MockInput input;
+  AppSettings settings;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  MockFrontlight frontlight;
+  QuickMenuWidget ui(display, input, widget, &frontlight, settings);
+
+  display.clear();
+  display.renderer.drawText(10, 50, 400, "Background text...", true);
+
+  ui.show();
+
+  saveBMP("test/golden/test_quick_menu.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
 // ── StreamingEpdFontFamily tests ───────────────────────────────────────────
 
 // Writes a minimal valid .epdfont file (zero glyphs/intervals/bitmap) for
@@ -903,36 +938,48 @@ void test_story_metadata_save_path(void) {
   char saveBufFolder[256];
   char saveBufRootFile[256];
 
-  // Story in a folder under /stories/ -> should use folder name (e.g. /.eenk_saves/my_story.sav)
-  StoryMetadata::getSavePath("/stories/my_story/game.bin", saveBufFolder, sizeof(saveBufFolder));
+  // Story in a folder under /stories/ -> should use folder name (e.g.
+  // /.eenk_saves/my_story.sav)
+  StoryMetadata::getSavePath("/stories/my_story/game.bin", saveBufFolder,
+                             sizeof(saveBufFolder));
   TEST_ASSERT_EQUAL_STRING("/.eenk_saves/my_story.sav", saveBufFolder);
 
   // Story with main.bin name in folder -> should use folder name
-  StoryMetadata::getSavePath("/stories/interceptor/main.bin", saveBufFolder, sizeof(saveBufFolder));
+  StoryMetadata::getSavePath("/stories/interceptor/main.bin", saveBufFolder,
+                             sizeof(saveBufFolder));
   TEST_ASSERT_EQUAL_STRING("/.eenk_saves/interceptor.sav", saveBufFolder);
 
   // Relative path inside folder -> should use folder name
-  StoryMetadata::getSavePath("stories/my_story/story.bin", saveBufFolder, sizeof(saveBufFolder));
+  StoryMetadata::getSavePath("stories/my_story/story.bin", saveBufFolder,
+                             sizeof(saveBufFolder));
   TEST_ASSERT_EQUAL_STRING("/.eenk_saves/my_story.sav", saveBufFolder);
 
   // Windows backslash path inside folder -> should use folder name
-  StoryMetadata::getSavePath("stories\\my_story\\story.bin", saveBufFolder, sizeof(saveBufFolder));
+  StoryMetadata::getSavePath("stories\\my_story\\story.bin", saveBufFolder,
+                             sizeof(saveBufFolder));
   TEST_ASSERT_EQUAL_STRING("/.eenk_saves/my_story.sav", saveBufFolder);
 
-  // Story directly at root of /stories/ -> fallback to bin filename (e.g. /.eenk_saves/my_story.bin.sav)
-  StoryMetadata::getSavePath("/stories/my_story.bin", saveBufRootFile, sizeof(saveBufRootFile));
+  // Story directly at root of /stories/ -> fallback to bin filename (e.g.
+  // /.eenk_saves/my_story.bin.sav)
+  StoryMetadata::getSavePath("/stories/my_story.bin", saveBufRootFile,
+                             sizeof(saveBufRootFile));
   TEST_ASSERT_EQUAL_STRING("/.eenk_saves/my_story.bin.sav", saveBufRootFile);
 
-  // VERIFY NO COLLISION: folder /stories/my_story/ and root file /stories/my_story.bin have distinct save paths!
+  // VERIFY NO COLLISION: folder /stories/my_story/ and root file
+  // /stories/my_story.bin have distinct save paths!
   TEST_ASSERT_NOT_EQUAL(0, strcmp(saveBufFolder, saveBufRootFile));
 
   // Relative path directly at root of stories/ -> fallback to bin filename
-  StoryMetadata::getSavePath("stories/the_intercept.bin", saveBufRootFile, sizeof(saveBufRootFile));
-  TEST_ASSERT_EQUAL_STRING("/.eenk_saves/the_intercept.bin.sav", saveBufRootFile);
+  StoryMetadata::getSavePath("stories/the_intercept.bin", saveBufRootFile,
+                             sizeof(saveBufRootFile));
+  TEST_ASSERT_EQUAL_STRING("/.eenk_saves/the_intercept.bin.sav",
+                           saveBufRootFile);
 
   // Bin file without directory -> fallback to bin filename
-  StoryMetadata::getSavePath("the_intercept.bin", saveBufRootFile, sizeof(saveBufRootFile));
-  TEST_ASSERT_EQUAL_STRING("/.eenk_saves/the_intercept.bin.sav", saveBufRootFile);
+  StoryMetadata::getSavePath("the_intercept.bin", saveBufRootFile,
+                             sizeof(saveBufRootFile));
+  TEST_ASSERT_EQUAL_STRING("/.eenk_saves/the_intercept.bin.sav",
+                           saveBufRootFile);
 }
 #endif
 
@@ -956,6 +1003,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_image_widget_screenshot);
   RUN_TEST(test_zero_delay_choice_reveal);
   RUN_TEST(test_story_metadata_save_path);
+  RUN_TEST(test_quick_menu_screenshot);
   // StreamingEpdFontFamily unit tests
   RUN_TEST(test_streaming_epd_font_family_load_plain);
   RUN_TEST(test_streaming_epd_font_family_load_regular_suffix);

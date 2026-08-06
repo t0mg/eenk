@@ -14,10 +14,8 @@ public:
   void present() override;
   void fullRefresh() override;
 
-  // Height and width are swapped on X4 (landscape)
-  // TODO: verify on X3.
-  int getWidth() const override { return _eink.getDisplayHeight(); }
-  int getHeight() const override { return _eink.getDisplayWidth(); }
+  int getWidth() const override { return _gfxRenderer.getScreenWidth(); }
+  int getHeight() const override { return _gfxRenderer.getScreenHeight(); }
 
   GfxRenderer *getRenderer() override { return &_gfxRenderer; }
 

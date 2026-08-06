@@ -1,8 +1,6 @@
 // Include <cmath> FIRST so GCC 15's specfun.h special-math functions are
 // emitted at global scope rather than inside ink::runtime namespace.
 #include <SDCardManager.h>
-#include <cmath>
-#include <string>
 
 #include "engine/InkEngine.h"
 
@@ -17,7 +15,6 @@
 #include "ui/QuickMenuWidget.h"
 #include "ui/SettingsView.h"
 #include "ui/SystemUI.h"
-#include <cctype>
 #include <cstdio>
 #include <cstring>
 #include <snapshot.h>
@@ -578,6 +575,7 @@ void InkEngine::update() {
         redraw();
       }
     }
+    delay(16);
     tickWaitingInput();
     break;
   }
@@ -964,10 +962,11 @@ InkEngine::ChoiceVisualState InkEngine::getChoiceVisualState(int index) const {
 // ─────────────────────────────────────────────────────────────────────────────
 void InkEngine::tickWaitingInput() {
   ButtonEvent ev = _input.pollInput();
-  int touchX = -1, touchY = -1;
-  bool hasTouchTap = _input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >= 0;
+  // int touchX = -1, touchY = -1;
+  // bool hasTouchTap =
+  //     _input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >= 0;
 
-  if (ev == ButtonEvent::NONE && !hasTouchTap)
+  if (ev == ButtonEvent::NONE) // && !hasTouchTap)
     return;
 
   GfxRenderer *renderer = _display.getRenderer();
@@ -978,43 +977,29 @@ void InkEngine::tickWaitingInput() {
 
   int scrollAmount = _display.getHeight() * 3 / 4;
 
-  // Handle touch tap on choice rows or text scroll
-  if (hasTouchTap) {
-    if (choicesVisible && _numChoices > 0 && renderer && isRevealComplete()) {
-      int choicesTop = _display.getHeight() - marginY - choiceHeight;
-      if (touchY >= choicesTop && touchY < _display.getHeight() - marginY) {
-        int relY = touchY - choicesTop;
-        int choiceLineH = renderer->getLineHeight(FONT_CHOICE);
-        int choicePadding = choiceLineH / 3;
-        int clickedIdx = relY / (choiceLineH + choicePadding);
-        if (clickedIdx >= 0 && clickedIdx < _numChoices) {
-          _selectedChoice = clickedIdx;
-          for (auto &l : _wrappedLines)
-            l.isOld = true;
-          _runner->choose(static_cast<std::size_t>(_selectedChoice));
-          _refreshCount++;
-          _state = State::RUNNING_TEXT;
-          redraw();
-          return;
-        }
-      }
-    }
-    // Touch tap on upper/lower narrative text area ONLY scrolls back and forth
-    // (does NOT cycle options!)
-    if (touchY < _display.getHeight() / 2) {
-      _scrollY -= scrollAmount;
-      if (_scrollY < 0)
-        _scrollY = 0;
-      redraw();
-      return;
-    } else {
-      _scrollY += scrollAmount;
-      if (_scrollY > _maxScrollY)
-        _scrollY = _maxScrollY;
-      redraw();
-      return;
-    }
-  }
+  // // Handle touch tap on choice rows or text scroll
+  // if (hasTouchTap) {
+  //   if (choicesVisible && _numChoices > 0 && renderer && isRevealComplete())
+  //   {
+  //     int choicesTop = _display.getHeight() - marginY - choiceHeight;
+  //     if (touchY >= choicesTop && touchY < _display.getHeight() - marginY) {
+  //       int relY = touchY - choicesTop;
+  //       int choiceLineH = renderer->getLineHeight(FONT_CHOICE);
+  //       int choicePadding = choiceLineH / 3;
+  //       int clickedIdx = relY / (choiceLineH + choicePadding);
+  //       if (clickedIdx >= 0 && clickedIdx < _numChoices) {
+  //         _selectedChoice = clickedIdx;
+  //         for (auto &l : _wrappedLines)
+  //           l.isOld = true;
+  //         _runner->choose(static_cast<std::size_t>(_selectedChoice));
+  //         _refreshCount++;
+  //         _state = State::RUNNING_TEXT;
+  //         redraw();
+  //         return;
+  //       }
+  //     }
+  //   }
+  // }
 
   // Handle TOP_EDGE_SWIPE: Open Quick Settings overlay
   if (ev == ButtonEvent::TOP_EDGE_SWIPE) {

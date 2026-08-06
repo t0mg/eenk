@@ -22,6 +22,7 @@ The repositories are cross-linked via git submodules:
 
 ```
 eenk (primary repo)
+├── lib/freeink-sdk  → Free-Ink/freeink-sdk (main branch)
 ├── lib/inkcpp       → t0mg/inkcpp (eenk-patches branch)
 └── tools/eenky      → t0mg/eenky
     ├── eenk/        → t0mg/eenk (recursive submodule)
@@ -142,18 +143,16 @@ src/
 | Library | Purpose |
 |---------|---------|
 | `ArabicShaper` | Arabic text shaping for RTL rendering |
-| `BatteryMonitor` | Battery ADC voltage reading |
-| `EInkDisplay` | Low-level e-ink display driver (ESP32 only) |
 | `EpdFont` | Bitmap font format and rendering |
 | `ExternalFont` | SD card font loading |
-| `FsAdapter` | Filesystem abstraction (SD/SPIFFS) |
+| `FsAdapter` | Filesystem abstraction (SD/SPIFFS/Stdio) |
 | `GfxRenderer` | High-level graphics renderer (text layout, drawing primitives) |
 | `Hyphenation` | Text hyphenation for justified text |
-| `InputManager` | Button/touch input handler |
 | `Logging` | Debug logging utilities |
 | `ScriptDetector` | Script/language detection (Latin, Arabic, Thai, etc.) |
 | `ThaiShaper` | Thai text shaping |
 | `Utf8` | UTF-8 encoding/decoding utilities |
+| `freeink-sdk` | **Submodule** — Hardware abstraction SDK (BoardConfig, EInkDisplay, InputManager, BatteryMonitor, PowerManager, XteinkDetect) |
 | `inkcpp` | **Submodule** — Custom inkcpp Ink runtime |
 
 > [!NOTE]
@@ -186,9 +185,10 @@ eenk uses a lot of code originally from the [papyrix-reader](https://github.com/
 
 ### Hardware Notes
 
-- **Display**: E-ink, 800×480 pixels, monochrome (black/white)
-- **MCU**: ESP32-C3 (RISC-V, single core)
-- **Storage**: SD card (SPI: SCLK=8, MISO=7, MOSI=10, CS=12) + 16 MB flash
+- **Supported Devices**: Xteink X3 (792×528, UC8253/UC8279), Xteink X4 (800×480, SSD1677), Xteink X4 Pro (800×480, SSD1677/UC8179)
+- **Display**: Monochrome e-ink display driven via FreeInk SDK facade
+- **MCU**: ESP32-C3 (X3/X4) or ESP32-S3 (X4 Pro)
+- **Storage**: SD card (SPI/SDMMC) + 16 MB flash
 - **Power**: Latching power circuit — deep sleep physically cuts power, destroying RTC memory. Always test sleep/wake on battery, NOT USB (USB keeps the MCU powered, giving false results).
 
 ### Story Format & Sidecar Files

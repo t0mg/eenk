@@ -18,7 +18,4 @@ public:
 
 private:
   IDisplay &_display;
-  bool _fontsLoaded = false;
-
-  void ensureFonts();
 };

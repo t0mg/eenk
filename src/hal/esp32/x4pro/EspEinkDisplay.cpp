@@ -4,6 +4,8 @@
 #include <SPI.h>
 #include "BoardConfig.h"
 
+#include <XteinkDetect.h>
+
 #define EPD_SCLK 12
 #define EPD_MOSI 11
 #define EPD_CS 13
@@ -16,27 +18,12 @@ EspEinkDisplay::EspEinkDisplay()
     , _gfxRenderer(_eink)
 {
     BoardConfig::selectDevice(BoardConfig::Board::XteinkX4Pro);
-    // Auto-detect the display controller by pulsing reset and reading the BUSY pin
-    pinMode(EPD_RST, OUTPUT);
-    pinMode(EPD_BUSY, INPUT);
     
-    // Soft reset pulse to wake controller
-    digitalWrite(EPD_RST, HIGH);
-    delay(20);
-    digitalWrite(EPD_RST, LOW);
-    delay(2);
-    digitalWrite(EPD_RST, HIGH);
-    delay(20);
-
-    // Read BUSY pin idle state to detect controller type
-    // UC8179 has active-LOW BUSY (idle is HIGH)
-    // SSD1677 has active-HIGH BUSY (idle is LOW)
-    if (digitalRead(EPD_BUSY) == HIGH) {
-        BoardConfig::ACTIVE.displayController = BoardConfig::DisplayController::UC8179;
-        Serial.println("[Display] Auto-detected UC8179 controller");
+    // Auto-detect controller via display-bus probe (SSD1677 vs UC8179)
+    if (freeink::applyXteinkDisplayController()) {
+        Serial.println("[Display] Display controller promoted via XteinkDetect.");
     } else {
-        BoardConfig::ACTIVE.displayController = BoardConfig::DisplayController::SSD1677;
-        Serial.println("[Display] Auto-detected SSD1677 controller");
+        Serial.println("[Display] Display controller kept default profile choice.");
     }
 
     _eink.begin();

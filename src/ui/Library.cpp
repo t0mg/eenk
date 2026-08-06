@@ -18,13 +18,6 @@
 #include <cstdio>
 #include <cstring>
 
-#include <EpdFont.h>
-#include <EpdFontFamily.h>
-#include <builtinFonts/syne_bold_10.h>
-#include <builtinFonts/ui_10.h>
-#include <builtinFonts/ui_12.h>
-#include <builtinFonts/ui_bold_12.h>
-
 #if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE)
 #ifdef PLATFORM_ESP32
 #include "HalTypes.h"
@@ -37,19 +30,6 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #endif
-
-static EpdFont s_glNormal(&ui_12);
-static EpdFontFamily s_glFamilyNormal(&s_glNormal);
-
-static EpdFont s_glBold(&ui_bold_12);
-static EpdFontFamily s_glFamilyBold(&s_glBold);
-
-static EpdFont s_glSmall(&ui_10);
-static EpdFontFamily s_glFamilySmall(&s_glSmall);
-
-static EpdFont s_glHeading(&syne_bold_10);
-static EpdFontFamily s_glFamilyHeading(&s_glHeading);
-
 #else
 // ── Native / SDL simulation ────────────────────────────────────────────────
 #include <dirent.h>
@@ -130,23 +110,6 @@ void Library::parseThumbMetadata(Library::StoryEntry &e) {
   file.close();
 }
 
-// ─── ensureFonts()
-// ────────────────────────────────────────────────────────────
-
-void Library::ensureFonts() {
-  if (_fontsLoaded)
-    return;
-#if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE)
-  auto *r = _display.getRenderer();
-  if (r) {
-    r->insertFont(FONT_NORMAL, s_glFamilyNormal);
-    r->insertFont(FONT_BOLD, s_glFamilyBold);
-    r->insertFont(FONT_SMALL, s_glFamilySmall);
-    r->insertFont(NeuStyle::FONT_HEADING, s_glFamilyHeading);
-  }
-#endif
-  _fontsLoaded = true;
-}
 
 // ─── titleFromFilename()
 // ──────────────────────────────────────────────────────
@@ -732,7 +695,6 @@ void Library::launchStory(int index) {
 // ────────────────────────────────────────────────────────────────────
 
 bool Library::run() {
-  ensureFonts();
   scanSD();
   focusLoadedStory();
   render();

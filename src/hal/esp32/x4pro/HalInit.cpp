@@ -6,8 +6,8 @@
 #include "os/BootManager.h"
 #include <Arduino.h>
 #include <BatteryMonitor.h>
-#include <driver/rtc_io.h>
 #include <PowerManager.h>
+#include <driver/rtc_io.h>
 #include <sys/stat.h>
 
 namespace HalInit {

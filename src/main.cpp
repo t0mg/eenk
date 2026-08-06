@@ -145,6 +145,7 @@ void setup() {
   display = new DisplayType();
   input = new InputType();
   frontlight = HalInit::createFrontlight();
+
   // Storage is assigned later in the STORY boot branch.
   // storage = new EspLittleFSStorage();
   systemUI = new SystemUI(*display);
@@ -374,9 +375,9 @@ void setup() {
                               wl.isOld = isOld;
                               wl.isImage = isImage;
                               wl.imagePath = imagePath;
-                              wl.imageHeight = isImage
-                                  ? engine->getImageHeight(imagePath.c_str())
-                                  : 0;
+                              wl.imageHeight = isImage ? engine->getImageHeight(
+                                                             imagePath.c_str())
+                                                       : 0;
                               wl.endOfParagraph = endOfParagraph;
                               history.push_back(wl);
                               delete[] lineBuf;

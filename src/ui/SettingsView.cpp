@@ -31,14 +31,7 @@
 // Builtin font table (for display names in the font picker)
 #include <BuiltinFonts.h>
 
-#include <EpdFont.h>
-#include <EpdFontFamily.h>
 #include <GfxRenderer.h>
-#include <builtinFonts/small14.h>
-#include <builtinFonts/syne_bold_10.h>
-#include <builtinFonts/ui_10.h>
-#include <builtinFonts/ui_12.h>
-#include <builtinFonts/ui_bold_12.h>
 
 #ifdef PLATFORM_ESP32
 #include <Arduino.h>
@@ -46,25 +39,9 @@
 #include <esp_sleep.h>
 #endif
 
-static EpdFont s_font12(&ui_12);
-static EpdFontFamily s_fam12(&s_font12);
-
-static EpdFont s_fontBold12(&ui_bold_12);
-static EpdFontFamily s_famBold12(&s_fontBold12);
-
-static EpdFont s_fontSmall14(&small14);
-static EpdFontFamily s_famSmall14(&s_fontSmall14);
-
-static EpdFont s_font10(&ui_10);
-static EpdFontFamily s_fam10(&s_font10);
-
-static EpdFont s_fontHeading(&syne_bold_10);
-static EpdFontFamily s_famHeading(&s_fontHeading);
-
-static constexpr int kFontNormal = 30;
-static constexpr int kFontBold = 31;
-static constexpr int kFontDiagram = 32;
-static constexpr int kFontSmall = 33;
+static constexpr int kFontNormal = NeuStyle::FONT_BODY;
+static constexpr int kFontBold = NeuStyle::FONT_BODY_BOLD;
+static constexpr int kFontSmall = NeuStyle::FONT_SMALL;
 static constexpr int kFontHeading = NeuStyle::FONT_HEADING;
 
 static constexpr int ROW_H = NeuStyle::ROW_H;
@@ -128,17 +105,6 @@ SettingsView::~SettingsView() {}
 // ─── run() ───────────────────────────────────────────────────────────────────
 
 void SettingsView::run() {
-  // Register fonts once
-  auto *r = _display.getRenderer();
-  if (r) {
-#if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE)
-    r->insertFont(kFontNormal, s_fam12);
-    r->insertFont(kFontBold, s_famBold12);
-    r->insertFont(kFontDiagram, s_famSmall14);
-    r->insertFont(kFontSmall, s_fam10);
-    r->insertFont(kFontHeading, s_famHeading);
-#endif
-  }
 
   _fontCatalogue.scan();
   _currentFontIndex = 0;

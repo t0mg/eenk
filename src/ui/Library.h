@@ -10,6 +10,7 @@
 #pragma once
 #include "FooterWidget.h"
 #include "HeaderWidget.h"
+#include "NeuStyle.h"
 #include "hal/IDisplay.h"
 #include "hal/IInput.h"
 #include "os/AppSettings.h"
@@ -66,9 +67,9 @@ protected:
 
   void parseThumbMetadata(StoryEntry &e);
   // SystemUI 10/11, or BatteryWidget 20).
-  static constexpr int FONT_NORMAL = 30; // ui_12
-  static constexpr int FONT_BOLD = 31;   // ui_bold_12
-  static constexpr int FONT_SMALL = 32;  // ui_10
+  static constexpr int FONT_NORMAL = NeuStyle::FONT_BODY;      // 10
+  static constexpr int FONT_BOLD   = NeuStyle::FONT_BODY_BOLD; // 11
+  static constexpr int FONT_SMALL  = NeuStyle::FONT_SMALL;     // 13
 
   StoryEntry _entries[MAX_STORIES];
   int _numEntries = 0;
@@ -76,13 +77,9 @@ protected:
   int _scrollOffset = 0;
   bool _firstRender = true;
   bool _needsFullRefresh = true;
-  bool _fontsLoaded = false;
   std::function<bool()> _backgroundTask = nullptr;
 
   // ── Private helpers ───────────────────────────────────────────────────────
-
-  // Register UI fonts in the renderer (idempotent).
-  void ensureFonts();
 
   // Populate _entries[] by scanning the SD card (or local stories/ dir on
   // native).

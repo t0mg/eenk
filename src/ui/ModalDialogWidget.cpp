@@ -1,8 +1,8 @@
 #include "ModalDialogWidget.h"
-#include <GfxRenderer.h>
-#include "NeuStyle.h"
-#include "HeaderWidget.h"
 #include "FooterWidget.h"
+#include "HeaderWidget.h"
+#include "NeuStyle.h"
+#include <GfxRenderer.h>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -11,7 +11,9 @@
 #include <Arduino.h>
 #endif
 
-bool ModalDialogWidget::show(IDisplay &display, IInput &input, BatteryWidget *batteryWidget, const char *title, const char *message) {
+bool ModalDialogWidget::show(IDisplay &display, IInput &input,
+                             BatteryWidget *batteryWidget, const char *title,
+                             const char *message) {
   auto renderer = display.getRenderer();
   if (!renderer)
     return false;
@@ -139,7 +141,7 @@ bool ModalDialogWidget::show(IDisplay &display, IInput &input, BatteryWidget *ba
   // Wait for user response.
   while (true) {
     ButtonEvent ev = input.pollInput();
-    if (ev == ButtonEvent::QUIT)
+    if (ev == ButtonEvent::QUIT || ev == ButtonEvent::LEFT)
       return false;
     else if (ev == ButtonEvent::RIGHT)
       return true;
