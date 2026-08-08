@@ -4,45 +4,11 @@
 #include "hal/IStorage.h"
 #include "os/AppSettings.h"
 
-class StreamingEpdFontFamily; // forward declaration — owned by InkEngine when SD font is active
-struct StoryMetadata;          // forward declaration
+#include "InkStoryManager.h"
+#include "InkDisplayManager.h"
+#include "InkInputHandler.h"
 
-// <cmath> must be included at global scope before InkCPP headers so GCC 15's
-// specfun.h special math functions (sph_bessel, etc.) are not injected into
-// ink::runtime namespace.
 #include <cmath>
-
-// InkCPP types (story_ptr smart handles)
-#include <story.h>
-#include <runner.h>
-#include <globals.h>
-
-#include <cstddef>
-#include <vector>
-#include <deque>
-#include <string>
-#include <map>
-#include <TextBlock.h>
-#include <SDCardManager.h>
-
-// FNV-1a hash function
-constexpr uint32_t fnv1a_32(const char* s, size_t count) {
-    uint32_t hash = 2166136261u;
-    for (size_t i = 0; i < count; ++i) {
-        hash ^= static_cast<uint8_t>(s[i]);
-        hash *= 16777619u;
-    }
-    return hash;
-}
-
-inline uint32_t fnv1a_32(const char* s) {
-    uint32_t hash = 2166136261u;
-    while (*s) {
-        hash ^= static_cast<uint8_t>(*s++);
-        hash *= 16777619u;
-    }
-    return hash;
-}
 
 class InkEngine
 {
@@ -64,25 +30,21 @@ public:
     void update();
     bool isDone() const { return _state == State::DONE; }
     bool shouldSleep() const { return _shouldSleep; }
+    
+    void setShouldSleep(bool sleep) { _shouldSleep = sleep; }
 
-    struct WrappedLine {
-        TextBlock block;
-        bool isOld = false;
-        bool isImage = false;
-        std::string imagePath = "";
-        int imageHeight = 0;
-        bool endOfParagraph = false;
-        int getHeight(class GfxRenderer* renderer) const;
-    };
-    const std::deque<WrappedLine>& getHistory() const { return _wrappedLines; }
-    void setHistory(const std::deque<WrappedLine>& history) { _wrappedLines = history; }
+    const std::deque<WrappedLine>& getHistory() const { return const_cast<InkDisplayManager&>(_displayManager).getHistory(); }
+    void setHistory(const std::deque<WrappedLine>& history) { 
+        _displayManager.clearHistory();
+        for (const auto& l : history) _displayManager.addWrappedLine(l);
+    }
 
     void applySettings(const struct AppSettings& settings);
 
     void setFrontlight(class IFrontlight* fl) { _frontlight = fl; }
     void setBatteryWidget(class BatteryWidget* bw) { _batteryWidget = bw; }
 
-    int getImageHeight(const char* imagePath) const;
+    int getImageHeight(const char* imagePath) const { return _storyManager.getImageHeight(imagePath); }
 
     void setChoiceDelays(uint32_t cascadeMs, uint32_t focusMs) {
         _cascadeOffsetMs = cascadeMs;
@@ -90,65 +52,6 @@ public:
     }
     uint32_t getCascadeOffsetMs() const { return _cascadeOffsetMs; }
     uint32_t getFocusDelayMs() const { return _focusDelayMs; }
-
-private:
-    IDisplay&  _display;
-    IInput&    _input;
-    IStorage&  _storage;
-    class IFrontlight* _frontlight = nullptr;
-    class BatteryWidget* _batteryWidget = nullptr;
-    struct AppSettings* _settingsObj = nullptr;
-
-    AppSettings _settings = AppSettings::defaults(); // cached settings for FontResolver
-    StreamingEpdFontFamily* _streamingFamily = nullptr; // non-null when an SD .epdfont family is active
-
-    ink::runtime::story*  _story   = nullptr;
-    ink::runtime::runner  _runner;
-    ink::runtime::snapshot* _currentSnapshot = nullptr;
-    ink::runtime::globals _globals = nullptr;
-    const unsigned char*  _storyBuf = nullptr;
-
-    std::string _storyDir;
-
-    std::deque<WrappedLine> _wrappedLines;
-    int _scrollY = 0;
-    int _maxScrollY = 0;
-    int _refreshCount = 0;
-
-    struct ImageMeta {
-        uint32_t offset;
-        uint32_t size;
-        uint32_t width;
-        uint32_t height;
-    };
-    std::map<uint32_t, ImageMeta> _mediaDict;
-    SdFile _mediaFile;
-    void loadMediaSidecar(bool hasMediaFlag, const char* storyPath = nullptr);
-
-    static constexpr int MAX_CHOICES = 8;
-    char  _choiceText[MAX_CHOICES][128] = {};
-    std::vector<TextBlock> _wrappedChoices[MAX_CHOICES];
-    int   _numChoices     = 0;
-    int   _selectedChoice = 0;
-
-    enum class ChoiceVisualState {
-        HIDDEN,
-        FULL
-    };
-
-    uint32_t _choiceTurnStartMs = 0;
-    uint32_t _initialChoiceDelayMs = 0;
-    uint32_t _revealStartMs = 0;
-    uint32_t _lastAnimFrameMs = 0;
-    int      _revealStep = 0;
-    bool     _revealStarted = false;
-
-    uint32_t _cascadeOffsetMs = 350;
-    uint32_t _focusDelayMs    = 700;
-
-    ChoiceVisualState getChoiceVisualState(int index) const;
-    bool isChoicesVisible() const;
-    bool isRevealComplete() const;
 
     enum class State {
         IDLE,
@@ -159,18 +62,40 @@ private:
         STORY_ENDED,
         DONE,
     };
+    State getState() const { return _state; }
+    void setState(State state) { _state = state; }
+
+    void incrementRefreshCount() { _refreshCount++; }
+    void requestRedraw() { _needsRedraw = true; }
+    void reloadSettings() { applySettings(AppSettings::load()); }
+
+private:
+    IDisplay&  _display;
+    IInput&    _input;
+    IStorage&  _storage;
+    class IFrontlight* _frontlight = nullptr;
+    class BatteryWidget* _batteryWidget = nullptr;
+    struct AppSettings* _settingsObj = nullptr;
+
+    AppSettings _settings = AppSettings::defaults(); 
+
+    InkStoryManager _storyManager;
+    InkDisplayManager _displayManager;
+    InkInputHandler _inputHandler;
+
     State _state = State::IDLE;
     bool _shouldSleep = false;
+    bool _needsRedraw = false;
+    int _refreshCount = 0;
+
+    uint32_t _choiceTurnStartMs = 0;
+    uint32_t _initialChoiceDelayMs = 0;
+    uint32_t _revealStartMs = 0;
+    uint32_t _lastAnimFrameMs = 0;
+
+    uint32_t _cascadeOffsetMs = 350;
+    uint32_t _focusDelayMs    = 700;
 
     void tickRunningText();
-    void tickWaitingInput();
-    void tickStoryEnded();
-    void redraw();
-    void collectChoices();
-    void drawNarrativeArea();
-    void drawChoiceArea();
-    int  getChoicesHeight(class GfxRenderer* renderer) const;
-
-    // FontResolver: parse header hint, select and apply the narrative font family.
-    void _resolveAndApplyFont(const StoryMetadata& meta, const char* storyBase, const char* storyDir = nullptr);
+    void updateAnimation();
 };

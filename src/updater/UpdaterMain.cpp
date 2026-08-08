@@ -4,7 +4,6 @@
 // SD.h included via HalTypes.h
 #include <SPI.h>
 #include <Update.h>
-#include "WifiProvisioner.h"
 #include <esp_ota_ops.h>
 #include <GfxRenderer.h>
 #include <EpdFont.h>
@@ -124,7 +123,10 @@ void bootToApp0() {
 void performOfflineUpdate(File& updateFile) {
     size_t updateSize = updateFile.size();
     drawMessage("Offline Update Found.\nFlashing firmware...");
-    
+
+    if (Update.begin(updateSize)) {
+        size_t written = Update.writeStream(updateFile);
+        if (written == updateSize) {
             drawMessage("Update complete!\nVerifying...");
             if (Update.end()) {
                 drawMessage("Success!\nRebooting to new firmware...");
@@ -134,7 +136,7 @@ void performOfflineUpdate(File& updateFile) {
                 }
                 SD_FS.rename("/firmware.bin", "/firmware.bin.bak");
                 delay(2000);
-                esp_restart(); // Update library already sets boot partition to app0
+                esp_restart();
                 return;
             } else {
                 drawMessage((String("Update Error: ") + Update.getError()).c_str());
@@ -145,7 +147,7 @@ void performOfflineUpdate(File& updateFile) {
     } else {
         drawMessage("Not enough space to begin OTA.");
     }
-    
+
     delay(5000);
     bootToApp0();
 }
@@ -180,34 +182,9 @@ void setup() {
             return;
         }
     }
-    Serial.println("No offline update found.");
-
-    String ssid, password;
-    if (!WifiProvisioner::readCredentialsFromSD(ssid, password)) {
-        drawMessage("Error: wifi.txt not found on SD card.\nPlease create /wifi.txt with:\nSSID\nPASSWORD\nRebooting in 5s...");
-        delay(5000);
-        bootToApp0();
-        return;
-    }
-
-    String connectingMsg = String("Connecting to WiFi: ") + ssid + "...";
-    drawMessage(connectingMsg.c_str());
-
-    if (!WifiProvisioner::connect(ssid, password)) {
-        drawMessage("Error: WiFi Connection Failed.\nCheck credentials in /wifi.txt.\nRebooting in 5s...");
-        delay(5000);
-        bootToApp0();
-        return;
-    }
-
-    drawMessage("Connected to WiFi!\nLooking for updates...");
-    
-    // TODO: Implement actual HTTP OTA download
-    // For now, just simulate a check and boot back to app0
-    delay(2000);
-    drawMessage("Update check complete.\nRebooting to main system...");
+    Serial.println("No offline update found. WiFi OTA not yet implemented.");
+    drawMessage("No update found.\nReturning to main firmware...");
     delay(3000);
-    
     bootToApp0();
 }
 

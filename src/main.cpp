@@ -347,7 +347,7 @@ void setup() {
                         // Read history
                         uint16_t historySize = 0;
                         if (saveFile.read((uint8_t *)&historySize, 2) == 2) {
-                          std::deque<InkEngine::WrappedLine> history;
+                          std::deque<WrappedLine> history;
                           for (uint16_t i = 0; i < historySize; i++) {
                             uint16_t lineLen;
                             if (saveFile.read((uint8_t *)&lineLen, 2) != 2)
@@ -370,7 +370,7 @@ void setup() {
                                 imagePath = str.substr(6, str.length() - 7);
                                 str = "";
                               }
-                              InkEngine::WrappedLine wl;
+                              WrappedLine wl;
                               wl.block = TextBlock(str);
                               wl.isOld = isOld;
                               wl.isImage = isImage;

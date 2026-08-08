@@ -24,7 +24,7 @@ The repositories are cross-linked via git submodules:
 eenk (primary repo)
 ├── lib/freeink-sdk  → Free-Ink/freeink-sdk (main branch)
 ├── lib/inkcpp       → t0mg/inkcpp (eenk-patches branch)
-└── tools/eenky      → t0mg/eenky
+└── tools/eenky      → t0mg/eenky (IDE repo)
     ├── eenk/        → t0mg/eenk (recursive submodule)
     └── inkcpp/      → t0mg/inkcpp (eenk-patches branch)
 ```
@@ -49,8 +49,8 @@ eenk uses **PlatformIO** with four build environments defined in `platformio.ini
 
 | Environment | Target | Purpose |
 |------------|--------|---------|
-| `native` | Host (MinGW/SDL2) | Desktop simulator, renders to 800×480 SDL2 window |
-| `esp32c3` | ESP32-C3 | Main firmware for Xteink X4 hardware (app0) |
+| `native` | Host (MinGW/SDL2) | Desktop simulator, renders to SDL2 window |
+| `esp32c3` | ESP32-C3 | Main firmware for Xteink X3 and X4 hardware (app0) |
 | `esp32c3_updater` | ESP32-C3 | Minimal OTA updater firmware for X4 (app1) |
 | `esp32s3` | ESP32-S3 | Main firmware for Xteink X4 Pro hardware (app0) |
 
@@ -62,6 +62,9 @@ pio run -e esp32s3         # Main firmware (X4 Pro)
 pio run -e esp32c3_updater # OTA updater (X4)
 pio test -e native         # Unit tests (native only)
 ```
+
+> [!NOTE]
+> The X4 Pro has **no separate updater environment** — it uses symmetric A/B OTA partitions (both `app0` and `app1` are full ~7.9 MB firmware slots). OTA on the X4 Pro is handled by swapping the active slot via `esp_ota_set_boot_partition` directly from the main firmware.
 
 > [!IMPORTANT]
 > **After making changes, always build `native`, `esp32c3`, and `esp32s3` targets** to verify cross-platform compatibility. The native build uses host g++ with SDL2; the ESP32 builds use the ESP-IDF Arduino framework.

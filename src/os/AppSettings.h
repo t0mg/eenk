@@ -5,41 +5,47 @@
 #include <cstdint>
 
 struct AppSettings {
-    char     storyFont[32];     // token (builtin) or stem (SD font), e.g. "sans-medium"
-    uint8_t  choiceFontIndex;   // 0..CHOICE_FONT_COUNT-1
-    uint8_t  marginPx;          // pixels: 8, 16, 24, 32
-    uint16_t sleepTimeoutSec;   // 0=never, 60, 120, 300
-    uint8_t  inputLayoutIndex;  // which button layout
-    uint8_t  refreshInterval;   // full refresh every N partials: 5, 10, 15, 20
-    bool     overrideStoryFont; // if true, storyFontIndex always wins over story @font hint
-    uint16_t choiceCascadeMs;   // delay per choice item in ms (default 350, can be 0)
-    uint16_t choiceFocusDelayMs; // delay before initial selection focus in ms (default 700, can be 0)
+  char storyFont[32]; // token (builtin) or stem (SD font), e.g. "sans-medium"
+  uint8_t choiceFontIndex;  // 0..CHOICE_FONT_COUNT-1
+  uint8_t marginPx;         // pixels: 8, 16, 24, 32
+  uint16_t sleepTimeoutSec; // 0=never, 60, 120, 300
+  uint8_t inputLayoutIndex; // which button layout
+  uint8_t refreshInterval;  // full refresh every N partials: 5, 10, 15, 20
+  bool overrideStoryFont;   // if true, storyFontIndex always wins over story
+                            // @font hint
+  uint16_t
+      choiceCascadeMs; // delay per choice item in ms (default 350, can be 0)
+  uint16_t choiceFocusDelayMs;   // delay before initial selection focus in ms
+                                 // (default 700, can be 0)
+  bool touchChoicesEnabled;      // if true, choices can be selected via touch
+  bool touchScrollEnabled;       // if true, history can be scrolled via touch
+  uint8_t frontLightBrightness;  // brightness level of the front led (0-100)
+  uint8_t frontLightTemperature; // temperature of the front led (0-100)
+  // ── Human-readable option lists (for UI display) ──────────────────────────
 
-    // ── Human-readable option lists (for UI display) ──────────────────────────
+  // Choice / UI font names.
+  static const char *const CHOICE_FONT_NAMES[];
+  static const int CHOICE_FONT_COUNT;
 
-    // Choice / UI font names.
-    static const char* const CHOICE_FONT_NAMES[];
-    static const int         CHOICE_FONT_COUNT;
+  // Discrete option arrays (mirrors what the settings screen cycles through).
+  static const uint8_t MARGIN_OPTIONS[];  // {8, 16, 24, 32}
+  static const uint16_t SLEEP_OPTIONS[];  // {0, 60, 120, 300}
+  static const uint8_t REFRESH_OPTIONS[]; // {5, 10, 15, 20}
 
-    // Discrete option arrays (mirrors what the settings screen cycles through).
-    static const uint8_t  MARGIN_OPTIONS[];   // {8, 16, 24, 32}
-    static const uint16_t SLEEP_OPTIONS[];    // {0, 60, 120, 300}
-    static const uint8_t  REFRESH_OPTIONS[];  // {5, 10, 15, 20}
+  // Number of supported input layouts (button mappings).
+  static constexpr int INPUT_LAYOUT_COUNT = 2;
 
-    // Number of supported input layouts (button mappings).
-    static constexpr int INPUT_LAYOUT_COUNT = 2;
+  // NVS key for the override flag.
+  static constexpr char KEY_SFONT_OVERRIDE[] = "sfont_ovr";
 
-    // NVS key for the override flag.
-    static constexpr char KEY_SFONT_OVERRIDE[] = "sfont_ovr";
+  // ── Persistence ───────────────────────────────────────────────────────────
 
-    // ── Persistence ───────────────────────────────────────────────────────────
+  // Load from NVS. Returns defaults() if NVS is empty or not available.
+  static AppSettings load();
 
-    // Load from NVS. Returns defaults() if NVS is empty or not available.
-    static AppSettings load();
+  // Save all fields to NVS.
+  void save() const;
 
-    // Save all fields to NVS.
-    void save() const;
-
-    // Factory defaults.
-    static AppSettings defaults();
+  // Factory defaults.
+  static AppSettings defaults();
 };
