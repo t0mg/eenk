@@ -1,6 +1,7 @@
 .pio
 .vscode
 .cache
+.gemini
 compile_commands.json
 build/
 build_inkcpp/
@@ -8,3 +9,4 @@ stories/*
 build.log
 sd_fonts/
 test_runs.txt
+dev_notes/
