@@ -149,6 +149,11 @@ void performOfflineUpdate(File& updateFile) {
     }
 
     delay(5000);
+    updateFile.close();
+    if (SD_FS.exists("/firmware.bin.err")) {
+        SD_FS.remove("/firmware.bin.err");
+    }
+    SD_FS.rename("/firmware.bin", "/firmware.bin.err");
     bootToApp0();
 }
 

@@ -13,13 +13,23 @@
 namespace HalInit {
 
 void earlyBootCheck() {
+  initHardware();
+
   bool updaterMode = false;
 
-  // Check UP button
+  // Check UP button (must be held continuously across multiple samples to avoid ADC startup noise)
   InputManager im;
   im.begin();
-  im.update();
-  if (im.isPressed(InputManager::BTN_UP)) {
+  int pressedCount = 0;
+  for (int i = 0; i < 5; i++) {
+    im.update();
+    if (im.isPressed(InputManager::BTN_UP)) {
+      pressedCount++;
+    }
+    delay(10);
+  }
+
+  if (pressedCount >= 4) {
     Serial.println("[Boot] UP button held. Forcing updater mode.");
     updaterMode = true;
   }
