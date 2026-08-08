@@ -45,6 +45,7 @@ public:
     void doAutoScroll(int newLinesCount, bool showChoices);
 
     void setScrollToBottom();
+    void scrollToSelectedChoice();
 
     bool isChoicesVisible() const;
     bool isRevealComplete() const;

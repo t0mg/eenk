@@ -20,4 +20,5 @@ private:
     IInput& _input;
 
     void handleScroll(InkDisplayManager& display, int scrollAmount);
+    void handleCommonNavigation(bool isStoryEnded, InkEngine& engine, InkDisplayManager& display, InkStoryManager& story, class IDisplay& IDisplay, struct AppSettings& settings, IFrontlight* frontlight, BatteryWidget* batteryWidget);
 };

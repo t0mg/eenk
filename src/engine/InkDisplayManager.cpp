@@ -369,6 +369,38 @@ void InkDisplayManager::doAutoScroll(int newLinesCount, bool showChoices) {
 
 void InkDisplayManager::setScrollToBottom() { _scrollY = _maxScrollY; }
 
+void InkDisplayManager::scrollToSelectedChoice() {
+  GfxRenderer *renderer = _display.getRenderer();
+  if (!renderer || _numChoices == 0) return;
+  
+  ChoiceLayout l = getChoiceLayout(renderer);
+  
+  int docY = l.marginY - _scrollY;
+  for (const auto &w : _wrappedLines) { docY += w.getHeight(renderer); }
+  docY += (l.marginY / 2) + 2 + (l.marginY / 2);
+  
+  for (int i = 0; i < _selectedChoice; ++i) {
+     if (i > 0) docY += l.choicePadding;
+     int lines = std::max((size_t)1, _wrappedChoices[i].size());
+     int textHeight = lines * l.choiceLineHeight;
+     docY += std::max(l.minChoiceHeight, textHeight);
+  }
+  
+  if (docY < l.marginY) {
+     _scrollY += docY - l.marginY;
+  } else {
+     int lines = std::max((size_t)1, _wrappedChoices[_selectedChoice].size());
+     int textHeight = lines * l.choiceLineHeight;
+     int currentChoiceHeight = std::max(l.minChoiceHeight, textHeight);
+     if (docY + currentChoiceHeight > _display.getHeight() - l.marginY) {
+        _scrollY += (docY + currentChoiceHeight) - (_display.getHeight() - l.marginY);
+     }
+  }
+  
+  if (_scrollY < 0) _scrollY = 0;
+  if (_scrollY > _maxScrollY) _scrollY = _maxScrollY;
+}
+
 bool InkDisplayManager::isChoicesVisible() const {
   if (_numChoices == 0)
     return true;
