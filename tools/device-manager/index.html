@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Manage stories on your eenk device over USB — no drivers required." />
+  <title>Device Manager — eenk</title>
+  <link rel="stylesheet" href="device-manager.css" />
+</head>
+<body>
+
+  <!-- Standalone site header (hidden in Electron) -->
+  <div class="dm-standalone-header">eenk / Device Manager</div>
+
+  <!-- Web Serial unavailable warning (shown by JS if needed) -->
+  <div class="serial-unavailable" id="serial-warn" style="display:none;">
+    ⚠ Web Serial is not available in this browser.
+    Please use <strong>Chrome</strong> or <strong>Edge</strong> (v89+), or open this from the eenky app.
+  </div>
+
+  <!-- Error banner -->
+  <div class="error-banner" id="error-banner" style="display:none;" role="alert" aria-live="assertive">
+    <span id="error-text"></span>
+    <button onclick="clearError()">Dismiss</button>
+  </div>
+
+  <div class="dm-shell">
+
+    <!-- ── Header bar ──────────────────────────────────────── -->
+    <header class="dm-header" role="banner">
+      <span class="dm-header-title">Device Manager</span>
+
+      <div class="dm-header-status" id="status-row" aria-live="polite">
+        <div class="status-dot" id="status-dot"></div>
+        <span class="status-text" id="status-text">Not connected</span>
+      </div>
+
+      <div class="dm-header-actions">
+        <button class="btn btn-secondary" id="connect-btn" aria-label="Connect to eenk device">
+          🔌 Connect
+        </button>
+        <button class="btn btn-secondary" id="disconnect-btn" style="display:none;" aria-label="Disconnect">
+          Disconnect
+        </button>
+        <button class="btn btn-secondary" id="refresh-btn" style="display:none;" aria-label="Refresh file list" title="Refresh">
+          ↺
+        </button>
+      </div>
+    </header>
+
+    <!-- ── SD Card usage ───────────────────────────────────── -->
+    <div class="sd-bar-row" id="sd-bar-row" style="display:none;" aria-label="SD Card storage">
+      <span class="sd-label">SD Card</span>
+      <div class="sd-bar-wrap">
+        <div class="sd-bar-fill" id="sd-bar" style="width:0%"></div>
+      </div>
+      <span class="sd-size-text" id="sd-size-text">—</span>
+    </div>
+
+    <!-- ── Tabs ────────────────────────────────────────────── -->
+    <div class="dm-tabs" id="tab-strip" role="tablist">
+      <button class="dm-tab active" role="tab" aria-selected="true"  data-tab="stories" id="tab-stories">
+        📖 Stories
+      </button>
+      <button class="dm-tab"        role="tab" aria-selected="false" data-tab="saves"   id="tab-saves">
+        💾 Saves
+      </button>
+    </div>
+
+    <!-- ── Main content ────────────────────────────────────── -->
+    <main class="dm-content" id="dm-content">
+
+      <!-- Disconnected empty state -->
+      <div class="dm-empty" id="empty-state">
+        <div class="dm-empty-icon">🔌</div>
+        <h2>Connect your eenk device</h2>
+        <p>Connect via USB, then click <strong>Connect</strong> above.<br>
+           The device must be on and showing the menu screen (not playing a story).</p>
+      </div>
+
+      <!-- Stories tab -->
+      <div class="tab-panel active" id="panel-stories" role="tabpanel" aria-labelledby="tab-stories" style="display:none;">
+        <div class="file-list-header">
+          <span class="file-list-title">Stories</span>
+          <label class="btn btn-secondary" for="upload-input" id="upload-label" aria-label="Upload story .bin file">
+            ↑ Upload Story…
+          </label>
+          <input type="file" id="upload-input" accept=".bin" style="display:none;" multiple />
+        </div>
+
+        <!-- Sidecar prompt (browser context: shown after picking a .bin) -->
+        <div class="sidecar-prompt" id="sidecar-prompt" style="display:none;">
+          <h4>Associated files detected</h4>
+          <p>The following files are in the same folder as the selected story. Upload them alongside it?</p>
+          <div class="sidecar-file-list" id="sidecar-file-list"></div>
+          <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+            <button class="btn btn-primary" id="sidecar-upload-btn">Upload All</button>
+            <button class="btn btn-secondary" id="sidecar-skip-btn">Story Only</button>
+          </div>
+        </div>
+
+        <!-- Upload drop zone -->
+        <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Drop .bin file here to upload">
+          <span class="upload-icon">📁</span>
+          <span class="upload-hint">Drop <strong>.bin</strong> story file here, or click Upload Story above</span>
+        </div>
+
+        <div class="file-list" id="stories-list"></div>
+      </div>
+
+      <!-- Saves tab -->
+      <div class="tab-panel" id="panel-saves" role="tabpanel" aria-labelledby="tab-saves" style="display:none;">
+        <div class="file-list-header">
+          <span class="file-list-title">Saves</span>
+        </div>
+        <div class="file-list" id="saves-list"></div>
+      </div>
+
+    </main>
+
+    <!-- ── Transfer footer ─────────────────────────────────── -->
+    <footer class="dm-footer" id="transfer-footer" aria-live="polite" aria-label="Transfer progress">
+      <div class="transfer-info">
+        <span id="transfer-icon">↑</span>
+        <span class="transfer-filename" id="transfer-filename">…</span>
+        <span class="transfer-pct" id="transfer-pct"></span>
+      </div>
+      <div class="transfer-bar-wrap">
+        <div class="transfer-bar-fill" id="transfer-bar" style="width:0%"></div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Delete confirm modal -->
+  <div class="modal-backdrop" id="confirm-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="confirm-heading">
+    <div class="modal-box">
+      <h3 id="confirm-heading">Delete item?</h3>
+      <p id="confirm-text">This action cannot be undone.</p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="confirm-cancel">Cancel</button>
+        <button class="btn btn-primary"   id="confirm-ok"     style="background:#CC0000;border-color:#CC0000;">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="serial-protocol.js"></script>
+  <script src="device-manager.js"></script>
+</body>
+</html>

@@ -1,0 +1,654 @@
+/* ============================================================
+   eenk Device Manager — Styles
+   Standalone token fallbacks for use outside the docs site.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@700;800&display=swap');
+
+:root {
+  --color-bg: #FFFFFF;
+  --color-fg: #111111;
+  --color-accent: #FF4D00;
+  --color-accent-dark: #CC3D00;
+  --color-gray: #888888;
+  --color-light: #F4F4F4;
+  --color-border: #111111;
+  --color-success: #2D9048;
+  --shadow-hard: 4px 4px 0px #111111;
+  --shadow-hard-sm: 2px 2px 0px #111111;
+  --border: 2px solid #111111;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-heading: 'Syne', system-ui, sans-serif;
+  --dither-bg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='2' height='2' fill='%23111111'/%3E%3Crect x='2' y='2' width='2' height='2' fill='%23111111'/%3E%3C/svg%3E");
+}
+
+body.theme-dark {
+  --color-bg: #1A1A1A;
+  --color-fg: #EEEEEE;
+  --color-light: #2A2A2A;
+  --color-border: #EEEEEE;
+  --shadow-hard: 4px 4px 0px #EEEEEE;
+  --shadow-hard-sm: 2px 2px 0px #EEEEEE;
+}
+
+/* ── Reset ──────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 14px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Standalone header (hidden in Electron) ─────────────────── */
+.dm-standalone-header {
+  background: var(--color-fg);
+  color: var(--color-bg);
+  padding: 0.9rem 1.5rem;
+  border-bottom: var(--border);
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+body.electron-embed .dm-standalone-header {
+  display: none;
+}
+
+/* ── Shell ──────────────────────────────────────────────────── */
+.dm-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Header bar ─────────────────────────────────────────────── */
+.dm-header {
+  background-image: var(--dither-bg);
+  background-size: 2px 2px;
+  image-rendering: pixelated;
+  border-bottom: var(--border);
+  padding: 0.85rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.dm-header-title {
+  font-family: var(--font-heading);
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.9);
+  flex-shrink: 0;
+}
+
+.dm-header-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-gray);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+
+.status-dot.connected {
+  background: #5EDD6E;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.status-dot.connecting {
+  background: #FFD166;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.status-text {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.75);
+  font-family: 'Courier New', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dm-header-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* ── SD Card usage bar ──────────────────────────────────────── */
+.sd-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1.25rem;
+  background: var(--color-light);
+  border-bottom: 1px solid #DDD;
+  flex-shrink: 0;
+}
+
+body.theme-dark .sd-bar-row {
+  border-bottom-color: #333;
+}
+
+.sd-label {
+  font-size: 0.75rem;
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-gray);
+  white-space: nowrap;
+}
+
+.sd-bar-wrap {
+  flex: 1;
+  height: 8px;
+  background: #DDD;
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+body.theme-dark .sd-bar-wrap {
+  background: #333;
+}
+
+.sd-bar-fill {
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 0.4s;
+}
+
+.sd-size-text {
+  font-size: 0.75rem;
+  color: var(--color-gray);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Tabs ───────────────────────────────────────────────────── */
+.dm-tabs {
+  display: flex;
+  border-bottom: var(--border);
+  flex-shrink: 0;
+  background: var(--color-bg);
+}
+
+.dm-tab {
+  padding: 0.6rem 1.25rem;
+  font-family: var(--font-heading);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  border: none;
+  border-right: 1px solid #DDD;
+  background: var(--color-bg);
+  color: var(--color-gray);
+  transition: background 0.1s, color 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+body.theme-dark .dm-tab {
+  border-right-color: #333;
+}
+
+.dm-tab:hover {
+  background: var(--color-light);
+  color: var(--color-fg);
+}
+
+.dm-tab.active {
+  background: var(--color-fg);
+  color: var(--color-bg);
+}
+
+/* ── Content area ───────────────────────────────────────────── */
+.dm-content {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+}
+
+/* ── Empty / disconnected state ─────────────────────────────── */
+.dm-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 0.75rem;
+  color: var(--color-gray);
+  padding: 2rem;
+  text-align: center;
+}
+
+.dm-empty-icon {
+  font-size: 2.5rem;
+  opacity: 0.5;
+}
+
+.dm-empty h2 {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  text-transform: uppercase;
+}
+
+.dm-empty p {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  max-width: 320px;
+}
+
+/* ── File list ──────────────────────────────────────────────── */
+.tab-panel {
+  display: none;
+}
+
+.tab-panel.active {
+  display: block;
+}
+
+.file-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid #EEE;
+  background: var(--color-light);
+}
+
+body.theme-dark .file-list-header {
+  border-bottom-color: #333;
+}
+
+.file-list-title {
+  font-family: var(--font-heading);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-gray);
+}
+
+.file-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  padding: 0.65rem 1.25rem;
+  border-bottom: 1px solid #EEE;
+  gap: 0.75rem;
+  transition: background 0.1s;
+}
+
+body.theme-dark .file-item {
+  border-bottom-color: #2A2A2A;
+}
+
+.file-item:hover {
+  background: var(--color-light);
+}
+
+.file-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.file-name {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-size {
+  font-size: 0.75rem;
+  color: var(--color-gray);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.file-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  background: none;
+  border: 1px solid transparent;
+  padding: 0.25rem 0.4rem;
+  cursor: pointer;
+  color: var(--color-gray);
+  font-size: 0.8rem;
+  border-radius: 0;
+  transition: border-color 0.1s, color 0.1s, background 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.icon-btn:hover {
+  border-color: var(--color-border);
+  color: var(--color-fg);
+  background: var(--color-light);
+}
+
+.icon-btn.delete:hover {
+  border-color: #CC0000;
+  color: #CC0000;
+}
+
+.empty-list {
+  padding: 2rem;
+  text-align: center;
+  color: var(--color-gray);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* ── Upload zone ────────────────────────────────────────────── */
+.upload-zone {
+  margin: 1rem 1.25rem;
+  border: var(--border);
+  border-style: dashed;
+  padding: 1.25rem;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.upload-zone:hover {
+  background: var(--color-light);
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.upload-zone.drag-over {
+  background: #FFF5F2;
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-hard);
+}
+
+.upload-icon {
+  font-size: 1.5rem;
+  opacity: 0.5;
+}
+
+.upload-hint {
+  font-size: 0.82rem;
+  color: var(--color-gray);
+}
+
+.upload-hint strong {
+  color: var(--color-accent);
+}
+
+/* ── Sidecar picker (browser-only) ──────────────────────────── */
+.sidecar-prompt {
+  margin: 0 1.25rem 1rem;
+  border: var(--border);
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-hard);
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: #FFF5F2;
+}
+
+body.theme-dark .sidecar-prompt {
+  background: #2a1a17;
+}
+
+.sidecar-prompt h4 {
+  font-family: var(--font-heading);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sidecar-prompt p {
+  font-size: 0.82rem;
+  color: var(--color-gray);
+}
+
+.sidecar-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+}
+
+.sidecar-file-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: 'Courier New', monospace;
+}
+
+/* ── Error banner ───────────────────────────────────────────── */
+.error-banner {
+  background: var(--color-accent);
+  color: #FFF;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.error-banner button {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  color: #FFF;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* ── Transfer footer ────────────────────────────────────────── */
+.dm-footer {
+  border-top: var(--border);
+  padding: 0.65rem 1.25rem;
+  background: var(--color-light);
+  flex-shrink: 0;
+  display: none;
+}
+
+.dm-footer.visible {
+  display: block;
+}
+
+.transfer-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.8rem;
+}
+
+.transfer-filename {
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transfer-pct {
+  color: var(--color-gray);
+  font-variant-numeric: tabular-nums;
+}
+
+.transfer-bar-wrap {
+  height: 6px;
+  background: #DDD;
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.transfer-bar-fill {
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 0.1s;
+}
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.9rem;
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: var(--border);
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+  box-shadow: var(--shadow-hard-sm);
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: var(--shadow-hard-sm) !important;
+}
+
+.btn:not(:disabled):active {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  color: #FFF;
+}
+
+.btn-primary:not(:disabled):hover {
+  background: var(--color-accent-dark);
+  color: #FFF;
+}
+
+.btn-secondary {
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.btn-secondary:not(:disabled):hover {
+  background: var(--color-light);
+}
+
+/* ── Confirm modal ──────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.modal-box {
+  background: var(--color-bg);
+  border: var(--border);
+  box-shadow: var(--shadow-hard);
+  padding: 1.5rem;
+  max-width: 360px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modal-box h3 {
+  font-family: var(--font-heading);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+}
+
+.modal-box p {
+  font-size: 0.85rem;
+  color: var(--color-gray);
+}
+
+.modal-box .modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+/* ── Web Serial unavailable banner ──────────────────────────── */
+.serial-unavailable {
+  background: #FFD166;
+  color: #111;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+  border-bottom: var(--border);
+}

@@ -10,3 +10,5 @@ build.log
 sd_fonts/
 test_runs.txt
 dev_notes/
+docs/node_modules
+docs/dist

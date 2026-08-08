@@ -1,0 +1,44 @@
+{
+  "site": {
+    "title": "eenk",
+    "description": "Interactive Fiction Firmware for Xteink e-ink devices",
+    "baseUrl": "https://t0mg.github.io/eenk",
+    "repo": "t0mg/eenk",
+    "githubUrl": "https://github.com/t0mg/eenk"
+  },
+  "nav": [
+    {
+      "id": "home",
+      "title": "Home",
+      "src": "pages/home.md",
+      "out": "index.html"
+    },
+    {
+      "id": "installation",
+      "title": "Installation",
+      "src": "pages/installation.md",
+      "out": "installation/index.html"
+    },
+    {
+      "id": "eenky",
+      "title": "Eenky IDE",
+      "src": "pages/eenky.md",
+      "out": "eenky/index.html",
+      "importAppend": ["../WritingWithEenk.md"]
+    },
+    {
+      "id": "flasher",
+      "title": "Web Flasher",
+      "src": null,
+      "out": "flasher/index.html",
+      "external": "../flasher/index.html"
+    },
+    {
+      "id": "device-manager",
+      "title": "Device Manager",
+      "src": null,
+      "out": "device-manager/index.html",
+      "external": "../device-manager/index.html"
+    }
+  ]
+}

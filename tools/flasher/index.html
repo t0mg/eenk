@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Flash eenk firmware to your Xteink device directly from your browser using Web Serial." />
+  <title>Web Flasher — eenk</title>
+
+  <!-- Fonts (standalone load — inherited from parent site when embedded in docs) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="flasher.css" />
+
+  <!-- esptool-js from CDN (loaded as ES module via importmap shim or direct script) -->
+  <!-- We use the UMD bundle so it works in both browser and Electron without bundler -->
+  <script src="https://unpkg.com/@espressif/esptool-js@0.4.3/bundles/esptool.bundle.js"></script>
+</head>
+<body>
+
+  <!-- Standalone site header (hidden when in Electron embed) -->
+  <div class="flasher-standalone-header">
+    <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;text-transform:uppercase;color:#fff;">
+      eenk / Web Flasher
+    </span>
+  </div>
+
+  <!-- ── Main layout ────────────────────────────────────────── -->
+  <div class="flasher-shell">
+
+    <!-- Sidebar stepper -->
+    <aside class="flasher-sidebar" aria-label="Flasher steps">
+      <div class="step-indicator active" data-step="1" id="sidebar-step-1">
+        <div class="step-dot">1</div>
+        <div class="step-label">
+          <strong>Safety</strong>
+          <small>USB unlock warning</small>
+        </div>
+      </div>
+      <div class="step-indicator" data-step="2" id="sidebar-step-2">
+        <div class="step-dot">2</div>
+        <div class="step-label">
+          <strong>Target</strong>
+          <small>Select hardware</small>
+        </div>
+      </div>
+      <div class="step-indicator" data-step="3" id="sidebar-step-3">
+        <div class="step-dot">3</div>
+        <div class="step-label">
+          <strong>Mode</strong>
+          <small>Flash type</small>
+        </div>
+      </div>
+      <div class="step-indicator" data-step="4" id="sidebar-step-4">
+        <div class="step-dot">4</div>
+        <div class="step-label">
+          <strong>Flash</strong>
+          <small>Connect &amp; burn</small>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main content area -->
+    <main class="flasher-main" id="flasher-main">
+
+      <!-- ════════════════════════════════════════════════════ -->
+      <!-- STEP 1: Safety Warning                               -->
+      <!-- ════════════════════════════════════════════════════ -->
+      <div class="step-panel active" id="step-1" role="region" aria-labelledby="step1-heading">
+        <span class="step-heading" id="step1-heading">⚠️ Safety Warning</span>
+
+        <div class="critical-warning" role="alert">
+          <div class="warning-title">
+            <span class="warning-icon">⚠️</span>
+            CRITICAL WARNING — READ BEFORE PROCEEDING
+          </div>
+          <p>
+            The device <strong>MUST be USB unlocked</strong> before proceeding.
+            Failure to USB unlock prior to flashing <strong>WILL BRICK THE DEVICE</strong>.
+          </p>
+          <p>
+            <em>Technical reason: The eenk firmware replaces the stock partition table,
+            allocating roughly half of the device's 16 MB flash as read-only storage for
+            loading and running Ink stories. The USB unlock procedure is required to allow
+            overwriting the partition table. Flashing without this step will result in a
+            device that cannot boot.</em>
+          </p>
+        </div>
+
+        <p>
+          Before you continue, ensure you have completed the USB unlock procedure described
+          in the <a href="../eenky/index.html#usb-unlock" target="_blank">eenky documentation</a>.
+          If you are reinstalling or updating firmware that was already unlocked, you may proceed.
+        </p>
+
+        <div class="confirm-checkbox-row">
+          <input type="checkbox" id="unlock-confirm" aria-required="true" />
+          <label for="unlock-confirm">
+            I have USB unlocked my device and I understand that flashing without
+            this step will brick it.
+          </label>
+        </div>
+
+        <div class="nav-btns">
+          <button class="btn btn-primary" id="step1-next" disabled aria-label="Proceed to target selection">
+            Next: Select Target →
+          </button>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════ -->
+      <!-- STEP 2: Hardware Target                              -->
+      <!-- ════════════════════════════════════════════════════ -->
+      <div class="step-panel" id="step-2" role="region" aria-labelledby="step2-heading">
+        <span class="step-heading" id="step2-heading">Select Hardware</span>
+        <p>Choose the Xteink model you are flashing.</p>
+
+        <div class="selection-grid three-col" role="radiogroup" aria-label="Hardware target">
+          <button class="select-card" data-target="X3" role="radio" aria-checked="false" id="target-X3">
+            <span class="card-icon">🖥️</span>
+            <span class="card-title">Xteink X3</span>
+            <span class="card-desc">ESP32-C3 · 792×528<br>UC8253 / UC8279</span>
+          </button>
+          <button class="select-card" data-target="X4" role="radio" aria-checked="false" id="target-X4">
+            <span class="card-icon">📖</span>
+            <span class="card-title">Xteink X4</span>
+            <span class="card-desc">ESP32-C3 · 800×480<br>SSD1677</span>
+          </button>
+          <button class="select-card" data-target="X4Pro" role="radio" aria-checked="false" id="target-X4Pro">
+            <span class="card-icon">⭐</span>
+            <span class="card-title">Xteink X4 Pro</span>
+            <span class="card-desc">ESP32-S3 · 800×480<br>PSRAM · Frontlight</span>
+          </button>
+        </div>
+
+        <div class="nav-btns">
+          <button class="btn btn-ghost" id="step2-back">← Back</button>
+          <button class="btn btn-primary" id="step2-next" disabled>Next: Select Mode →</button>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════ -->
+      <!-- STEP 3: Flashing Mode                                -->
+      <!-- ════════════════════════════════════════════════════ -->
+      <div class="step-panel" id="step-3" role="region" aria-labelledby="step3-heading">
+        <span class="step-heading" id="step3-heading">Select Mode</span>
+        <p>Choose what to flash onto the device.</p>
+
+        <div class="selection-grid one-col" role="radiogroup" aria-label="Flash mode">
+          <button class="select-card" data-mode="factory" role="radio" aria-checked="false" id="mode-factory">
+            <div style="display:flex;gap:0.75rem;align-items:flex-start;">
+              <span class="card-icon">🏭</span>
+              <div>
+                <span class="card-title">Factory Flash</span>
+                <span class="card-desc" style="display:block;margin-top:0.35rem;">
+                  Full erase and install. Writes the bootloader, custom partition table, and
+                  application from scratch. <strong>Required for first-time installation.</strong>
+                </span>
+              </div>
+            </div>
+          </button>
+          <button class="select-card" data-mode="update" role="radio" aria-checked="false" id="mode-update">
+            <div style="display:flex;gap:0.75rem;align-items:flex-start;">
+              <span class="card-icon">⬆️</span>
+              <div>
+                <span class="card-title">Update</span>
+                <span class="card-desc" style="display:block;margin-top:0.35rem;">
+                  Reflashes the application partition only. Preserves your NVS settings
+                  (font preferences, sleep timers). Use this for routine firmware updates.
+                </span>
+              </div>
+            </div>
+          </button>
+          <button class="select-card" data-mode="crosspoint" role="radio" aria-checked="false" id="mode-crosspoint">
+            <div style="display:flex;gap:0.75rem;align-items:flex-start;">
+              <span class="card-icon">🔄</span>
+              <div>
+                <span class="card-title">CrossPoint / Stock Restore</span>
+                <span class="card-desc" style="display:block;margin-top:0.35rem;">
+                  Restores the original vendor partition table and stock firmware.
+                  Use this to revert to factory state or to re-unlock the device.
+                </span>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        <div class="nav-btns">
+          <button class="btn btn-ghost" id="step3-back">← Back</button>
+          <button class="btn btn-primary" id="step3-next" disabled>Next: Connect &amp; Flash →</button>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════ -->
+      <!-- STEP 4: Version, Connect & Flash                     -->
+      <!-- ════════════════════════════════════════════════════ -->
+      <div class="step-panel" id="step-4" role="region" aria-labelledby="step4-heading">
+        <span class="step-heading" id="step4-heading">Connect &amp; Flash</span>
+
+        <!-- Summary row -->
+        <div id="flash-summary" style="font-size:0.85rem;color:var(--color-gray);display:flex;gap:1rem;flex-wrap:wrap;">
+          Target: <strong id="summary-target">—</strong>
+          Mode: <strong id="summary-mode">—</strong>
+        </div>
+
+        <!-- Version picker (hidden for crosspoint) -->
+        <div id="version-section">
+          <div class="version-row">
+            <label for="version-select">Firmware version:</label>
+            <select id="version-select" aria-label="Firmware version">
+              <option value="">Loading releases…</option>
+            </select>
+            <button class="version-toggle-btn" id="show-all-versions" aria-pressed="false">
+              Show all
+            </button>
+          </div>
+          <div id="version-error" style="color:var(--color-accent);font-size:0.82rem;display:none;">
+            Could not load release list. Check your connection and try refreshing.
+          </div>
+        </div>
+
+        <!-- CrossPoint binary section (shown only for crosspoint mode) -->
+        <div id="crosspoint-section" style="display:none;">
+          <div class="fallback-chain" id="crosspoint-fallbacks">
+
+            <div class="fallback-step active-fallback" id="fallback-1">
+              <div class="fallback-step-title">
+                <span class="step-num">1</span>
+                Auto-download stock firmware
+              </div>
+              <p>Attempting to fetch the stock firmware directly from the CrossPoint / Xteink distribution…</p>
+              <button class="btn btn-secondary" id="crosspoint-auto-btn">Try Auto-Download</button>
+            </div>
+
+            <div class="fallback-step" id="fallback-2">
+              <div class="fallback-step-title">
+                <span class="step-num">2</span>
+                Download manually &amp; select
+              </div>
+              <p>
+                Download the correct factory firmware for your device from the
+                <a href="#" id="crosspoint-download-link" target="_blank" rel="noopener noreferrer">CrossPoint firmware page</a>
+                then select the file below.
+              </p>
+              <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:0.25rem;">
+                <input type="file" id="crosspoint-file" accept=".bin" style="display:none;" />
+                <button class="btn btn-secondary" id="crosspoint-file-btn">Select firmware .bin…</button>
+                <span id="crosspoint-file-name" style="font-size:0.82rem;align-self:center;color:var(--color-gray);font-family:monospace;"></span>
+              </div>
+            </div>
+
+            <div class="fallback-step" id="fallback-3">
+              <div class="fallback-step-title">
+                <span class="step-num">3</span>
+                Find firmware manually
+              </div>
+              <p>
+                Locate the correct <strong>factory image</strong> (not OTA — must include bootloader and partition table)
+                for your <span id="fallback3-model">device</span>.
+                It is typically named <code>factory.bin</code> or includes <code>-full</code> or <code>-factory</code>
+                in the filename. Once you have it, select it above.
+              </p>
+            </div>
+
+            <div class="fallback-step" id="fallback-4">
+              <div class="fallback-step-title">
+                <span class="step-num">4</span>
+                Full erase + online flasher
+              </div>
+              <p>
+                Erase the device flash entirely, then use the CrossPoint / Xteink online flasher
+                to complete the restore.
+              </p>
+              <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:0.25rem;">
+                <button class="btn btn-secondary" id="crosspoint-erase-btn" disabled>Erase &amp; Open Online Flasher</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Connect -->
+        <div class="connect-row">
+          <button class="btn btn-secondary" id="connect-btn" aria-label="Connect to device via Web Serial">
+            🔌 Connect Device
+          </button>
+          <div class="port-badge" id="port-badge" aria-live="polite">Not connected</div>
+          <button class="btn btn-ghost" id="disconnect-btn" style="display:none;" aria-label="Disconnect">
+            Disconnect
+          </button>
+        </div>
+
+        <!-- Flash button -->
+        <div class="nav-btns">
+          <button class="btn btn-ghost" id="step4-back">← Back</button>
+          <button class="btn btn-primary" id="flash-btn" disabled aria-label="Start flashing">
+            ⚡ Flash Now
+          </button>
+        </div>
+
+        <!-- Progress -->
+        <div class="progress-section" id="progress-section" style="display:none;" aria-live="polite">
+          <div class="progress-label">
+            <span id="progress-label-text">Flashing…</span>
+            <span id="progress-pct" style="float:right;font-variant-numeric:tabular-nums;"></span>
+          </div>
+          <div class="progress-bar-wrap" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-bar-fill" id="progress-bar"></div>
+          </div>
+          <pre class="flash-log" id="flash-log" aria-label="Flash output log"></pre>
+        </div>
+
+        <!-- Done state -->
+        <div class="flash-done" id="flash-done" style="display:none;" role="status">
+          <span class="done-icon">✅</span>
+          <h3>Firmware flashed successfully!</h3>
+          <p style="font-size:0.9rem;">The device is rebooting. You may disconnect it now.</p>
+          <button class="btn btn-secondary" id="flash-again-btn">Flash Again</button>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <script src="flasher.js"></script>
+</body>
+</html>
