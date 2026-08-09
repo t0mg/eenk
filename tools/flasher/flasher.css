@@ -14,6 +14,7 @@
   --color-gray: #888888;
   --color-light: #F4F4F4;
   --color-border: #111111;
+  --color-over-dither: #111111;
   --shadow-hard: 4px 4px 0px #111111;
   --shadow-hard-sm: 2px 2px 0px #111111;
   --border: 2px solid #111111;
@@ -46,6 +47,7 @@ body {
   background: var(--color-bg);
   color: var(--color-fg);
   -webkit-font-smoothing: antialiased;
+  user-select: none;
 }
 
 /* When embedded in Electron, fill the window */
@@ -61,30 +63,20 @@ body.electron-embed .flasher-shell {
   overflow: hidden;
 }
 
-/* Standalone site embed: normal scroll */
-.flasher-standalone-header {
-  background: var(--color-fg);
-  color: var(--color-bg);
-  padding: 1.25rem 2rem;
-  border-bottom: var(--border);
-}
-
-body.electron-embed .flasher-standalone-header {
-  display: none;
-}
-
 /* ── Flasher Shell ───────────────────────────────────────────── */
 .flasher-shell {
   display: grid;
   grid-template-columns: 260px 1fr;
-  height: calc(100vh - 64px);
-  /* subtract site nav height */
-  overflow: hidden;
+  height: 100vh;
 }
 
 body.electron-embed .flasher-shell {
   height: 100%;
   grid-template-columns: 220px 1fr;
+}
+
+body.iframe-embed .flasher-shell {
+  height: 100%;
 }
 
 /* ── Sidebar (Stepper) ──────────────────────────────────────── */
@@ -142,7 +134,7 @@ body.electron-embed .flasher-sidebar {
   font-family: var(--font-heading);
   font-size: 0.75rem;
   font-weight: 800;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-over-dither);
   flex-shrink: 0;
   transition: background 0.2s, color 0.2s;
 }
@@ -155,12 +147,13 @@ body.electron-embed .flasher-sidebar {
 }
 
 .step-indicator.done .step-dot {
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--color-bg);
   color: var(--color-fg);
 }
 
 .step-label {
   padding-top: 0.2rem;
+  color: var(--color-over-dither);
 }
 
 .step-label strong {
@@ -225,7 +218,7 @@ body.electron-embed .flasher-main {
   display: inline-block;
   background: var(--color-fg);
   color: var(--color-bg);
-  padding: 0.1em 0.35em;
+  padding: 1.5rem;
 }
 
 /* ── Warning Box (Step 1) ───────────────────────────────────── */
@@ -346,7 +339,7 @@ body.electron-embed .flasher-main {
 }
 
 body.theme-dark .select-card.selected {
-  background: #2a1a17;
+  background: var(--color-fg);
 }
 
 .select-card .card-icon {
@@ -360,6 +353,15 @@ body.theme-dark .select-card.selected {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+}
+
+body.theme-dark .select-card .card-title {
+  color: var(--color-fg);
+}
+
+
+body.theme-dark .select-card.selected .card-title {
+  color: var(--color-bg);
 }
 
 .select-card .card-desc {
@@ -511,6 +513,7 @@ body.theme-dark .port-badge.connected {
   gap: 0.75rem;
   flex-wrap: wrap;
   margin-top: 0.5rem;
+  justify-content: space-between;
 }
 
 /* ── Progress ───────────────────────────────────────────────── */
@@ -645,10 +648,6 @@ body.theme-dark .flash-done {
   background: #0f2e18;
   border-color: #7de09a;
   box-shadow: 4px 4px 0 #7de09a;
-}
-
-.flash-done .done-icon {
-  font-size: 2rem;
 }
 
 .flash-done h3 {

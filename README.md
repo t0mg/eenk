@@ -73,3 +73,9 @@ pio run -e esp32c3 -t upload
 ```
 
 Alternatively, you can flash using the **Flash** tab within the eenky IDE, which uses ESP Web Tools to push `firmware-factory.bin` over USB.
+
+---
+
+## 4. Credits & Acknowledgments
+
+eenk builds upon the work of open-source firmware projects, drivers, and runtime libraries. See [credits.md](credits.md) for the complete list of credits and software acknowledgments.

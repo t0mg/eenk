@@ -310,8 +310,9 @@ Shortcuts are defined in `app/main-process/appmenus.js`. Key shortcuts include `
 > [!IMPORTANT]
 > When adding or modifying keyboard shortcuts, always:
 > 1. Update the shortcuts definition in `appmenus.js`.
-> 2. Verify the Shortcuts help window (accessible from the Help menu) is properly updated to reflect the change.
+> 2. Verify the Shortcuts help window (`app/renderer/src/components/Modals.vue`) is properly updated to reflect the change.
 > 3. Check for conflicts with existing Electron or CodeMirror shortcuts.
+> 4. Update the shortuts table in `eenky/docs/pages/eenky.md` in the root repository.
 
 ---
 

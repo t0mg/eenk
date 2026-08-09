@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "build": "node build.js",
-    "dev": "node build.js --watch"
+    "dev": "node build.js --watch && python -m http.server -d dist"
   },
   "dependencies": {
     "marked": "^12.0.0"

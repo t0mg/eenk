@@ -1,6 +1,6 @@
 <div class="page-content">
 
-# Installation
+# Build eenk
 
 Everything you need to build eenk firmware from source and set up the eenky IDE.
 
@@ -154,8 +154,14 @@ Connect your device via USB and run:
 pio run -e esp32c3 -t upload
 ```
 
+or for the X4Pro:
+
+```powershell
+pio run -e esp32s3 -t upload
+```
+
 ### Via eenky IDE
 
-The eenky Device Manager includes a **Flash Firmware** tab with the same wizard-style flasher embedded directly in the IDE.
+The eenky Device Manager window includes the same  [Web Flasher](../flasher/index.html) embedded directly in the IDE.
 
 </div>

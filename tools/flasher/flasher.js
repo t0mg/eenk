@@ -15,21 +15,21 @@
 'use strict';
 
 /* ── Constants ─────────────────────────────────────────────────── */
-const GITHUB_REPO    = 't0mg/eenk';
-const RELEASES_API   = `https://api.github.com/repos/${GITHUB_REPO}/releases`;
-const FLASH_BAUD     = 921600;
+const GITHUB_REPO = 't0mg/eenk';
+const RELEASES_API = `https://api.github.com/repos/${GITHUB_REPO}/releases`;
+const FLASH_BAUD = 921600;
 
 /** CrossPoint / Xteink stock firmware download pages per target */
 const CROSSPOINT_LINKS = {
-  X3:    'https://www.crosspoint.fr/firmware',
-  X4:    'https://www.crosspoint.fr/firmware',
+  X3: 'https://www.crosspoint.fr/firmware',
+  X4: 'https://www.crosspoint.fr/firmware',
   X4Pro: 'https://www.crosspoint.fr/firmware',
 };
 
 /** Auto-download URL patterns (attempt before requesting manual upload) */
 const CROSSPOINT_AUTO_URLS = {
-  X3:    null,  // Fill in if a direct-download URL becomes available
-  X4:    null,
+  X3: null,  // Fill in if a direct-download URL becomes available
+  X4: null,
   X4Pro: null,
 };
 
@@ -39,77 +39,82 @@ const IS_ELECTRON = (
   (typeof navigator !== 'undefined' && /Electron/.test(navigator.userAgent))
 );
 
+const IS_IFRAME = typeof window !== 'undefined' && window.self !== window.top;
+
 if (IS_ELECTRON) {
   document.body.classList.add('electron-embed');
+}
+if (IS_IFRAME) {
+  document.body.classList.add('iframe-embed');
 }
 
 /* ── State ──────────────────────────────────────────────────────── */
 const state = {
-  step:          1,
-  target:        null,   // 'X3' | 'X4' | 'X4Pro'
-  mode:          null,   // 'factory' | 'update' | 'crosspoint'
-  releaseTag:    null,
-  manifest:      null,
-  port:          null,
-  transport:     null,
-  loader:        null,
-  flashing:      false,
+  step: 1,
+  target: null,   // 'X3' | 'X4' | 'X4Pro'
+  mode: null,   // 'factory' | 'update' | 'crosspoint'
+  releaseTag: null,
+  manifest: null,
+  port: null,
+  transport: null,
+  loader: null,
+  flashing: false,
   showAllReleases: false,
   stableReleases: [],
-  allReleases:    [],
+  allReleases: [],
   crosspointBinaryData: null,  // ArrayBuffer from file picker or auto-download
 };
 
 /* ── DOM references ─────────────────────────────────────────────── */
-const $ = id => document.getElementById(id);
+const $id = id => document.getElementById(id);
 
 // Step panels & sidebar
-const stepPanels  = [1, 2, 3, 4].map(n => $(`step-${n}`));
-const sidebarSteps = [1, 2, 3, 4].map(n => $(`sidebar-step-${n}`));
+const stepPanels = [1, 2, 3, 4].map(n => $id(`step-${n}`));
+const sidebarSteps = [1, 2, 3, 4].map(n => $id(`sidebar-step-${n}`));
 
 // Step 1
-const unlockConfirm = $('unlock-confirm');
-const step1Next     = $('step1-next');
+const unlockConfirm = $id('unlock-confirm');
+const step1Next = $id('step1-next');
 
 // Step 2
-const targetCards   = document.querySelectorAll('[data-target]');
-const step2Back     = $('step2-back');
-const step2Next     = $('step2-next');
+const targetCards = document.querySelectorAll('[data-target]');
+const step2Back = $id('step2-back');
+const step2Next = $id('step2-next');
 
 // Step 3
-const modeCards     = document.querySelectorAll('[data-mode]');
-const step3Back     = $('step3-back');
-const step3Next     = $('step3-next');
+const modeCards = document.querySelectorAll('[data-mode]');
+const step3Back = $id('step3-back');
+const step3Next = $id('step3-next');
 
 // Step 4
-const versionSelect     = $('version-select');
-const showAllBtn        = $('show-all-versions');
-const versionError      = $('version-error');
-const versionSection    = $('version-section');
-const crosspointSection = $('crosspoint-section');
-const connectBtn        = $('connect-btn');
-const disconnectBtn     = $('disconnect-btn');
-const portBadge         = $('port-badge');
-const flashBtn          = $('flash-btn');
-const step4Back         = $('step4-back');
-const progressSection   = $('progress-section');
-const progressBar       = $('progress-bar');
-const progressLabel     = $('progress-label-text');
-const progressPct       = $('progress-pct');
-const flashLog          = $('flash-log');
-const flashDone         = $('flash-done');
-const flashAgainBtn     = $('flash-again-btn');
-const summaryTarget     = $('summary-target');
-const summaryMode       = $('summary-mode');
+const versionSelect = $id('version-select');
+const showAllBtn = $id('show-all-versions');
+const versionError = $id('version-error');
+const versionSection = $id('version-section');
+const crosspointSection = $id('crosspoint-section');
+const connectBtn = $id('connect-btn');
+const disconnectBtn = $id('disconnect-btn');
+const portBadge = $id('port-badge');
+const flashBtn = $id('flash-btn');
+const step4Back = $id('step4-back');
+const progressSection = $id('progress-section');
+const progressBar = $id('progress-bar');
+const progressLabel = $id('progress-label-text');
+const progressPct = $id('progress-pct');
+const flashLog = $id('flash-log');
+const flashDone = $id('flash-done');
+const flashAgainBtn = $id('flash-again-btn');
+const summaryTarget = $id('summary-target');
+const summaryMode = $id('summary-mode');
 
 // CrossPoint
-const crosspointAutoBtn      = $('crosspoint-auto-btn');
-const crosspointFileBtn      = $('crosspoint-file-btn');
-const crosspointFileInput    = $('crosspoint-file');
-const crosspointFileName     = $('crosspoint-file-name');
-const crosspointDownloadLink = $('crosspoint-download-link');
-const crosspointEraseBtn     = $('crosspoint-erase-btn');
-const fallback3Model         = $('fallback3-model');
+const crosspointAutoBtn = $id('crosspoint-auto-btn');
+const crosspointFileBtn = $id('crosspoint-file-btn');
+const crosspointFileInput = $id('crosspoint-file');
+const crosspointFileName = $id('crosspoint-file-name');
+const crosspointDownloadLink = $id('crosspoint-download-link');
+const crosspointEraseBtn = $id('crosspoint-erase-btn');
+const fallback3Model = $id('fallback3-model');
 
 /* ── Navigation ─────────────────────────────────────────────────── */
 function goToStep(n) {
@@ -176,7 +181,7 @@ function renderStep4() {
   summaryMode.textContent = { factory: 'Factory Flash', update: 'Update', crosspoint: 'CrossPoint / Stock Restore' }[state.mode] || '—';
 
   const isCrosspoint = state.mode === 'crosspoint';
-  versionSection.style.display    = isCrosspoint ? 'none' : '';
+  versionSection.style.display = isCrosspoint ? 'none' : '';
   crosspointSection.style.display = isCrosspoint ? '' : 'none';
 
   if (isCrosspoint) {
@@ -199,7 +204,7 @@ async function loadReleases() {
     const res = await fetch(RELEASES_API);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const all = await res.json();
-    state.allReleases    = all;
+    state.allReleases = all;
     state.stableReleases = all.filter(r => !r.prerelease && !r.draft);
     populateVersionDropdown();
   } catch (err) {
@@ -229,7 +234,7 @@ function populateVersionDropdown() {
 
 versionSelect.addEventListener('change', () => {
   state.releaseTag = versionSelect.value;
-  state.manifest   = null;  // reset cached manifest on version change
+  state.manifest = null;  // reset cached manifest on version change
   updateFlashButton();
 });
 
@@ -242,7 +247,7 @@ showAllBtn.addEventListener('click', () => {
 
 /* ── CrossPoint UI ──────────────────────────────────────────────── */
 function renderCrosspointUI() {
-  crosspointDownloadLink.href   = CROSSPOINT_LINKS[state.target] || '#';
+  crosspointDownloadLink.href = CROSSPOINT_LINKS[state.target] || '#';
   crosspointDownloadLink.textContent = 'CrossPoint / Xteink firmware page';
   if (fallback3Model) fallback3Model.textContent = state.target;
 
@@ -258,10 +263,10 @@ function renderCrosspointUI() {
 
 function activateFallback(n) {
   [1, 2, 3, 4].forEach(i => {
-    const el = $(`fallback-${i}`);
+    const el = $id(`fallback-${i}`);
     if (!el) return;
     el.classList.remove('active-fallback', 'completed');
-    if (i < n)  el.classList.add('completed');
+    if (i < n) el.classList.add('completed');
     if (i === n) el.classList.add('active-fallback');
   });
 }
@@ -328,14 +333,13 @@ connectBtn.addEventListener('click', async () => {
   }
   try {
     state.port = await navigator.serial.requestPort();
-    await state.port.open({ baudRate: FLASH_BAUD });
     state.transport = new Transport(state.port, true);
-    portBadge.textContent = getPortName(state.port);
+    portBadge.textContent = `Connected (${getPortName(state.port)})`;
     portBadge.classList.add('connected');
-    connectBtn.style.display    = 'none';
+    connectBtn.style.display = 'none';
     disconnectBtn.style.display = '';
     if (state.mode === 'crosspoint') crosspointEraseBtn.disabled = false;
-    log('✓ Port opened.', 'info');
+    log('✓ Serial port selected.', 'info');
     updateFlashButton();
   } catch (err) {
     if (err.name !== 'NotFoundError') {
@@ -348,7 +352,7 @@ disconnectBtn.addEventListener('click', async () => {
   await closePort();
   portBadge.textContent = 'Not connected';
   portBadge.classList.remove('connected');
-  connectBtn.style.display    = '';
+  connectBtn.style.display = '';
   disconnectBtn.style.display = 'none';
   if (state.mode === 'crosspoint') crosspointEraseBtn.disabled = true;
   updateFlashButton();
@@ -357,27 +361,27 @@ disconnectBtn.addEventListener('click', async () => {
 async function closePort() {
   try {
     if (state.transport) await state.transport.disconnect();
-    if (state.port)      await state.port.close();
-  } catch (_) {}
+    if (state.port) await state.port.close();
+  } catch (_) { }
   state.transport = null;
-  state.port      = null;
-  state.loader    = null;
+  state.port = null;
+  state.loader = null;
 }
 
 function getPortName(port) {
   const info = port.getInfo?.() || {};
-  if (info.usbVendorId)  return `USB 0x${info.usbVendorId.toString(16).padStart(4,'0')}:0x${info.usbProductId?.toString(16).padStart(4,'0') ?? '????'}`;
+  if (info.usbVendorId) return `USB 0x${info.usbVendorId.toString(16).padStart(4, '0')}:0x${info.usbProductId?.toString(16).padStart(4, '0') ?? '????'}`;
   return 'Serial port';
 }
 
 /* ── Flash Button State ─────────────────────────────────────────── */
 function updateFlashButton() {
   if (state.flashing) { flashBtn.disabled = true; return; }
-  const hasPort    = !!state.port;
-  const hasTarget  = !!state.target;
-  const hasMode    = !!state.mode;
+  const hasPort = !!state.port;
+  const hasTarget = !!state.target;
+  const hasMode = !!state.mode;
   const hasVersion = state.mode === 'crosspoint' ? true : !!versionSelect.value;
-  const hasCpBin   = state.mode !== 'crosspoint' ? true : !!state.crosspointBinaryData;
+  const hasCpBin = state.mode !== 'crosspoint' ? true : !!state.crosspointBinaryData;
   flashBtn.disabled = !(hasPort && hasTarget && hasMode && hasVersion && hasCpBin);
 }
 
@@ -386,25 +390,25 @@ step4Back.addEventListener('click', () => goToStep(3));
 /* ── Flash Sequence ─────────────────────────────────────────────── */
 flashBtn.addEventListener('click', startFlash);
 flashAgainBtn.addEventListener('click', () => {
-  flashDone.style.display    = 'none';
+  flashDone.style.display = 'none';
   progressSection.style.display = 'none';
-  progressBar.style.width    = '0%';
+  progressBar.style.width = '0%';
   progressBar.classList.remove('complete');
-  flashLog.textContent       = '';
-  flashBtn.disabled          = false;
+  flashLog.textContent = '';
+  flashBtn.disabled = false;
 });
 
 async function initLoader() {
   if (!state.loader) {
     const terminal = {
-      clean:     ()  => { flashLog.textContent = ''; },
+      clean: () => { flashLog.textContent = ''; },
       writeLine: (s) => log(s),
-      write:     (s) => log(s, 'raw'),
+      write: (s) => log(s, 'raw'),
     };
     state.loader = new ESPLoader({
-      transport:    state.transport,
-      baudrate:     FLASH_BAUD,
-      romBaudrate:  115200,
+      transport: state.transport,
+      baudrate: FLASH_BAUD,
+      romBaudrate: 115200,
       terminal,
     });
   }
@@ -414,9 +418,9 @@ async function initLoader() {
 async function startFlash() {
   if (state.flashing) return;
   state.flashing = true;
-  flashBtn.disabled  = true;
+  flashBtn.disabled = true;
   step4Back.disabled = true;
-  flashDone.style.display    = 'none';
+  flashDone.style.display = 'none';
   progressSection.style.display = '';
   flashLog.textContent = '';
 
@@ -424,8 +428,8 @@ async function startFlash() {
     // Detect chip
     log('⚡ Connecting to chip…', 'info');
     const loader = await initLoader();
-    const chip   = await loader.main_fn();
-    log(`✓ Chip detected: ${chip}`, 'info');
+    const chip = await loader.main();
+    log(`✓ Chip detected: ${chip || 'connected'}`, 'info');
 
     if (state.mode === 'crosspoint') {
       await flashCrosspoint(loader);
@@ -436,14 +440,14 @@ async function startFlash() {
     progressBar.style.width = '100%';
     progressBar.classList.add('complete');
     progressLabel.textContent = 'Done!';
-    progressPct.textContent   = '100%';
+    progressPct.textContent = '100%';
     log('✅ All done! Device is rebooting.', 'success');
-    flashDone.style.display   = '';
+    flashDone.style.display = '';
 
     await closePort();
     portBadge.textContent = 'Not connected';
     portBadge.classList.remove('connected');
-    connectBtn.style.display    = '';
+    connectBtn.style.display = '';
     disconnectBtn.style.display = 'none';
 
   } catch (err) {
@@ -451,7 +455,7 @@ async function startFlash() {
     console.error(err);
     flashBtn.disabled = false;
   } finally {
-    state.flashing     = false;
+    state.flashing = false;
     step4Back.disabled = false;
     updateFlashButton();
   }
@@ -460,7 +464,7 @@ async function startFlash() {
 async function flashFromManifest(loader) {
   // Load manifest if not cached
   if (!state.manifest) {
-    const tag         = versionSelect.value;
+    const tag = versionSelect.value;
     const manifestUrl = `https://github.com/${GITHUB_REPO}/releases/download/${tag}/manifest.json`;
     log(`⬇ Fetching manifest for ${tag}…`, 'info');
     const res = await fetch(manifestUrl);
@@ -473,50 +477,68 @@ async function flashFromManifest(loader) {
     throw new Error(`No binaries defined in manifest for ${state.target}/${state.mode}`);
   }
 
-  if (state.mode === 'factory') {
-    log('🗑 Erasing flash…', 'info');
-    await loader.erase_flash();
-    log('✓ Flash erased.', 'info');
-  }
-
+  const fileArray = [];
   const totalBinaries = entry.binaries.length;
+
   for (let i = 0; i < totalBinaries; i++) {
     const { offset, url } = entry.binaries[i];
     log(`⬇ Downloading binary ${i + 1}/${totalBinaries}…`, 'info');
-    const data = await fetchBinaryAsBase64(url, (pct) => {
-      const overall = ((i / totalBinaries) + (pct / 100 / totalBinaries)) * 100;
-      setProgress(Math.round(overall * 0.6), `Downloading ${i + 1}/${totalBinaries}…`);
+    const buffer = await fetchBinaryAsArrayBuffer(url, (pct) => {
+      const overall = ((i / totalBinaries) + (pct / 100 / totalBinaries)) * 40;
+      setProgress(Math.round(overall), `Downloading ${i + 1}/${totalBinaries}…`);
     });
-    log(`⚡ Writing at offset ${offset}…`, 'info');
-    await loader.flash_data(data, parseInt(offset, 16), (pct) => {
-      const overall = 60 + ((i / totalBinaries) + (pct / 100 / totalBinaries)) * 40;
-      setProgress(Math.round(overall), `Flashing ${i + 1}/${totalBinaries}…`);
+    fileArray.push({
+      data: loader.ui8ToBstr(new Uint8Array(buffer)),
+      address: typeof offset === 'string' ? parseInt(offset, 16) : offset
     });
-    log(`✓ Binary ${i + 1}/${totalBinaries} written.`, 'success');
   }
 
-  await loader.hard_reset();
+  log('⚡ Flashing binaries to device…', 'info');
+  await loader.writeFlash({
+    fileArray,
+    flashSize: 'keep',
+    eraseAll: state.mode === 'factory',
+    compress: true,
+    reportProgress: (fileIdx, written, total) => {
+      const filePct = total > 0 ? (written / total) : 0;
+      const overall = 40 + ((fileIdx / totalBinaries) + (filePct / totalBinaries)) * 60;
+      setProgress(Math.min(100, Math.round(overall)), `Flashing ${fileIdx + 1}/${totalBinaries}…`);
+    }
+  });
+
+  log('✓ All binaries written.', 'success');
+  await loader.hardReset();
 }
 
 async function flashCrosspoint(loader) {
   if (!state.crosspointBinaryData) {
     throw new Error('No CrossPoint binary selected.');
   }
-  log('🗑 Erasing flash for stock restore…', 'info');
-  await loader.erase_flash();
-  log('✓ Erased.', 'info');
-  setProgress(20, 'Writing stock firmware…');
+  log('🗑 Erasing flash & restoring stock firmware…', 'info');
+  setProgress(10, 'Writing stock firmware…');
 
-  const b64 = arrayBufferToBase64(state.crosspointBinaryData);
-  await loader.flash_data(b64, 0x0, (pct) => {
-    setProgress(20 + Math.round(pct * 0.8), 'Writing stock firmware…');
+  const fileArray = [{
+    data: loader.ui8ToBstr(new Uint8Array(state.crosspointBinaryData)),
+    address: 0x0
+  }];
+
+  await loader.writeFlash({
+    fileArray,
+    flashSize: 'keep',
+    eraseAll: true,
+    compress: true,
+    reportProgress: (fileIdx, written, total) => {
+      const pct = total > 0 ? Math.round((written / total) * 100) : 0;
+      setProgress(10 + Math.round(pct * 0.85), `Writing stock firmware (${pct}%)…`);
+    }
   });
 
-  await loader.hard_reset();
+  log('✓ Stock firmware written.', 'success');
+  await loader.hardReset();
 }
 
 /* ── Fetch binary with progress ─────────────────────────────────── */
-async function fetchBinaryAsBase64(url, onProgress) {
+async function fetchBinaryAsArrayBuffer(url, onProgress) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to fetch ${url}: HTTP ${res.status}`);
   const total = parseInt(res.headers.get('content-length') || '0', 10);
@@ -534,13 +556,16 @@ async function fetchBinaryAsBase64(url, onProgress) {
 
   const buffer = new Uint8Array(received);
   let pos = 0;
-  for (const chunk of chunks) { buffer.set(chunk, pos); pos += chunk.length; }
-  return arrayBufferToBase64(buffer.buffer);
+  for (const chunk of chunks) {
+    buffer.set(chunk, pos);
+    pos += chunk.length;
+  }
+  return buffer.buffer;
 }
 
 function arrayBufferToBase64(buffer) {
   const bytes = new Uint8Array(buffer);
-  let binary  = '';
+  let binary = '';
   for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary);
 }
@@ -550,8 +575,8 @@ function log(msg, type = 'default') {
   const line = document.createElement('span');
   line.textContent = msg + '\n';
   if (type === 'success') line.className = 'log-success';
-  else if (type === 'error')   line.className = 'log-error';
-  else if (type === 'info')    line.className = 'log-info';
+  else if (type === 'error') line.className = 'log-error';
+  else if (type === 'info') line.className = 'log-info';
   flashLog.appendChild(line);
   flashLog.scrollTop = flashLog.scrollHeight;
 }

@@ -14,6 +14,7 @@
   --color-light: #F4F4F4;
   --color-border: #111111;
   --color-success: #2D9048;
+  --color-over-dither: #111111;
   --shadow-hard: 4px 4px 0px #111111;
   --shadow-hard-sm: 2px 2px 0px #111111;
   --border: 2px solid #111111;
@@ -55,25 +56,10 @@ body {
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+  user-select: none;
 }
 
-/* ── Standalone header (hidden in Electron) ─────────────────── */
-.dm-standalone-header {
-  background: var(--color-fg);
-  color: var(--color-bg);
-  padding: 0.9rem 1.5rem;
-  border-bottom: var(--border);
-  font-family: var(--font-heading);
-  font-size: 1rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  flex-shrink: 0;
-}
 
-body.electron-embed .dm-standalone-header {
-  display: none;
-}
 
 /* ── Shell ──────────────────────────────────────────────────── */
 .dm-shell {
@@ -95,6 +81,7 @@ body.electron-embed .dm-standalone-header {
   gap: 1rem;
   flex-wrap: wrap;
   flex-shrink: 0;
+  height: 64px;
 }
 
 .dm-header-title {
@@ -103,7 +90,7 @@ body.electron-embed .dm-standalone-header {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--color-over-dither);
   flex-shrink: 0;
 }
 
@@ -120,17 +107,16 @@ body.electron-embed .dm-standalone-header {
   height: 8px;
   border-radius: 50%;
   background: var(--color-gray);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 1px solid var(--color-over-dither);
   flex-shrink: 0;
 }
 
 .status-dot.connected {
-  background: #5EDD6E;
-  border-color: rgba(255, 255, 255, 0.3);
+  background: var(--color-success);
 }
 
 .status-dot.connecting {
-  background: #FFD166;
+  background: var(--color-accent);
   animation: pulse 1s infinite;
 }
 
@@ -148,7 +134,7 @@ body.electron-embed .dm-standalone-header {
 
 .status-text {
   font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--color-over-dither);
   font-family: 'Courier New', monospace;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -219,10 +205,10 @@ body.theme-dark .sd-bar-wrap {
 }
 
 .dm-tab {
-  padding: 0.6rem 1.25rem;
+  padding: 1rem 1.5rem;
   font-family: var(--font-heading);
-  font-size: 0.78rem;
-  font-weight: 800;
+  font-size: 0.85rem;
+  font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   cursor: pointer;

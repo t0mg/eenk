@@ -24,9 +24,12 @@ const IS_ELECTRON = (
   (typeof navigator !== 'undefined' && /Electron/.test(navigator.userAgent))
 );
 
+const IS_IFRAME = typeof window !== 'undefined' && window.self !== window.top;
+
 const HAS_FS_API = IS_ELECTRON && typeof window.api?.fs !== 'undefined';
 
 if (IS_ELECTRON) document.body.classList.add('electron-embed');
+if (IS_IFRAME) document.body.classList.add('iframe-embed');
 
 /* ── State ──────────────────────────────────────────────────────── */
 const state = {

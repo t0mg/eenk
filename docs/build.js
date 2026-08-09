@@ -66,10 +66,8 @@ function canonicalUrl(outFile) {
 function buildNavItems(activeId) {
   return nav.map(item => {
     const isActive = item.id === activeId;
-    const isExternal = !!item.external;
     const classes = [
-      isActive ? 'active' : '',
-      isExternal ? 'flasher-link' : '',  // reuse existing accent style for all external modules
+      isActive ? 'active' : ''
     ].filter(Boolean).join(' ');
     const href = item.out;
     return `<li><a href="${href}"${classes ? ` class="${classes}"` : ''} aria-current="${isActive ? 'page' : 'false'}">${item.title}</a></li>`;
@@ -104,6 +102,10 @@ function build() {
   // 2. Copy flasher/ and device-manager/ (portable modules, live in repo root)
   if (fs.existsSync(FLASHER_SRC)) {
     copyDir(FLASHER_SRC, path.join(DIST_DIR, 'flasher'));
+    const flasherIndex = path.join(DIST_DIR, 'flasher', 'index.html');
+    if (fs.existsSync(flasherIndex)) {
+      fs.renameSync(flasherIndex, path.join(DIST_DIR, 'flasher', 'app.html'));
+    }
     console.log('  ✓ Copied flasher/');
   } else {
     console.warn('  ⚠ flasher/ directory not found — skipping');
@@ -111,6 +113,10 @@ function build() {
 
   if (fs.existsSync(DEVICE_MANAGER_SRC)) {
     copyDir(DEVICE_MANAGER_SRC, path.join(DIST_DIR, 'device-manager'));
+    const dmIndex = path.join(DIST_DIR, 'device-manager', 'index.html');
+    if (fs.existsSync(dmIndex)) {
+      fs.renameSync(dmIndex, path.join(DIST_DIR, 'device-manager', 'app.html'));
+    }
     console.log('  ✓ Copied device-manager/');
   } else {
     console.warn('  ⚠ device-manager/ directory not found — skipping');
@@ -118,35 +124,38 @@ function build() {
 
   // 3. Build each page
   for (const page of nav) {
-    // External module: directory already copied above, no HTML render needed
-    if (page.external) {
-      console.log(`  ✓ External module: ${page.id}/`);
-      continue;
-    }
-
     const outFile = page.out;
     const assetPfx = assetRoot(outFile);
     const outPath = path.join(DIST_DIR, outFile);
 
     ensureDir(path.dirname(outPath));
 
-    // Read primary markdown
-    let mdContent = fs.readFileSync(path.join(DOCS_DIR, page.src), 'utf8');
+    let bodyHtml = '';
+    let bodyClass = '';
 
-    // Append any extra markdown files (e.g. WritingWithEenk.md into eenky page)
-    if (page.importAppend) {
-      for (const rel of page.importAppend) {
-        const appendPath = path.resolve(DOCS_DIR, rel);
-        if (fs.existsSync(appendPath)) {
-          const appendMd = fs.readFileSync(appendPath, 'utf8');
-          mdContent += '\n\n---\n\n' + appendMd;
-        } else {
-          console.warn(`  ⚠ importAppend file not found: ${appendPath}`);
+    if (page.external) {
+      bodyClass = ' class="is-module"';
+      bodyHtml = `<iframe src="app.html" title="${page.title}" class="module-iframe" allow="serial"></iframe>`;
+      console.log(`  ✓ External module wrapper: ${page.id} (${outFile})`);
+    } else {
+      // Read primary markdown
+      let mdContent = fs.readFileSync(path.join(DOCS_DIR, page.src), 'utf8');
+
+      // Append any extra markdown files (e.g. WritingWithEenk.md into eenky page)
+      if (page.importAppend) {
+        for (const rel of page.importAppend) {
+          const appendPath = path.resolve(DOCS_DIR, rel);
+          if (fs.existsSync(appendPath)) {
+            const appendMd = fs.readFileSync(appendPath, 'utf8');
+            mdContent += '\n\n<div class="page-content">\n\n' + appendMd + '\n\n</div>';
+          } else {
+            console.warn(`  ⚠ importAppend file not found: ${appendPath}`);
+          }
         }
       }
-    }
 
-    const bodyHtml = marked.parse(mdContent);
+      bodyHtml = marked.parse(mdContent);
+    }
 
     // Build nav items with correct relative hrefs
     const rawNavItems = buildNavItems(page.id);
@@ -155,6 +164,7 @@ function build() {
     // Inject into template
     const description = site.description;
     let html = templateHtml
+      .replaceAll('{{BODY_CLASS}}', bodyClass)
       .replaceAll('{{PAGE_TITLE}}', page.title)
       .replaceAll('{{PAGE_DESCRIPTION}}', description)
       .replaceAll('{{CANONICAL_URL}}', canonicalUrl(outFile))

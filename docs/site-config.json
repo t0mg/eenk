@@ -14,17 +14,19 @@
       "out": "index.html"
     },
     {
-      "id": "installation",
-      "title": "Installation",
-      "src": "pages/installation.md",
-      "out": "installation/index.html"
+      "id": "userguide",
+      "title": "User Guide",
+      "src": "pages/userguide.md",
+      "out": "userguide/index.html"
     },
     {
       "id": "eenky",
       "title": "Eenky IDE",
       "src": "pages/eenky.md",
       "out": "eenky/index.html",
-      "importAppend": ["../WritingWithEenk.md"]
+      "importAppend": [
+        "../WritingWithEenk.md"
+      ]
     },
     {
       "id": "flasher",
@@ -39,6 +41,22 @@
       "src": null,
       "out": "device-manager/index.html",
       "external": "../device-manager/index.html"
+    },
+    {
+      "id": "build",
+      "title": "Build eenk",
+      "src": "pages/build.md",
+      "out": "build/index.html"
+    },
+    {
+      "id": "credits",
+      "title": "Credits",
+      "src": "pages/credits.md",
+      "out": "credits/index.html",
+      "importAppend": [
+        "../credits.md",
+        "../tools/eenky/credits.md"
+      ]
     }
   ]
 }

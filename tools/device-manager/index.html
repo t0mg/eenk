@@ -1,16 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="Manage stories on your eenk device over USB — no drivers required." />
   <title>Device Manager — eenk</title>
+  <link rel="stylesheet" href="../assets/fonts/material-symbols-outlined.css" />
   <link rel="stylesheet" href="device-manager.css" />
 </head>
-<body>
 
-  <!-- Standalone site header (hidden in Electron) -->
-  <div class="dm-standalone-header">eenk / Device Manager</div>
+<body>
 
   <!-- Web Serial unavailable warning (shown by JS if needed) -->
   <div class="serial-unavailable" id="serial-warn" style="display:none;">
@@ -37,13 +37,14 @@
 
       <div class="dm-header-actions">
         <button class="btn btn-secondary" id="connect-btn" aria-label="Connect to eenk device">
-          🔌 Connect
+          <span class="material-symbols-outlined">usb</span> Connect
         </button>
         <button class="btn btn-secondary" id="disconnect-btn" style="display:none;" aria-label="Disconnect">
-          Disconnect
+          <span class="material-symbols-outlined">usb_off</span> Disconnect
         </button>
-        <button class="btn btn-secondary" id="refresh-btn" style="display:none;" aria-label="Refresh file list" title="Refresh">
-          ↺
+        <button class="btn btn-secondary" id="refresh-btn" style="display:none;" aria-label="Refresh file list"
+          title="Refresh">
+          <span class="material-symbols-outlined">refresh</span>
         </button>
       </div>
     </header>
@@ -59,11 +60,11 @@
 
     <!-- ── Tabs ────────────────────────────────────────────── -->
     <div class="dm-tabs" id="tab-strip" role="tablist">
-      <button class="dm-tab active" role="tab" aria-selected="true"  data-tab="stories" id="tab-stories">
-        📖 Stories
+      <button class="dm-tab active" role="tab" aria-selected="true" data-tab="stories" id="tab-stories">
+        <span class="material-symbols-outlined">menu_book</span> Stories
       </button>
-      <button class="dm-tab"        role="tab" aria-selected="false" data-tab="saves"   id="tab-saves">
-        💾 Saves
+      <button class="dm-tab" role="tab" aria-selected="false" data-tab="saves" id="tab-saves">
+        <span class="material-symbols-outlined">save</span> Saves
       </button>
     </div>
 
@@ -72,18 +73,19 @@
 
       <!-- Disconnected empty state -->
       <div class="dm-empty" id="empty-state">
-        <div class="dm-empty-icon">🔌</div>
+        <div class="dm-empty-icon"><span class="material-symbols-outlined" style="font-size:3rem;">usb</span></div>
         <h2>Connect your eenk device</h2>
         <p>Connect via USB, then click <strong>Connect</strong> above.<br>
-           The device must be on and showing the menu screen (not playing a story).</p>
+          The device must be on and showing the menu screen (not playing a story).</p>
       </div>
 
       <!-- Stories tab -->
-      <div class="tab-panel active" id="panel-stories" role="tabpanel" aria-labelledby="tab-stories" style="display:none;">
+      <div class="tab-panel active" id="panel-stories" role="tabpanel" aria-labelledby="tab-stories"
+        style="display:none;">
         <div class="file-list-header">
           <span class="file-list-title">Stories</span>
           <label class="btn btn-secondary" for="upload-input" id="upload-label" aria-label="Upload story .bin file">
-            ↑ Upload Story…
+            <span class="material-symbols-outlined">upload</span> Upload Story…
           </label>
           <input type="file" id="upload-input" accept=".bin" style="display:none;" multiple />
         </div>
@@ -101,7 +103,8 @@
 
         <!-- Upload drop zone -->
         <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Drop .bin file here to upload">
-          <span class="upload-icon">📁</span>
+          <span class="upload-icon"><span class="material-symbols-outlined"
+              style="font-size:2rem;">folder_open</span></span>
           <span class="upload-hint">Drop <strong>.bin</strong> story file here, or click Upload Story above</span>
         </div>
 
@@ -133,13 +136,14 @@
   </div>
 
   <!-- Delete confirm modal -->
-  <div class="modal-backdrop" id="confirm-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="confirm-heading">
+  <div class="modal-backdrop" id="confirm-modal" style="display:none;" role="dialog" aria-modal="true"
+    aria-labelledby="confirm-heading">
     <div class="modal-box">
       <h3 id="confirm-heading">Delete item?</h3>
       <p id="confirm-text">This action cannot be undone.</p>
       <div class="modal-actions">
         <button class="btn btn-secondary" id="confirm-cancel">Cancel</button>
-        <button class="btn btn-primary"   id="confirm-ok"     style="background:#CC0000;border-color:#CC0000;">Delete</button>
+        <button class="btn btn-primary" id="confirm-ok" style="background:#CC0000;border-color:#CC0000;">Delete</button>
       </div>
     </div>
   </div>
@@ -147,4 +151,5 @@
   <script src="serial-protocol.js"></script>
   <script src="device-manager.js"></script>
 </body>
+
 </html>

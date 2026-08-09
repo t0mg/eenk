@@ -7,33 +7,19 @@
 ## Features
 
 - **CodeMirror 6** editor with Ink syntax highlighting and snippet support
-- **One-click compile** — runs `inklecate → inkcpp_cl` to produce a `.bin` ready for hardware
-- **Integrated simulator** — renders your story in a live 800×480 e-ink window
-- **Device Manager** — browse, upload, and delete stories on your eenk device via USB Serial
-- **Flash Firmware** — wizard-style Web Serial flasher for installing and updating firmware
-- **Custom font conversion** — converts `.ttf` files to the `.epdfont` format used by eenk
-- **Image processing** — dithers and packs images into the `.media` sidecar format
+- **One-click compile** — runs the custom `inklecate → inkcpp_cl → eenk` pipeline to produce the `.bin` file the firmware expects, automatically converts `.ttf` files to the `.epdfont` format used by eenk, and dithers and packs images into a `.media` "sidecar" file
+- **Integrated simulator** — preview what the story will look like on a simulated 800×480 e-ink display
+- **Device Manager** — manage stories and save files on your eenk device connected via USB (also available [on this website](/device-manager))
+- **Flash Firmware** — wizard-style flasher for installing and updating the firmware (also available [on this website](/flasher))
 
 ## Installation
 
 Download the latest eenky release for your platform from the [GitHub Releases](https://github.com/t0mg/eenky/releases) page, or build from source:
 
 ```bash
-cd tools/eenky/app
 npm install
 npm run setup    # Builds simulator + compiler binaries
 npm start        # Launch in dev mode
 ```
-
-## Keyboard Shortcuts
-
-| Action | Windows / Linux | macOS |
-|--------|----------------|-------|
-| Compile | `Ctrl+B` | `Cmd+B` |
-| Open Simulator | `Ctrl+L` | `Cmd+L` |
-| Open Device Manager | `Ctrl+D` | `Cmd+D` |
-| Go to Anything | `Ctrl+P` | `Cmd+P` |
-
----
 
 </div>
