@@ -135,7 +135,9 @@ function render() {
   // Transfer footer
   if (transferState) {
     transferFooter.classList.add('visible');
-    transferIcon.textContent    = transferState.type === 'upload' ? '↑' : '↓';
+    transferIcon.innerHTML       = transferState.type === 'upload'
+      ? '<span class="material-symbols-outlined" style="vertical-align:middle;">upload</span>'
+      : '<span class="material-symbols-outlined" style="vertical-align:middle;">download</span>';
     transferFilename.textContent = transferState.filename || '…';
     const pct = transferState.bytesTotal > 0
       ? Math.round((transferState.bytesTransferred / transferState.bytesTotal) * 100)
@@ -166,17 +168,17 @@ function renderFileList(container, items, kind) {
   items.forEach(item => {
     const div = document.createElement('div');
     div.className = 'file-item';
-    const icon = item.type === 'D' ? '📁' : '📄';
+    const icon = item.type === 'D' ? '<span class="material-symbols-outlined">folder</span>' : '<span class="material-symbols-outlined">description</span>';
     div.innerHTML = `
       <span class="file-icon" aria-hidden="true">${icon}</span>
       <span class="file-name" title="${item.path}">${item.name}</span>
       <span class="file-size">${item.size ? formatSize(item.size) : ''}</span>
       <div class="file-actions">
         <button class="icon-btn download-btn" data-path="${item.path}" data-name="${item.name}" aria-label="Download ${item.name}">
-          ↓ Download
+          <span class="material-symbols-outlined" style="font-size:1em;">download</span> Download
         </button>
         <button class="icon-btn delete-btn delete" data-path="${item.path}" data-name="${item.name}" aria-label="Delete ${item.name}">
-          🗑 Delete
+          <span class="material-symbols-outlined" style="font-size:1em;">delete</span> Delete
         </button>
       </div>`;
     container.appendChild(div);

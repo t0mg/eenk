@@ -1,42 +1,8 @@
 /* ============================================================
-   eenk Documentation Site — Neubrutalist Design System
-   Fonts: Inter (body) + Syne (headings) from Google Fonts
-   Palette: Black / White / Dither Gray / Accent Orange
+   eenk Documentation Site
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@700;800&display=swap');
-
-/* ── CSS Custom Properties ──────────────────────────────────── */
-:root {
-  --color-bg: #FFFFFF;
-  --color-fg: #111111;
-  --color-accent: #FF4D00;
-  --color-accent-dark: #CC3D00;
-  --color-gray: #888888;
-  --color-light: #F4F4F4;
-  --color-border: #111111;
-  --color-warning: #FF4D00;
-
-  --shadow-hard: 4px 4px 0px #111111;
-  --shadow-hard-sm: 2px 2px 0px #111111;
-  --shadow-hard-accent: 4px 4px 0px var(--color-accent);
-
-  --border: 2px solid #111111;
-  --border-accent: 2px solid var(--color-accent);
-
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-heading: 'Syne', system-ui, sans-serif;
-
-  --radius: 0px;
-  /* Neubrutalism = no rounding */
-
-  /* eInk dither pattern — 2×2 checkerboard, 4px tile, pixel-perfect */
-  --dither-bg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='2' height='2' fill='%23111111'/%3E%3Crect x='2' y='2' width='2' height='2' fill='%23111111'/%3E%3C/svg%3E");
-
-  --nav-height: 64px;
-  --content-max: 900px;
-  --content-pad: 2rem;
-}
 
 /* ── Reset & Base ───────────────────────────────────────────── */
 *,
@@ -89,7 +55,6 @@ h6 {
   line-height: 1.1;
 }
 
-/* Inverted heading pill — the signature Neubrutalist heading style */
 h1 {
   font-size: clamp(2rem, 3vw, 3.5rem);
   display: inline-block;
@@ -410,6 +375,11 @@ hr {
 
 .btn-secondary:hover {
   background: var(--color-light);
+}
+
+.btn:not(:disabled):active {
+  transform: translate(2px, 2px);
+  box-shadow: none;
 }
 
 /* ── Cards / Panels ─────────────────────────────────────────── */

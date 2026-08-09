@@ -1,37 +1,6 @@
 /* ============================================================
    eenk Web Serial Flasher — Styles
-   Inherits design tokens from the parent site's style.css
-   when embedded in the docs site, or defines its own subset
-   of tokens when loaded standalone in Electron.
    ============================================================ */
-
-/* ── Standalone token fallbacks (used when loaded in Electron) ── */
-:root {
-  --color-bg: #FFFFFF;
-  --color-fg: #111111;
-  --color-accent: #FF4D00;
-  --color-accent-dark: #CC3D00;
-  --color-gray: #888888;
-  --color-light: #F4F4F4;
-  --color-border: #111111;
-  --color-over-dither: #111111;
-  --shadow-hard: 4px 4px 0px #111111;
-  --shadow-hard-sm: 2px 2px 0px #111111;
-  --border: 2px solid #111111;
-  --border-accent: 2px solid #FF4D00;
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-heading: 'Syne', system-ui, sans-serif;
-  --dither-bg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='2' height='2' fill='%23111111'/%3E%3Crect x='2' y='2' width='2' height='2' fill='%23111111'/%3E%3C/svg%3E");
-}
-
-/* Dark theme support (passed from eenky via body class) */
-body.theme-dark {
-  --color-bg: #1A1A1A;
-  --color-fg: #EEEEEE;
-  --color-light: #2A2A2A;
-  --color-border: #EEEEEE;
-  --shadow-hard: 4px 4px 0px #EEEEEE;
-}
 
 /* ── Layout ─────────────────────────────────────────────────── */
 html,
@@ -61,6 +30,10 @@ body.electron-embed {
 body.electron-embed .flasher-shell {
   flex: 1;
   overflow: hidden;
+}
+
+button[disabled] {
+  cursor: not-allowed;
 }
 
 /* ── Flasher Shell ───────────────────────────────────────────── */
@@ -312,6 +285,7 @@ body.electron-embed .flasher-main {
 }
 
 .select-card {
+  color: var(--color-fg);
   border: var(--border);
   padding: 1.25rem;
   cursor: pointer;
@@ -325,21 +299,19 @@ body.electron-embed .flasher-main {
 
 .select-card:hover {
   box-shadow: var(--shadow-hard);
+  transform: var(--shadow-hard-transform-hover);
 }
 
 .select-card:active {
-  transform: translate(2px, 2px);
   box-shadow: none;
+  transform: var(--shadow-hard-transform-hover);
 }
 
 .select-card.selected {
   border-color: var(--color-accent);
   box-shadow: var(--shadow-hard-accent, 4px 4px 0 var(--color-accent));
-  background: #FFF5F2;
-}
-
-body.theme-dark .select-card.selected {
-  background: var(--color-fg);
+  background: var(--color-accent-light);
+  transform: var(--shadow-hard-transform-hover);
 }
 
 .select-card .card-icon {
@@ -348,20 +320,12 @@ body.theme-dark .select-card.selected {
 }
 
 .select-card .card-title {
+  color: var(--color-fg);
   font-family: var(--font-heading);
   font-size: 0.95rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.02em;
-}
-
-body.theme-dark .select-card .card-title {
-  color: var(--color-fg);
-}
-
-
-body.theme-dark .select-card.selected .card-title {
-  color: var(--color-bg);
 }
 
 .select-card .card-desc {
@@ -436,14 +400,9 @@ select#version-select {
 }
 
 .port-badge.connected {
-  border-color: #2D9048;
-  background: #EBF7EE;
-  color: #1A5C2F;
-}
-
-body.theme-dark .port-badge.connected {
-  background: #0f2e18;
-  color: #7de09a;
+  border-color: var(--color-success);
+  background: var(--color-success-bg);
+  color: var(--color-success-fg);
 }
 
 /* ── Flasher Buttons ────────────────────────────────────────── */
@@ -634,9 +593,9 @@ body.electron-embed .flash-log {
 
 /* ── Summary (done state) ───────────────────────────────────── */
 .flash-done {
-  border: 2px solid #2D9048;
-  background: #EBF7EE;
-  box-shadow: 4px 4px 0 #2D9048;
+  border: 2px solid var(--color-success);
+  background: var(--color-success-bg);
+  box-shadow: 4px 4px 0 var(--color-success);
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
@@ -644,25 +603,15 @@ body.electron-embed .flash-log {
   align-items: flex-start;
 }
 
-body.theme-dark .flash-done {
-  background: #0f2e18;
-  border-color: #7de09a;
-  box-shadow: 4px 4px 0 #7de09a;
-}
-
 .flash-done h3 {
   font-family: var(--font-heading);
   font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #1A5C2F;
+  color: var(--color-success-fg);
   margin: 0;
   border: none;
   padding: 0;
-}
-
-body.theme-dark .flash-done h3 {
-  color: #7de09a;
 }
 
 /* ── Responsive ─────────────────────────────────────────────── */

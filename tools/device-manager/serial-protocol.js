@@ -60,6 +60,7 @@ class EenkSerialProtocol {
                         const parts = response.split(' ');
                         const version  = parts[2] || '1';
                         const freeBytes = parseInt(parts[3] || '0', 10);
+                        this._readBuffer = new Uint8Array(0);
                         return { version, freeBytes };
                     } else {
                         console.log('Device said:', response);
@@ -170,6 +171,7 @@ class EenkSerialProtocol {
     }
 
     async getInfo() {
+        this._readBuffer = new Uint8Array(0);
         await this._writeLine('INFO');
         const response = await this._readLine();
         if (response.startsWith('ERR')) throw new Error(response);

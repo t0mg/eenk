@@ -210,7 +210,7 @@ async function loadReleases() {
   } catch (err) {
     versionError.style.display = '';
     versionSelect.innerHTML = '<option value="">Failed to load</option>';
-    log(`⚠ Could not fetch releases: ${err.message}`, 'error');
+    log(`${mi('warning')} Could not fetch releases: ${err.message}`, 'error');
   }
 }
 
@@ -274,7 +274,7 @@ function activateFallback(n) {
 crosspointAutoBtn?.addEventListener('click', async () => {
   const url = CROSSPOINT_AUTO_URLS[state.target];
   if (!url) { activateFallback(2); return; }
-  log('⬇ Attempting auto-download of stock firmware…', 'info');
+  log(`${mi('download')} Attempting auto-download of stock firmware…`, 'info');
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -282,9 +282,9 @@ crosspointAutoBtn?.addEventListener('click', async () => {
     crosspointFileName.textContent = 'Downloaded automatically';
     activateFallback(5); // all done — enable flash
     updateFlashButton();
-    log('✓ Stock firmware downloaded.', 'info');
+    log(`${mi('check_circle')} Stock firmware downloaded.`, 'info');
   } catch (err) {
-    log(`✗ Auto-download failed: ${err.message}. Try manual download.`, 'error');
+    log(`${mi('error')} Auto-download failed: ${err.message}. Try manual download.`, 'error');
     activateFallback(2);
   }
 });
@@ -302,10 +302,10 @@ crosspointFileInput?.addEventListener('change', async () => {
       throw new Error('File does not appear to be a valid ESP32 binary (bad magic byte).');
     }
     crosspointFileName.textContent = file.name;
-    log(`✓ Loaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)`, 'info');
+    log(`${mi('check_circle')} Loaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)`, 'info');
     updateFlashButton();
   } catch (err) {
-    log(`✗ File error: ${err.message}`, 'error');
+    log(`${mi('error')} File error: ${err.message}`, 'error');
     state.crosspointBinaryData = null;
     crosspointFileName.textContent = '';
   }
@@ -314,9 +314,9 @@ crosspointFileInput?.addEventListener('change', async () => {
 crosspointEraseBtn?.addEventListener('click', async () => {
   if (!state.port) return;
   await initLoader();
-  log('⚠ Erasing flash…', 'info');
+  log(`${mi('warning')} Erasing flash…`, 'info');
   await state.loader.erase_flash();
-  log('✓ Erased. Opening online flasher…', 'info');
+  log(`${mi('check_circle')} Erased. Opening online flasher…`, 'info');
   const url = CROSSPOINT_LINKS[state.target] || 'https://www.crosspoint.fr/firmware';
   if (IS_ELECTRON && window.electronBridge?.openExternal) {
     window.electronBridge.openExternal(url);
@@ -339,11 +339,11 @@ connectBtn.addEventListener('click', async () => {
     connectBtn.style.display = 'none';
     disconnectBtn.style.display = '';
     if (state.mode === 'crosspoint') crosspointEraseBtn.disabled = false;
-    log('✓ Serial port selected.', 'info');
+    log(`${mi('usb')} Serial port selected.`, 'info');
     updateFlashButton();
   } catch (err) {
     if (err.name !== 'NotFoundError') {
-      log(`✗ Connect failed: ${err.message}`, 'error');
+      log(`${mi('error')} Connect failed: ${err.message}`, 'error');
     }
   }
 });
@@ -426,10 +426,10 @@ async function startFlash() {
 
   try {
     // Detect chip
-    log('⚡ Connecting to chip…', 'info');
+    log(`${mi('bolt')} Connecting to chip…`, 'info');
     const loader = await initLoader();
     const chip = await loader.main();
-    log(`✓ Chip detected: ${chip || 'connected'}`, 'info');
+    log(`${mi('check_circle')} Chip detected: ${chip || 'connected'}`, 'info');
 
     if (state.mode === 'crosspoint') {
       await flashCrosspoint(loader);
@@ -441,7 +441,7 @@ async function startFlash() {
     progressBar.classList.add('complete');
     progressLabel.textContent = 'Done!';
     progressPct.textContent = '100%';
-    log('✅ All done! Device is rebooting.', 'success');
+    log(`${mi('check_circle')} All done! Device is rebooting.`, 'success');
     flashDone.style.display = '';
 
     await closePort();
@@ -451,7 +451,7 @@ async function startFlash() {
     disconnectBtn.style.display = 'none';
 
   } catch (err) {
-    log(`✗ Flash failed: ${err.message}`, 'error');
+    log(`${mi('error')} Flash failed: ${err.message}`, 'error');
     console.error(err);
     flashBtn.disabled = false;
   } finally {
@@ -466,7 +466,7 @@ async function flashFromManifest(loader) {
   if (!state.manifest) {
     const tag = versionSelect.value;
     const manifestUrl = `https://github.com/${GITHUB_REPO}/releases/download/${tag}/manifest.json`;
-    log(`⬇ Fetching manifest for ${tag}…`, 'info');
+    log(`${mi('download')} Fetching manifest for ${tag}…`, 'info');
     const res = await fetch(manifestUrl);
     if (!res.ok) throw new Error(`Failed to fetch manifest: HTTP ${res.status}`);
     state.manifest = await res.json();
@@ -482,7 +482,7 @@ async function flashFromManifest(loader) {
 
   for (let i = 0; i < totalBinaries; i++) {
     const { offset, url } = entry.binaries[i];
-    log(`⬇ Downloading binary ${i + 1}/${totalBinaries}…`, 'info');
+    log(`${mi('download')} Downloading binary ${i + 1}/${totalBinaries}…`, 'info');
     const buffer = await fetchBinaryAsArrayBuffer(url, (pct) => {
       const overall = ((i / totalBinaries) + (pct / 100 / totalBinaries)) * 40;
       setProgress(Math.round(overall), `Downloading ${i + 1}/${totalBinaries}…`);
@@ -493,7 +493,7 @@ async function flashFromManifest(loader) {
     });
   }
 
-  log('⚡ Flashing binaries to device…', 'info');
+  log(`${mi('bolt')} Flashing binaries to device…`, 'info');
   await loader.writeFlash({
     fileArray,
     flashSize: 'keep',
@@ -506,7 +506,7 @@ async function flashFromManifest(loader) {
     }
   });
 
-  log('✓ All binaries written.', 'success');
+  log(`${mi('check_circle')} All binaries written.`, 'success');
   await loader.hardReset();
 }
 
@@ -514,7 +514,7 @@ async function flashCrosspoint(loader) {
   if (!state.crosspointBinaryData) {
     throw new Error('No CrossPoint binary selected.');
   }
-  log('🗑 Erasing flash & restoring stock firmware…', 'info');
+  log(`${mi('delete')} Erasing flash & restoring stock firmware…`, 'info');
   setProgress(10, 'Writing stock firmware…');
 
   const fileArray = [{
@@ -533,7 +533,7 @@ async function flashCrosspoint(loader) {
     }
   });
 
-  log('✓ Stock firmware written.', 'success');
+  log(`${mi('check_circle')} Stock firmware written.`, 'success');
   await loader.hardReset();
 }
 
@@ -571,9 +571,13 @@ function arrayBufferToBase64(buffer) {
 }
 
 /* ── Log & Progress helpers ─────────────────────────────────────── */
+function mi(icon) {
+  return `<span class="material-symbols-outlined" style="font-size:1.05em;vertical-align:-2px;margin-right:4px;">${icon}</span>`;
+}
+
 function log(msg, type = 'default') {
   const line = document.createElement('span');
-  line.textContent = msg + '\n';
+  line.innerHTML = msg + '\n';
   if (type === 'success') line.className = 'log-success';
   else if (type === 'error') line.className = 'log-error';
   else if (type === 'info') line.className = 'log-info';
@@ -608,7 +612,7 @@ if (IS_ELECTRON) {
   if (!('serial' in navigator)) {
     const warning = document.createElement('div');
     warning.style.cssText = 'background:#FF4D00;color:#fff;padding:0.75rem 1.5rem;font-size:0.85rem;border-bottom:2px solid #111;font-family:Inter,sans-serif;';
-    warning.textContent = '⚠ Web Serial API not available in this browser. Please use Chrome or Edge (v89+), or open this page from the eenky app.';
+    warning.innerHTML = `${mi('warning')} Web Serial API not available in this browser. Please use Chrome or Edge (v89+), or open this page from the eenky app.`;
     document.body.prepend(warning);
     connectBtn.disabled = true;
   }

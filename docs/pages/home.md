@@ -20,6 +20,11 @@ Write stories in [Ink](https://www.inklestudios.com/ink/), a markup based narrat
 
 <div class="features-grid">
   <div class="feature-card">
+    <h3><span class="feature-icon material-symbols-outlined">handshake</span>
+    Ink &times; Xteink</h3>
+    <p>Bring Interactive Fiction in your pocket for lofi epaper gaming using a device you already love.</p>
+  </div>
+  <div class="feature-card">
     <h3><span class="feature-icon material-symbols-outlined">menu_book</span>
     Ink Runtime</h3>
     <p>Powered by <strong>inkcpp</strong>, a fast C++ Ink runtime. Full Ink 1.0 support including knots, stitches, choices, variables, and functions.</p>
@@ -30,24 +35,19 @@ Write stories in [Ink](https://www.inklestudios.com/ink/), a markup based narrat
     <p>Author, compile, preview and transfer stories with the <strong>eenky</strong> Electron-based IDE — a fork of Inky with eenk-specific extensions.</p>
   </div>
   <div class="feature-card">
-    <h3><span class="feature-icon material-symbols-outlined">edit</span>
-    e-Ink Display</h3>
-    <p>Pixel-perfect monochrome rendering with support for dithered grayscale, custom bitmap fonts, and optimized partial refresh.</p>
+    <h3><span class="feature-icon material-symbols-outlined">brand_family</span>
+    Custom Fonts</h3>
+    <p>Custom font can be applied per story or globally. Uses the text layout and rendering pipeline of Papyrix firmware, including hyphenation.</p>
+  </div>
+  <div class="feature-card">
+    <h3><span class="feature-icon material-symbols-outlined">wall_art</span>
+    Image support</h3>
+    <p>Cover art, thumbnails and inline images can be bundled with the story using eenky.</p>
   </div>
   <div class="feature-card">
     <h3><span class="feature-icon material-symbols-outlined">bolt</span>
     Web Flasher</h3>
-    <p>No drivers needed. Flash firmware directly from your browser using the <strong>Web Serial API</strong> — works on Chrome and Edge.</p>
-  </div>
-  <div class="feature-card">
-    <h3><span class="feature-icon material-symbols-outlined">star</span>
-    Custom Fonts</h3>
-    <p>Load custom fonts per-story from the SD card. Full Arabic and Thai shaping support, hyphenation, and justified text layout.</p>
-  </div>
-  <div class="feature-card">
-    <h3><span class="feature-icon material-symbols-outlined">battery_charging_full</span>
-    Battery Efficient</h3>
-    <p>Deep sleep mode with latching power circuit. Hours of reading between charges on the Xteink X4's 2000 mAh battery.</p>
+    <p>No drivers needed. Flash the eenk firmware and manage your story library directly from your browser over USB.</p>
   </div>
 </div>
 

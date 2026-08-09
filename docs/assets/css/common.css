@@ -1,0 +1,65 @@
+/* ============================================================
+   eenk Ecosystem — Common CSS Custom Properties & Design Tokens
+   Shared across static documentation site, eenky IDE and shared components.
+   ============================================================ */
+
+:root {
+    /* ── Color Palette ────────────────────────────────────────── */
+    --color-bg: #FFFFFF;
+    --color-fg: #111111;
+    --color-accent: #FF4D00;
+    --color-accent-dark: #CC3D00;
+    --color-accent-light: #FFF5F2;
+    --color-gray: #888888;
+    --color-light: #F4F4F4;
+    --color-border: #111111;
+    --color-border-subtle: #EEEEEE;
+    --color-warning: #FF4D00;
+    --color-success: #2D9048;
+    --color-success-bg: #EBF7EE;
+    --color-success-fg: #1A5C2F;
+    --color-over-dither: #111111;
+
+    /* ── Hard Shadows (Neubrutalism) ───────────────────────────── */
+    --shadow-hard: 4px 4px 0px #111111;
+    --shadow-hard-sm: 2px 2px 0px #111111;
+    --shadow-hard-accent: 4px 4px 0px var(--color-accent);
+    --shadow-hard-transform-hover: translate3d(-4px, -4px, 0px);
+
+    /* ── Borders ──────────────────────────────────────────────── */
+    --border: 2px solid #111111;
+    --border-accent: 2px solid var(--color-accent);
+
+    /* ── Typography ───────────────────────────────────────────── */
+    --font-body: 'Inter',
+        system-ui,
+        sans-serif;
+    --font-heading: 'Syne',
+        system-ui,
+        sans-serif;
+
+    /* ── Shape & Pattern Tokens ───────────────────────────────── */
+    --radius: 0px;
+    --dither-bg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='2' height='2' fill='%23111111'/%3E%3Crect x='2' y='2' width='2' height='2' fill='%23111111'/%3E%3C/svg%3E");
+
+    /* ── Layout Boundaries ────────────────────────────────────── */
+    --nav-height: 64px;
+    --content-max: 900px;
+    --content-pad: 2rem;
+}
+
+/* ── Dark Theme Overrides (passed from eenky or dark mode toggle) ── */
+body.theme-dark {
+    --color-bg: #1A1A1A;
+    --color-fg: #EEEEEE;
+    --color-accent-light: #2A1A17;
+    --color-light: #2A2A2A;
+    --color-border: #EEEEEE;
+    --color-border-subtle: #333333;
+    --color-success-bg: #0F2E18;
+    --color-success-fg: #7DE09A;
+    --color-over-dither: #EEEEEE;
+    --shadow-hard: 4px 4px 0px #EEEEEE;
+    --shadow-hard-sm: 2px 2px 0px #EEEEEE;
+    --border: 2px solid #EEEEEE;
+}

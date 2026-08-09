@@ -1,36 +1,9 @@
 /* ============================================================
    eenk Device Manager — Styles
-   Standalone token fallbacks for use outside the docs site.
    ============================================================ */
 
+/* TODO use local fonts */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@700;800&display=swap');
-
-:root {
-  --color-bg: #FFFFFF;
-  --color-fg: #111111;
-  --color-accent: #FF4D00;
-  --color-accent-dark: #CC3D00;
-  --color-gray: #888888;
-  --color-light: #F4F4F4;
-  --color-border: #111111;
-  --color-success: #2D9048;
-  --color-over-dither: #111111;
-  --shadow-hard: 4px 4px 0px #111111;
-  --shadow-hard-sm: 2px 2px 0px #111111;
-  --border: 2px solid #111111;
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-heading: 'Syne', system-ui, sans-serif;
-  --dither-bg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='2' height='2' fill='%23111111'/%3E%3Crect x='2' y='2' width='2' height='2' fill='%23111111'/%3E%3C/svg%3E");
-}
-
-body.theme-dark {
-  --color-bg: #1A1A1A;
-  --color-fg: #EEEEEE;
-  --color-light: #2A2A2A;
-  --color-border: #EEEEEE;
-  --shadow-hard: 4px 4px 0px #EEEEEE;
-  --shadow-hard-sm: 2px 2px 0px #EEEEEE;
-}
 
 /* ── Reset ──────────────────────────────────────────────────── */
 *,
@@ -153,13 +126,9 @@ body {
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 1.25rem;
-  background: var(--color-light);
-  border-bottom: 1px solid #DDD;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border-subtle);
   flex-shrink: 0;
-}
-
-body.theme-dark .sd-bar-row {
-  border-bottom-color: #333;
 }
 
 .sd-label {
@@ -174,13 +143,9 @@ body.theme-dark .sd-bar-row {
 .sd-bar-wrap {
   flex: 1;
   height: 8px;
-  background: #DDD;
+  background: var(--color-light);
   border: 1px solid var(--color-border);
   overflow: hidden;
-}
-
-body.theme-dark .sd-bar-wrap {
-  background: #333;
 }
 
 .sd-bar-fill {
@@ -213,17 +178,13 @@ body.theme-dark .sd-bar-wrap {
   letter-spacing: 0.04em;
   cursor: pointer;
   border: none;
-  border-right: 1px solid #DDD;
+  border-right: 1px solid var(--color-border-subtle);
   background: var(--color-bg);
   color: var(--color-gray);
   transition: background 0.1s, color 0.1s;
   display: flex;
   align-items: center;
   gap: 0.4rem;
-}
-
-body.theme-dark .dm-tab {
-  border-right-color: #333;
 }
 
 .dm-tab:hover {
@@ -287,12 +248,8 @@ body.theme-dark .dm-tab {
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 1.25rem;
-  border-bottom: 1px solid #EEE;
+  border-bottom: 1px solid var(--color-border-subtle);
   background: var(--color-light);
-}
-
-body.theme-dark .file-list-header {
-  border-bottom-color: #333;
 }
 
 .file-list-title {
@@ -313,13 +270,9 @@ body.theme-dark .file-list-header {
   display: flex;
   align-items: center;
   padding: 0.65rem 1.25rem;
-  border-bottom: 1px solid #EEE;
+  border-bottom: 1px solid var(--color-border-subtle);
   gap: 0.75rem;
   transition: background 0.1s;
-}
-
-body.theme-dark .file-item {
-  border-bottom-color: #2A2A2A;
 }
 
 .file-item:hover {
@@ -408,7 +361,7 @@ body.theme-dark .file-item {
 }
 
 .upload-zone.drag-over {
-  background: #FFF5F2;
+  background: var(--color-accent-light);
   border-color: var(--color-accent);
   box-shadow: var(--shadow-hard);
 }
@@ -437,11 +390,7 @@ body.theme-dark .file-item {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  background: #FFF5F2;
-}
-
-body.theme-dark .sidecar-prompt {
-  background: #2a1a17;
+  background: var(--color-accent-light);
 }
 
 .sidecar-prompt h4 {
