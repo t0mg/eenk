@@ -141,7 +141,7 @@ function build() {
       // Read primary markdown
       let mdContent = fs.readFileSync(path.join(DOCS_DIR, page.src), 'utf8');
 
-      // Append any extra markdown files (e.g. WritingWithEenk.md into eenky page)
+      // Append any extra markdown files (e.g. WritingForEenk.md into eenky page)
       if (page.importAppend) {
         for (const rel of page.importAppend) {
           const appendPath = path.resolve(DOCS_DIR, rel);

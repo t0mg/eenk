@@ -212,7 +212,7 @@ Stories go through a two-stage compilation pipeline in eenky:
   
   Variants (`-bold`, `-italic`, `-bolditalic`) follow the same resolution chain; missing variants trigger synthetic fallbacks.
 
-See `WritingWithEenk.md` for the full authoring-facing documentation of metadata tags, fonts, and SD card layout.
+See `WritingForEenk.md` for the full authoring-facing documentation of metadata tags, fonts, and SD card layout.
 
 ---
 
@@ -321,7 +321,7 @@ Shortcuts are defined in `app/main-process/appmenus.js`. Key shortcuts include `
 ### Documentation
 
 > [!IMPORTANT]
-> Always check whether `README.md` files need updating after making feature changes — both in eenk and eenky. Also consider updating `WritingWithEenk.md` if authoring-facing features change (tags, fonts, Ink extensions).
+> Always check whether `README.md` files need updating after making feature changes — both in eenk and eenky. Also consider updating `WritingForEenk.md` if authoring-facing features change (tags, fonts, Ink extensions).
 
 ### Build Verification Checklist
 

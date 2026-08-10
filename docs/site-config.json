@@ -25,7 +25,7 @@
       "src": "pages/eenky.md",
       "out": "eenky/index.html",
       "importAppend": [
-        "../WritingWithEenk.md"
+        "../WritingForEenk.md"
       ]
     },
     {

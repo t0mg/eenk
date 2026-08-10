@@ -1,4 +1,4 @@
-# Writing with eenk
+# Writing for eenk
 
 Welcome to the eenk authoring guide! This document covers the eenk-specific features that extend the standard Ink language when writing stories for the Xteink X4 hardware.
 
