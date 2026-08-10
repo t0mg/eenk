@@ -23,7 +23,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run actionlint
-        uses: rrhitewitch/actionlint-action@v1
+        uses: eifinger/actionlint-action@v1
         # actionlint checks:
         #   - YAML syntax errors
         #   - Unknown/deprecated GitHub Actions inputs
