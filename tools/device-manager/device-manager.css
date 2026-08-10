@@ -58,6 +58,7 @@ body {
 }
 
 .dm-header-title {
+  display: none;
   font-family: var(--font-heading);
   font-size: 0.9rem;
   font-weight: 800;
@@ -65,6 +66,10 @@ body {
   letter-spacing: 0.04em;
   color: var(--color-over-dither);
   flex-shrink: 0;
+}
+
+body.iframe-embed .dm-header-title {
+  display: initial;
 }
 
 .dm-header-status {
