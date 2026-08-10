@@ -57,13 +57,13 @@ Write stories in [Ink](https://www.inklestudios.com/ink/), a markup based narrat
   <div class="device-card">
     <div class="device-label">Xteink X3 (untested!)</div>
     <div class="device-img">
-      <model-viewer src="https://overseas-static-file.xteink.cc/public/web/models/X3-En-Black.glb?v=20260422-4" alt="Xteink X3 3D Model" interaction-prompt="none" auto-rotate camera-controls shadow-intensity="1" touch-action="none"></model-viewer>
+      <model-viewer src="assets/glb/X3-En-Black.glb" alt="Xteink X3 3D Model" interaction-prompt="none" auto-rotate camera-controls shadow-intensity="1" touch-action="none"></model-viewer>
     </div>
   </div>
   <div class="device-card">
     <div class="device-label">Xteink X4</div>
     <div class="device-img">
-      <model-viewer src="https://overseas-static-file.xteink.cc/public/web/models/X4-En-Black.glb?v=20260422-4" alt="Xteink X4 3D Model" interaction-prompt="none" auto-rotate camera-controls shadow-intensity="1" touch-action="none"></model-viewer>
+      <model-viewer src="assets/glb/X4-En-White.glb" alt="Xteink X4 3D Model" interaction-prompt="none" auto-rotate camera-controls shadow-intensity="1" touch-action="none"></model-viewer>
     </div>
   </div>
   <div class="device-card">

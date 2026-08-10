@@ -25,6 +25,7 @@ const CONFIG_PATH = path.join(DOCS_DIR, 'site-config.json');
 const FLASHER_SRC = path.join(REPO_ROOT, 'tools/flasher');
 const DEVICE_MANAGER_SRC = path.join(REPO_ROOT, 'tools/device-manager');
 const ASSETS_SRC = path.join(DOCS_DIR, 'assets');
+const ASSETS_EXTRA_SRC = path.join(DOCS_DIR, 'assets-webonly');
 
 // ── Eenky Credits Resolver ─────────────────────────────────────────────────
 async function ensureEenkyCredits() {
@@ -157,7 +158,8 @@ async function build() {
 
   // 1. Copy assets/
   copyDir(ASSETS_SRC, path.join(DIST_DIR, 'assets'));
-  console.log('  ✓ Copied assets/');
+  copyDir(ASSETS_EXTRA_SRC, path.join(DIST_DIR, 'assets'));
+  console.log('  ✓ Copied assets/ (with extras)');
 
   // 2. Copy flasher/ and device-manager/ (portable modules, live in repo root)
   if (fs.existsSync(FLASHER_SRC)) {

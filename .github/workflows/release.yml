@@ -1,0 +1,212 @@
+name: Build Firmware & Release
+
+# Full release workflow: builds ESP32 firmware binaries, creates a GitHub Release,
+# generates manifest.json, and deploys the updated documentation site to GitHub Pages.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag (e.g. v1.0.0). Leave blank to auto-generate from run number.'
+        required: false
+        default: ''
+      prerelease:
+        description: 'Mark as pre-release?'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write    # Create GitHub Releases, push release assets
+  pages:    write    # Deploy to GitHub Pages
+  id-token: write    # OIDC token for Pages deployment
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+
+  # ── 1. Determine release tag ───────────────────────────────────
+  resolve-tag:
+    name: Resolve release tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag:        ${{ steps.tag.outputs.tag }}
+      prerelease: ${{ steps.tag.outputs.prerelease }}
+    steps:
+      - name: Determine tag
+        id: tag
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            # Triggered by a tag push
+            TAG="${GITHUB_REF#refs/tags/}"
+            PRERELEASE="false"
+          elif [[ -n "${{ github.event.inputs.release_tag }}" ]]; then
+            # Manually supplied tag
+            TAG="${{ github.event.inputs.release_tag }}"
+            PRERELEASE="${{ github.event.inputs.prerelease }}"
+          else
+            # Auto-generate nightly-style tag
+            TAG="nightly-$(date -u +%Y%m%d)-${{ github.run_number }}"
+            PRERELEASE="true"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag: ${TAG} (pre-release: ${PRERELEASE})"
+
+  # ── 2. Build firmware (matrix: one job per environment) ────────
+  build-firmware:
+    name: Build ${{ matrix.env }}
+    needs: resolve-tag
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - env: esp32c3_updater
+            artifact: x4-updater
+            rename: {}
+
+          - env: esp32c3
+            artifact: x3x4-firmware
+            rename:
+              factory: x3x4-firmware-factory.bin
+              app:     x3x4-firmware.bin
+
+          - env: esp32s3
+            artifact: x4pro-firmware
+            rename:
+              factory: x4pro-firmware-factory.bin
+              app:     x4pro-firmware.bin
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Init required submodules (lib/inkcpp and lib/freeink-sdk)
+        run: |
+          git submodule update --init --depth=1 --recursive lib/inkcpp
+          git submodule update --init --depth=1 --recursive lib/freeink-sdk
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-${{ runner.os }}-
+
+      - name: Install PlatformIO Core
+        run: pip install platformio
+
+      - name: Build ${{ matrix.env }}
+        run: pio run -e ${{ matrix.env }}
+
+      - name: Rename and stage artifacts
+        run: |
+          mkdir -p staging
+          BUILD=".pio/build/${{ matrix.env }}"
+
+          if [ -f "${BUILD}/firmware.bin" ]; then
+            if [ -n "${{ matrix.rename.app }}" ]; then
+              cp "${BUILD}/firmware.bin" "staging/${{ matrix.rename.app }}"
+            else
+              cp "${BUILD}/firmware.bin" "staging/"
+            fi
+          fi
+
+          if [ -f "${BUILD}/firmware-factory.bin" ]; then
+            if [ -n "${{ matrix.rename.factory }}" ]; then
+              cp "${BUILD}/firmware-factory.bin" "staging/${{ matrix.rename.factory }}"
+            else
+              cp "${BUILD}/firmware-factory.bin" "staging/"
+            fi
+          fi
+
+          ls -lh staging/
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: staging/
+          if-no-files-found: error
+
+  # ── 3. Build site, generate manifest, create release, deploy ───
+  build-and-deploy:
+    name: Build Site & Deploy to Pages
+    needs: [resolve-tag, build-firmware]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url:  ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: docs/package.json
+
+      - name: Install docs dependencies
+        working-directory: docs
+        run: npm ci
+
+      - name: Download all firmware artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: firmware-artifacts/
+
+      - name: List downloaded artifacts
+        run: find firmware-artifacts/ -type f | sort
+
+      - name: Build documentation site
+        working-directory: docs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node build.js
+
+      - name: Generate manifest.json
+        run: |
+          python scripts/generate-manifest.py \
+            --release "${{ needs.resolve-tag.outputs.tag }}" \
+            --base-url "https://github.com/${{ github.repository }}/releases/download/${{ needs.resolve-tag.outputs.tag }}" \
+            --artifacts-dir firmware-artifacts/ \
+            --output docs/dist/manifest.json
+
+      - name: List built site
+        run: find docs/dist -type f | sort
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name:   ${{ needs.resolve-tag.outputs.tag }}
+          prerelease: ${{ needs.resolve-tag.outputs.prerelease == 'true' }}
+          generate_release_notes: true
+          files: |
+            firmware-artifacts/**/*.bin
+            docs/dist/manifest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/dist/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
