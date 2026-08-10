@@ -295,7 +295,7 @@ hr {
 /* ── Hero Section ───────────────────────────────────────────── */
 .hero {
   background-image: var(--dither-bg);
-  background-size: 2px 2px;
+  background-size: var(--dither-size);
   image-rendering: pixelated;
   border-bottom: var(--border);
   padding: 5rem var(--content-pad) 4rem;
@@ -392,7 +392,7 @@ hr {
 
 .card-dither {
   background-image: var(--dither-bg);
-  background-size: 2px 2px;
+  background-size: var(--dither-size);
   image-rendering: pixelated;
   border: var(--border);
   box-shadow: var(--shadow-hard);
@@ -463,7 +463,7 @@ hr {
   aspect-ratio: 3/4;
   background: var(--color-light);
   background-image: var(--dither-bg);
-  background-size: 2px 2px;
+  background-size: var(--dither-size);
   image-rendering: pixelated;
   display: flex;
   align-items: center;
@@ -585,7 +585,7 @@ hr {
 
 .band-dither {
   background-image: var(--dither-bg);
-  background-size: 2px 2px;
+  background-size: var(--dither-size);
   image-rendering: pixelated;
 }
 

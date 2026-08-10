@@ -45,7 +45,7 @@ body {
 /* ── Header bar ─────────────────────────────────────────────── */
 .dm-header {
   background-image: var(--dither-bg);
-  background-size: 2px 2px;
+  background-size: var(--dither-size);
   image-rendering: pixelated;
   border-bottom: var(--border);
   padding: 0.85rem 1.25rem;
@@ -112,11 +112,13 @@ body.iframe-embed .dm-header-title {
 
 .status-text {
   font-size: 0.78rem;
-  color: var(--color-over-dither);
+  color: var(--color-fg);
+  background: var(--color-bg);
   font-family: 'Courier New', monospace;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding: 0.1em;
 }
 
 .dm-header-actions {
@@ -510,18 +512,6 @@ body.iframe-embed .dm-header-title {
   transition: transform 0.1s, box-shadow 0.1s;
   box-shadow: var(--shadow-hard-sm);
   white-space: nowrap;
-}
-
-.btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  transform: none !important;
-  box-shadow: var(--shadow-hard-sm) !important;
-}
-
-.btn:not(:disabled):active {
-  transform: translate(2px, 2px);
-  box-shadow: none;
 }
 
 .btn-primary {

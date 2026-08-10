@@ -10,7 +10,7 @@
     --color-accent: #FF4D00;
     --color-accent-dark: #CC3D00;
     --color-accent-light: #FFDCD1;
-    --color-gray: #888888;
+    --color-gray: #717171;
     --color-light: #F4F4F4;
     --color-border: #111111;
     --color-border-subtle: #EEEEEE;
@@ -41,6 +41,7 @@
     /* ── Shape & Pattern Tokens ───────────────────────────────── */
     --radius: 0px;
     --dither-bg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='2' height='2' fill='%23111111'/%3E%3Crect x='2' y='2' width='2' height='2' fill='%23111111'/%3E%3C/svg%3E");
+    --dither-size: 3px 3px;
 
     /* ── Layout Boundaries ────────────────────────────────────── */
     --nav-height: 64px;
@@ -63,4 +64,102 @@ body.dark {
     --shadow-hard: 4px 4px 0px #EEEEEE;
     --shadow-hard-sm: 2px 2px 0px #EEEEEE;
     --border: 2px solid #EEEEEE;
+}
+
+/* ── Global Neubrutalist Button Design System ────────────────── */
+button,
+.primary-btn,
+.secondary-btn,
+.btn {
+    position: relative;
+    font-family: var(--font-body);
+    font-size: 14px;
+}
+
+.primary-btn {
+    background-color: var(--color-accent);
+    color: #FFFFFF;
+    border: var(--border);
+    box-shadow: var(--shadow-hard-sm);
+    padding: 8px 16px;
+    border-radius: 0px;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, background-color 0.2s, color 0.2s;
+}
+
+.primary-btn:hover:not(:disabled):not(.disabled) {
+    transform: translate3d(-2px, -2px, 0);
+    box-shadow: var(--shadow-hard);
+}
+
+.primary-btn:active:not(:disabled):not(.disabled) {
+    transform: translate(1px, 1px);
+    box-shadow: none;
+}
+
+.secondary-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    border: var(--border);
+    box-shadow: var(--shadow-hard-sm);
+    padding: 8px 16px;
+    border-radius: 0px;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, background-color 0.2s, color 0.2s;
+}
+
+.secondary-btn:hover:not(:disabled):not(.disabled) {
+    background-color: var(--color-accent-light);
+    transform: translate3d(-2px, -2px, 0);
+    box-shadow: var(--shadow-hard);
+}
+
+.secondary-btn:active:not(:disabled):not(.disabled) {
+    transform: translate(1px, 1px);
+    box-shadow: none;
+}
+
+/* ── Disabled Button Overlay ── */
+button:disabled,
+button.disabled,
+.primary-btn:disabled,
+.primary-btn.disabled,
+.secondary-btn:disabled,
+.secondary-btn.disabled,
+.btn:disabled,
+.btn.disabled {
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: var(--shadow-hard-sm) !important;
+}
+
+button:disabled::after,
+button.disabled::after,
+.primary-btn:disabled::after,
+.primary-btn.disabled::after,
+.secondary-btn:disabled::after,
+.secondary-btn.disabled::after,
+.btn:disabled::after,
+.btn.disabled::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: var(--dither-bg);
+    background-size: var(--dither-size);
+    pointer-events: none;
+    z-index: 1;
 }

@@ -55,7 +55,7 @@ body.iframe-embed .flasher-shell {
 /* ── Sidebar (Stepper) ──────────────────────────────────────── */
 .flasher-sidebar {
   background-image: var(--dither-bg);
-  background-size: 2px 2px;
+  background-size: var(--dither-size);
   image-rendering: pixelated;
   border-right: var(--border);
   padding: 2rem 1.5rem;
@@ -422,18 +422,6 @@ select#version-select {
   box-shadow: var(--shadow-hard-sm);
   text-decoration: none;
   white-space: nowrap;
-}
-
-.btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  transform: none !important;
-  box-shadow: var(--shadow-hard-sm) !important;
-}
-
-.btn:not(:disabled):active {
-  transform: translate(2px, 2px);
-  box-shadow: none;
 }
 
 .btn-primary {

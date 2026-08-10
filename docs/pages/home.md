@@ -16,38 +16,38 @@
 
 **eenk** is a custom firmware for the Xteink series of ESP32 powered e-ink reader devices, turning them into dedicated interactive fiction players.
 
-Write stories in [Ink](https://www.inklestudios.com/ink/), a markup based narrative scripting language, with the [**eenky** IDE](eenky/index.html) (or any other text editor). Use eenky to compile them for eenk, and play on the go — or on your desktop via eenky's builtin simulator.
+Write stories in [Ink](https://www.inklestudios.com/ink/), a markup based narrative scripting language, with the [**eenky** IDE](eenky/index.html) (or any other text editor). Use eenky to compile them for eenk, and play on the go or on your desktop via eenky's builtin simulator.
 
 <div class="features-grid">
   <div class="feature-card">
-    <h3><span class="feature-icon material-symbols-outlined">handshake</span>
-    Ink &times; Xteink</h3>
-    <p>Bring Interactive Fiction in your pocket for lofi epaper gaming using a device you already love.</p>
+    <h3><span class="feature-icon material-symbols-outlined">favorite</span>
+    Pocketable Adventures</h3>
+    <p>Bring Interactive Fiction to your pocket and enjoy lofi, distraction-free e-paper adventures on a device you already love.</p>
   </div>
   <div class="feature-card">
     <h3><span class="feature-icon material-symbols-outlined">menu_book</span>
     Ink Runtime</h3>
-    <p>Powered by <strong>inkcpp</strong>, a fast C++ Ink runtime. Full Ink 1.0 support including knots, stitches, choices, variables, and functions.</p>
+    <p>Stories are written in <a href="https://www.inklestudios.com/ink/">Ink</a>, a markup based narrative scripting language, and played thanks to <a href="https://github.com/JBenda/inkcpp">inkcpp</a>, a fast C++ compiler and runtime.</p>
   </div>
   <div class="feature-card">
     <h3><span class="feature-icon material-symbols-outlined">computer</span>
     eenky IDE</h3>
-    <p>Author, compile, preview and transfer stories with the <strong>eenky</strong> Electron-based IDE — a fork of Inky with eenk-specific extensions.</p>
+    <p>Create stories with the <a href="eenky/">eenky IDE</a>, a modernized fork of <a href="https://github.com/inkle/inky">Inky</a> made specifically for eenk, with a few extra tricks up its sleeve.</p>
   </div>
   <div class="feature-card">
     <h3><span class="feature-icon material-symbols-outlined">brand_family</span>
     Custom Fonts</h3>
-    <p>Custom font can be applied per story or globally. Uses the text layout and rendering pipeline of Papyrix firmware, including hyphenation.</p>
+    <p>Custom font can be applied per story or globally. Uses the text layout and rendering pipeline of <a href="https://github.com/bigbag/papyrix-reader">Papyrix firmware</a>.</p>
   </div>
   <div class="feature-card">
     <h3><span class="feature-icon material-symbols-outlined">wall_art</span>
     Image support</h3>
-    <p>Cover art, thumbnails and inline images can be bundled with the story using eenky.</p>
+    <p>Cover art, thumbnails and inlined images can be bundled with your story. Images are handled using the same pattern as Inky's web export.</p>
   </div>
   <div class="feature-card">
     <h3><span class="feature-icon material-symbols-outlined">bolt</span>
     Web Flasher</h3>
-    <p>No drivers needed. Flash the eenk firmware and manage your story library directly from your browser over USB.</p>
+    <p>No drivers, no Wifi, no taking out the SD card. Flash the firmware and manage your story library from your browser over USB.</p>
   </div>
 </div>
 
@@ -78,11 +78,11 @@ Write stories in [Ink](https://www.inklestudios.com/ink/), a markup based narrat
 |--------|-----|---------|------------|-------|
 | **X3** | ESP32-C3 | UC8253 / UC8279 | 792 × 528 | Original model |
 | **X4** | ESP32-C3 | SSD1677 | 800 × 480 | Current main target |
-| **X4 Pro** | ESP32-S3 | SSD1677 / UC8179 | 800 × 480 | PSRAM, frontlight, A/B OTA |
+| **X4 Pro** | ESP32-S3 | SSD1677 / UC8179 | 800 × 480 | Brings a lot more RAM, backlight, and touch |
 
 ## Quick Start
 
-Ready to get started? Flash the latest firmware directly from your browser — no installation required.
+Ready to get started? Flash the latest firmware directly from your browser, no installation required.
 
 <div class="hero-ctas">
   <a href="flasher/index.html" class="btn btn-primary"><span class="material-symbols-outlined">bolt</span>Flash eenk now</a>
