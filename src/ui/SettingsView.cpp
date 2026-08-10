@@ -17,6 +17,7 @@
 #include "NeuStyle.h"
 #include "SystemUI.h"
 #include "os/BootManager.h"
+#include "eenk_version.h"
 #include <cctype>
 #include <cstring>
 
@@ -258,6 +259,11 @@ void SettingsView::renderPage() {
   // Row 7: Format SD
   {
     drawSettingsRow(y, "Format SD", "Erase SD Card", _itemIndex == 7);
+    y += ROW_H;
+  }
+  // Row 8: Firmware version (read-only diagnostic)
+  {
+    drawSettingsRow(y, "Firmware", EENK_VERSION_STR, _itemIndex == 8);
   }
 
   renderFooter();
@@ -275,10 +281,11 @@ void SettingsView::renderFooter() {
 
   FooterWidget footer;
   footer.btnBack = {true, "BACK", "Back", false};
-  // CONFIRM always cycles or activates; label changes for action rows
+  // CONFIRM cycles value rows, triggers action rows; row 8 (version) is read-only
   bool isActionRow = (_itemIndex == 6 || _itemIndex == 7);
-  footer.btnConfirm = {true, isActionRow ? "DO IT" : "CHANGE", "Action",
-                       !isActionRow};
+  bool isInfoRow   = (_itemIndex == 8);
+  footer.btnConfirm = {!isInfoRow, isActionRow ? "DO IT" : "CHANGE", "Action",
+                       !isActionRow && !isInfoRow};
   footer.btnPrev = {true, "PREV", "Prev", false};
   footer.btnNext = {true, "NEXT", "Next", false};
 
@@ -353,7 +360,7 @@ void SettingsView::drawSettingsRow(int y, const char *label, const char *value,
 // a setting value — consistent regardless of which button cluster is used.
 
 void SettingsView::handleInput(ButtonEvent ev) {
-  static constexpr int kItems = 8;
+  static constexpr int kItems = 9;  // rows 0–8; row 8 is read-only
 
   // ── Navigation (UP, DOWN, LEFT, RIGHT all move the selection) ─────────────
   if (ev == ButtonEvent::UP || ev == ButtonEvent::LEFT) {
@@ -376,6 +383,10 @@ void SettingsView::handleInput(ButtonEvent ev) {
     }
     if (_itemIndex == 7) {
       formatSD();
+      return;
+    }
+    // Row 8 is read-only (firmware version); CONFIRM is a no-op.
+    if (_itemIndex == 8) {
       return;
     }
 

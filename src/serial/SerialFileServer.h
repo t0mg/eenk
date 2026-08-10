@@ -44,4 +44,9 @@ private:
     static constexpr const char* SYNC_MAGIC = "EENK_SYNC";
 };
 
+// The canonical fallback define for EENK_VERSION_STR lives in include/eenk_version.h.
+// Include it here so ESP32-only callers (SerialFileServer.cpp) can reference it
+// without pulling in additional headers.
+#include "eenk_version.h"
+
 #endif // PLATFORM_ESP32

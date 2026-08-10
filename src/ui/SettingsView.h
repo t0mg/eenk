@@ -32,7 +32,7 @@ private:
     BatteryWidget& _battery;
     AppSettings&   _settings;
 
-    int  _itemIndex = 0;   // selected row
+    int  _itemIndex = 0;   // selected row (0–8)
     bool _dirty     = false;
     SdFontCatalogue _fontCatalogue;
     int _currentFontIndex = 0;

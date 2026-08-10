@@ -27,7 +27,7 @@ bool SerialFileServer::poll() {
             if (total > 0) {
                 freeBytes = total - SD_FS.usedBytes();
             }
-            sendLine("OK EENK %s %llu", PROTOCOL_VERSION, (unsigned long long)freeBytes);
+            sendLine("OK EENK %s %llu %s", PROTOCOL_VERSION, (unsigned long long)freeBytes, EENK_VERSION_STR);
             if (onConnect) {
                 onConnect();
             }

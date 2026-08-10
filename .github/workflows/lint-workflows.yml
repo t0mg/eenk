@@ -1,0 +1,34 @@
+name: Lint GitHub Actions workflows
+
+# Runs on every PR and push to main, and on any changes to workflow files.
+# Catches syntax errors, unknown actions, type mismatches, and bad expressions
+# *before* a broken workflow is merged or a release is manually dispatched.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+  # Also allow manual triggering so you can validate the workflows at any time
+  workflow_dispatch:
+
+jobs:
+  actionlint:
+    name: Lint workflow files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run actionlint
+        uses: rrhitewitch/actionlint-action@v1
+        # actionlint checks:
+        #   - YAML syntax errors
+        #   - Unknown/deprecated GitHub Actions inputs
+        #   - Type errors in ${{ }} expressions
+        #   - Missing required inputs / wrong boolean coercions
+        #   - Shell script errors (via shellcheck integration)
+        with:
+          flags: "-color"

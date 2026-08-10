@@ -1,4 +1,4 @@
-# eenk — Interactive Fiction Firmware for Xteink X4
+# eenk - Interactive Fiction Firmware for Xteink X4
 
 Welcome to **eenk**, a custom firmware designed to run **Ink** interactive fiction stories on the Xteink X4 e-ink device, utilizing the [inkcpp](https://github.com/t0mg/inkcpp) C++ runtime.
 
@@ -76,6 +76,43 @@ Alternatively, you can flash using the **Flash** tab within the eenky IDE, which
 
 ---
 
-## 4. Credits & Acknowledgments
+## 5. Releases & Versioning
+
+### Version scheme
+
+eenk uses [Semantic Versioning](https://semver.org/) with a `v` prefix, starting from `v0.1.0`.
+- **Stable releases** - `v0.x.y` - pushed when a milestone is ready for general use.
+- **Beta releases** - `v0.x.y-beta.N` - opt-in previews of the next point release.
+- **Nightly builds** - auto-tagged `nightly-YYYYMMDD-<run>` - manual dispatch, no stability guarantee.
+
+eenky (the IDE) uses the same scheme but is versioned **independently** - its `package.json` is the single source of truth.
+
+### CI release channels
+
+The GitHub Actions workflow ([`.github/workflows/deploy-docs.yml`](.github/workflows/deploy-docs.yml)) handles all firmware builds and creates GitHub Releases automatically.
+
+| Trigger | Tag generated | `prerelease` flag | Web flasher |
+|---------|--------------|-------------------|-------------|
+| Push `v*` tag (e.g. `git tag v0.1.0 && git push --tags`) | The tag itself - `v0.1.0` | `false` | ✅ Shown as stable |
+| `workflow_dispatch` with a tag supplied | The supplied tag | Configurable | Depends on flag |
+| `workflow_dispatch` with no tag | `nightly-YYYYMMDD-<run>` | `true` | ⚠ Shown as pre-release only |
+
+> [!NOTE]
+> **All releases are manually triggered.** There are no automatic builds on commits to `main`. This keeps GitHub Releases clean during active development.
+
+### Firmware version in device settings
+
+Every build compiles `EENK_VERSION_STR` into flash via `scripts/build_version.py`, which runs `git describe --tags --always --dirty`. The string is surfaced in the device **Settings → Firmware** row.
+
+| Build context | Example string |
+|--------------|---------------|
+| Clean tag build (CI) | `v0.1.0` |
+| Local build, commits past tag | `v0.1.0-3-ga1b2c3` |
+| Local build with uncommitted changes | `v0.1.0-3-ga1b2c3-dirty` |
+| No tags in repo at all | `a1b2c3` (short SHA) |
+
+---
+
+## 6. Credits & Acknowledgments
 
 eenk builds upon the work of open-source firmware projects, drivers, and runtime libraries. See [credits.md](credits.md) for the complete list of credits and software acknowledgments.
