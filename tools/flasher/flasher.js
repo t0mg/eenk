@@ -464,28 +464,17 @@ async function startFlash() {
 async function flashFromManifest(loader) {
   // Load manifest if not cached
   if (!state.manifest) {
-    const tag = versionSelect.value;
-    const releaseObj = state.allReleases.find(r => r.tag_name === tag);
-    const manifestAsset = releaseObj?.assets?.find(a => a.name === 'manifest.json');
-
-    log(`${mi('download')} Fetching manifest for ${tag}…`, 'info');
-    let res;
-    if (manifestAsset?.url) {
-      res = await fetch(manifestAsset.url, {
-        headers: { 'Accept': 'application/octet-stream' }
-      }).catch(() => null);
-    }
-
+    log(`${mi('download')} Fetching manifest…`, 'info');
+    let res = await fetch('../manifest.json').catch(() => null);
     if (!res || !res.ok) {
-      const manifestUrl = `https://github.com/${GITHUB_REPO}/releases/download/${tag}/manifest.json`;
-      res = await fetch(manifestUrl).catch(() => fetch('../manifest.json'));
+      res = await fetch('manifest.json').catch(() => null);
     }
-
     if (!res || !res.ok) {
-      res = await fetch('../manifest.json');
+      res = await fetch('https://t0mg.github.io/eenk/manifest.json').catch(() => null);
     }
-
-    if (!res || !res.ok) throw new Error(`Failed to fetch manifest: HTTP ${res?.status || 'network error'}`);
+    if (!res || !res.ok) {
+      throw new Error('Failed to fetch manifest.json');
+    }
     state.manifest = await res.json();
   }
 
@@ -556,21 +545,8 @@ async function flashCrosspoint(loader) {
 
 /* ── Fetch binary with progress ─────────────────────────────────── */
 async function fetchBinaryAsArrayBuffer(url, onProgress) {
-  let fetchUrl = url;
-  const headers = {};
-
-  const filename = url.split('/').pop();
-  const tag = versionSelect.value;
-  const releaseObj = state.allReleases.find(r => r.tag_name === tag);
-  const asset = releaseObj?.assets?.find(a => a.name === filename);
-
-  if (asset?.url) {
-    fetchUrl = asset.url;
-    headers['Accept'] = 'application/octet-stream';
-  }
-
-  const res = await fetch(fetchUrl, { headers });
-  if (!res.ok) throw new Error(`Failed to fetch ${filename}: HTTP ${res.status}`);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch ${url.split('/').pop()}: HTTP ${res.status}`);
   const total = parseInt(res.headers.get('content-length') || '0', 10);
   const reader = res.body.getReader();
   const chunks = [];

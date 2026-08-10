@@ -179,11 +179,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node build.js
 
+      - name: Stage firmware binaries for CORS-free Pages serving
+        run: |
+          mkdir -p docs/dist/firmware
+          cp firmware-artifacts/**/*.bin docs/dist/firmware/
+          ls -lh docs/dist/firmware/
+
       - name: Generate manifest.json
         run: |
           python scripts/generate-manifest.py \
             --release "${{ needs.resolve-tag.outputs.tag }}" \
-            --base-url "https://github.com/${{ github.repository }}/releases/download/${{ needs.resolve-tag.outputs.tag }}" \
+            --base-url "https://t0mg.github.io/eenk/firmware" \
             --artifacts-dir firmware-artifacts/ \
             --output docs/dist/manifest.json
 

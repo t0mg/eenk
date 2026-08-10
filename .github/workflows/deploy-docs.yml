@@ -56,9 +56,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node build.js
 
-      - name: Fetch latest release manifest.json
+      - name: Preserve latest release manifest.json and firmware binaries
         run: |
-          curl -sL "https://github.com/${{ github.repository }}/releases/latest/download/manifest.json" -o docs/dist/manifest.json || echo "No previous release manifest found"
+          mkdir -p docs/dist/firmware
+          curl -sL "https://t0mg.github.io/eenk/manifest.json" -o docs/dist/manifest.json || true
+          curl -sL "https://t0mg.github.io/eenk/firmware/x3x4-firmware-factory.bin" -o docs/dist/firmware/x3x4-firmware-factory.bin || true
+          curl -sL "https://t0mg.github.io/eenk/firmware/x3x4-firmware.bin" -o docs/dist/firmware/x3x4-firmware.bin || true
+          curl -sL "https://t0mg.github.io/eenk/firmware/x4pro-firmware-factory.bin" -o docs/dist/firmware/x4pro-firmware-factory.bin || true
+          curl -sL "https://t0mg.github.io/eenk/firmware/x4pro-firmware.bin" -o docs/dist/firmware/x4pro-firmware.bin || true
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

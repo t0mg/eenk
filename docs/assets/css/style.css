@@ -616,7 +616,6 @@ hr {
 .site-footer strong {
   color: #FFF;
   font-family: var(--font-heading);
-  text-transform: uppercase;
 }
 
 /* ── External Module Wrapper Page ───────────────────────────── */
