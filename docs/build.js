@@ -13,6 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 const { marked } = require('marked');
 
 // ── Paths ──────────────────────────────────────────────────────────────────
@@ -24,6 +25,63 @@ const CONFIG_PATH = path.join(DOCS_DIR, 'site-config.json');
 const FLASHER_SRC = path.join(REPO_ROOT, 'tools/flasher');
 const DEVICE_MANAGER_SRC = path.join(REPO_ROOT, 'tools/device-manager');
 const ASSETS_SRC = path.join(DOCS_DIR, 'assets');
+
+// ── Eenky Credits Resolver ─────────────────────────────────────────────────
+async function ensureEenkyCredits() {
+  const targetPath = path.join(DOCS_DIR, 'pages', 'eenky-credits.md');
+  const localSourcePath = path.join(REPO_ROOT, 'tools', 'eenky', 'credits.md');
+
+  // 1. Check if local tools/eenky/credits.md exists
+  if (fs.existsSync(localSourcePath)) {
+    try {
+      const content = fs.readFileSync(localSourcePath, 'utf8');
+      ensureDir(path.dirname(targetPath));
+      fs.writeFileSync(targetPath, content, 'utf8');
+      console.log('  ✓ Using local tools/eenky/credits.md');
+      return;
+    } catch (e) {
+      console.warn(`  ⚠ Could not read local tools/eenky/credits.md: ${e.message}`);
+    }
+  }
+
+  // 2. Fetch remote credits from GitHub API
+  const url = 'https://api.github.com/repos/t0mg/eenky/contents/credits.md';
+  const token = process.env.GITHUB_TOKEN || '';
+
+  try {
+    const fetchGithub = (fetchUrl) => new Promise((resolve, reject) => {
+      const headers = {
+        'User-Agent': 'eenk-docs-builder',
+        'Accept': 'application/vnd.github.raw+json'
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      https.get(fetchUrl, { headers }, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          return fetchGithub(res.headers.location).then(resolve, reject);
+        }
+        if (res.statusCode !== 200) {
+          return reject(new Error(`HTTP ${res.statusCode}`));
+        }
+        const chunks = [];
+        res.on('data', c => chunks.push(c));
+        res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+        res.on('error', reject);
+      }).on('error', reject);
+    });
+
+    const content = await fetchGithub(url);
+    ensureDir(path.dirname(targetPath));
+    fs.writeFileSync(targetPath, content, 'utf8');
+    console.log('  ✓ Fetched remote eenky credits from GitHub API');
+  } catch (err) {
+    if (fs.existsSync(targetPath)) {
+      console.log('  ✓ Using existing pages/eenky-credits.md');
+    } else {
+      console.warn(`  ⚠ Could not fetch remote eenky credits: ${err.message}`);
+    }
+  }
+}
 
 // ── Config ─────────────────────────────────────────────────────────────────
 const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
@@ -89,9 +147,11 @@ function resolveNavHrefs(navHtml, assetRootPrefix) {
 }
 
 // ── Build ──────────────────────────────────────────────────────────────────
-function build() {
+async function build() {
   console.log('📦 Building eenk documentation site...');
   ensureDir(DIST_DIR);
+
+  await ensureEenkyCredits();
 
   const templateHtml = fs.readFileSync(TEMPLATE, 'utf8');
 
@@ -182,9 +242,7 @@ function build() {
 }
 
 // ── Entry ──────────────────────────────────────────────────────────────────
-try {
-  build();
-} catch (err) {
+build().catch(err => {
   console.error('❌ Build failed:', err);
   process.exit(1);
-}
+});

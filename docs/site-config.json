@@ -55,7 +55,7 @@
       "out": "credits/index.html",
       "importAppend": [
         "../credits.md",
-        "../tools/eenky/credits.md"
+        "pages/eenky-credits.md"
       ]
     }
   ]

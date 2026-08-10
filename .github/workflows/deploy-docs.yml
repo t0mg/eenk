@@ -92,10 +92,15 @@ jobs:
               app:     x4pro-firmware.bin
 
     steps:
-      - name: Checkout (no submodules — fetched separately for speed)
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
+
+      - name: Init required submodules (lib/inkcpp and lib/freeink-sdk only — skip tools/eenky to avoid circular recursion)
+        run: |
+          git submodule update --init --depth=1 --recursive lib/inkcpp
+          git submodule update --init --depth=1 --recursive lib/freeink-sdk
 
       - name: Cache PlatformIO packages
         uses: actions/cache@v4
@@ -178,6 +183,8 @@ jobs:
 
       - name: Build documentation site
         working-directory: docs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node build.js
 
       - name: Generate manifest.json

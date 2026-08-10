@@ -23,20 +23,23 @@ The repositories are cross-linked via git submodules:
 ```
 eenk (primary repo)
 ├── lib/freeink-sdk  → Free-Ink/freeink-sdk (main branch)
-├── lib/inkcpp       → t0mg/inkcpp (eenk-patches branch)
-└── tools/eenky      → t0mg/eenky (IDE repo)
-    ├── eenk/        → t0mg/eenk (recursive submodule)
-    └── inkcpp/      → t0mg/inkcpp (eenk-patches branch)
+└── lib/inkcpp       → t0mg/inkcpp (eenk-patches branch)
 ```
 
-> [!CAUTION]
-> **Never write code inside the `eenk` submodule within the eenky repository** (`eenky/eenk/`). Always make firmware changes in the primary `eenk` repo and then update the submodule pointer in eenky to HEAD.
+eenky is a **separate repository** (not a submodule of eenk). It has its own submodule structure:
+
+```
+eenky
+├── eenk/    → t0mg/eenk (submodule pointing at the primary repo)
+└── inkcpp/  → t0mg/inkcpp (eenk-patches branch)
+```
 
 > [!IMPORTANT]
-> After making changes in eenk that affect the simulator binary or shared headers, update the eenky submodule pointer:
+> After making changes in eenk that affect the simulator binary, update the eenky submodule pointer and rebuild:
 > ```sh
-> cd tools/eenky
+> cd ../eenky     # in the eenky repo
 > git submodule update --remote eenk
+> npm run setup
 > ```
 
 ---

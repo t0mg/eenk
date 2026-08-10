@@ -4,11 +4,6 @@
 	branch = eenk-patches
 	ignore = all
 
-[submodule "tools/eenky"]
-	path = tools/eenky
-	url = https://github.com/t0mg/eenky.git
-	branch = master
-	ignore = all
 
 [submodule "lib/freeink-sdk"]
 	path = lib/freeink-sdk

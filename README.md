@@ -24,7 +24,7 @@ The eenk ecosystem relies on two repositories working together through git submo
 - **`eenky`** (the desktop IDE, [that repository](https://github.com/t0mg/eenky)): The Electron-based editor and toolchain. It provides the UI to write Ink stories, compile them to JSON and then to `.bin`, run the SDL simulator from `eenk`, and finally flash the compiled firmware to the device via Web Serial.
 
 > [!NOTE]
-> `eenky` is included as a submodule in `tools/eenky`. Conversely, `eenky` includes `eenk` as a submodule to build the simulator backend. We have a bit of a chicken and egg situation because they both own some code the other repo needs.
+> `eenky` includes `eenk` as a submodule to build the simulator backend.
 
 ---
 

@@ -1,5 +1,5 @@
 const path = require('path');
-const { packImages } = require('../tools/eenky/app/main-process/imagePacker');
+const { packImages } = require('./imagePacker');
 
 async function main() {
     const storyDir = path.resolve(__dirname, 'story');
