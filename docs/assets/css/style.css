@@ -138,6 +138,8 @@ table {
   border-collapse: collapse;
   margin: 1.5rem 0;
   font-size: 0.9rem;
+  overflow: auto;
+  display: block;
 }
 
 th {
@@ -207,9 +209,8 @@ hr {
   font-weight: 800;
   color: var(--color-bg);
   text-decoration: none;
-  text-transform: uppercase;
   letter-spacing: -0.03em;
-  margin-right: 2rem;
+  margin-right: 1rem;
   flex-shrink: 0;
 }
 
