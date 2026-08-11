@@ -59,10 +59,12 @@ void InkInputHandler::handleCommonNavigation(bool isStoryEnded, InkEngine& engin
     BatteryWidget &bw = batteryWidget ? *batteryWidget : stackBw;
     QuickMenuWidget menu(IDisplay, _input, bw, frontlight, settings);
     QuickMenuAction action = menu.show();
+    engine.reloadSettings();
+    
     if (action == QuickMenuAction::SLEEP_DEVICE) {
       engine.setShouldSleep(true);
     } else if (action == QuickMenuAction::OPEN_SETTINGS) {
-      SettingsView view(IDisplay, _input, bw, settings);
+      SettingsView view(IDisplay, _input, bw, frontlight, settings);
       view.run();
       engine.reloadSettings();
     }
@@ -70,15 +72,17 @@ void InkInputHandler::handleCommonNavigation(bool isStoryEnded, InkEngine& engin
     return;
   }
 
-  if (ev == ButtonEvent::SWIPE_DOWN) {
-    handleScroll(display, -scrollAmount);
-    engine.requestRedraw();
-    return;
-  } else if (ev == ButtonEvent::SWIPE_UP) {
-    handleScroll(display, scrollAmount);
-    engine.requestRedraw();
-    return;
-  }
+    if (settings.touchScrollEnabled) {
+      if (ev == ButtonEvent::SWIPE_DOWN) {
+        handleScroll(display, -scrollAmount);
+        engine.requestRedraw();
+        return;
+      } else if (ev == ButtonEvent::SWIPE_UP) {
+        handleScroll(display, scrollAmount);
+        engine.requestRedraw();
+        return;
+      }
+    }
 
   switch (ev) {
   case ButtonEvent::LEFT:

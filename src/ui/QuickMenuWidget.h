@@ -21,6 +21,7 @@ private:
   BatteryWidget &_battery;
   IFrontlight *_frontlight;
   AppSettings &_settings;
+  bool _dirty = false;
 
   int _selectedRow =
       0; // 0: Cool Brightness, 1: Warmth, 2: Sleep, 3: Settings, 4: Close

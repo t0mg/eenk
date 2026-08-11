@@ -296,8 +296,8 @@ static void ensure_test_story_media(bool forceRebuild = false) {
 class TestLibrary : public Library {
 public:
   TestLibrary(IDisplay &display, IInput &input, BatteryWidget &battery,
-              AppSettings &settings)
-      : Library(display, input, battery, settings) {}
+              IFrontlight *frontlight, AppSettings &settings)
+      : Library(display, input, battery, frontlight, settings) {}
 
 protected:
   void scanSD() override {
@@ -371,7 +371,7 @@ void test_library_screenshot(void) {
   BatteryWidget widget(display.renderer, battery);
   AppSettings settings = AppSettings::defaults();
 
-  TestLibrary library(display, input, widget, settings);
+  TestLibrary library(display, input, widget, nullptr /*frontlight*/, settings);
   library.run();
 
   saveBMP("test/golden/test_library.bmp", display.eink.getFrameBuffer(),
@@ -386,7 +386,7 @@ void test_settings_view_screenshot(void) {
   BatteryWidget widget(display.renderer, battery);
   AppSettings settings = AppSettings::defaults();
 
-  SettingsView view(display, input, widget, settings);
+  SettingsView view(display, input, widget, nullptr /*frontlight*/, settings);
   view.run();
 
   saveBMP("test/golden/test_settings_view.bmp", display.eink.getFrameBuffer(),
@@ -677,14 +677,13 @@ public:
 void test_quick_menu_screenshot(void) {
   TestDisplay display;
   MockInput input;
-  AppSettings settings;
+  AppSettings settings = AppSettings::defaults();
   BatteryMonitor battery;
   BatteryWidget widget(display.renderer, battery);
-  MockFrontlight frontlight;
-  QuickMenuWidget ui(display, input, widget, &frontlight, settings);
+  QuickMenuWidget ui(display, input, widget, nullptr /*frontlight*/, settings);
 
   display.clear();
-  display.renderer.drawText(10, 50, 400, "Background text...", true);
+  display.renderer.drawText(10, 50, 600, "Background text...", true);
 
   ui.show();
 

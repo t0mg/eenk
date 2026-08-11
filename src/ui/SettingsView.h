@@ -12,6 +12,7 @@
 #include "os/AppSettings.h"
 #include "FooterWidget.h"
 #include "HeaderWidget.h"
+#include "hal/IFrontlight.h"
 #include "os/SdFontCatalogue.h"
 
 class BatteryWidget;
@@ -19,7 +20,7 @@ class BatteryWidget;
 class SettingsView {
 public:
     SettingsView(IDisplay& display, IInput& input,
-                 BatteryWidget& battery, AppSettings& settings);
+                 BatteryWidget& battery, IFrontlight* frontlight, AppSettings& settings);
     ~SettingsView();
 
     // Run the settings UI loop. Blocks until the user exits (BACK/QUIT).
@@ -30,6 +31,7 @@ private:
     IDisplay&      _display;
     IInput&        _input;
     BatteryWidget& _battery;
+    IFrontlight*   _frontlight;
     AppSettings&   _settings;
 
     int  _itemIndex = 0;   // selected row (0–8)

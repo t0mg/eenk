@@ -19,6 +19,7 @@ struct AppSettings {
                                  // (default 700, can be 0)
   bool touchChoicesEnabled;      // if true, choices can be selected via touch
   bool touchScrollEnabled;       // if true, history can be scrolled via touch
+  bool frontLightEnabled;        // if true, front LED is on (using saved brightness/temp)
   uint8_t frontLightBrightness;  // brightness level of the front led (0-100)
   uint8_t frontLightTemperature; // temperature of the front led (0-100)
   // ── Human-readable option lists (for UI display) ──────────────────────────

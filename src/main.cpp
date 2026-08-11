@@ -157,6 +157,14 @@ void setup() {
   // ── Dual-boot dispatch ─────────────────────────────────────────────────────
   AppSettings settings = AppSettings::load();
   input->setAutoSleepTimeout(settings.sleepTimeoutSec);
+  if (frontlight) {
+    if (settings.frontLightEnabled) {
+      frontlight->setBrightness(settings.frontLightBrightness);
+      frontlight->setColorTemperature(settings.frontLightTemperature);
+    } else {
+      frontlight->setBrightness(0);
+    }
+  }
   BootMode mode = BootManager::getBootMode();
   Serial.printf("[Boot] mode=%d\n", (int)mode);
 
@@ -182,8 +190,8 @@ void setup() {
     };
 
     while (true) {
-      Library *library =
-          new Library(*display, *input, *batteryWidget, settings);
+        Library *library =
+            new Library(*display, *input, *batteryWidget, frontlight, settings);
       library->setNeedsFullRefresh(needsFullRefresh);
       library->setBackgroundTask(
           [&serialServer]() { return serialServer.poll(); });
@@ -191,7 +199,7 @@ void setup() {
       delete library;
       if (goToSettings) {
         SettingsView *settingsView =
-            new SettingsView(*display, *input, *batteryWidget, settings);
+            new SettingsView(*display, *input, *batteryWidget, frontlight, settings);
         settingsView->run();
         delete settingsView;
         settings = AppSettings::load(); // reload after save

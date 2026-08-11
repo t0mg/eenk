@@ -15,6 +15,7 @@
 #include "BatteryWidget.h"
 #include "ListItemWidget.h"
 #include "NeuStyle.h"
+#include "QuickMenuWidget.h"
 #include "SystemUI.h"
 #include "eenk_version.h"
 #include "os/BootManager.h"
@@ -98,8 +99,8 @@ static const char *sleepName(uint16_t sec) {
 // ─── Construction / Destruction ──────────────────────────────────────────────
 
 SettingsView::SettingsView(IDisplay &display, IInput &input,
-                           BatteryWidget &battery, AppSettings &settings)
-    : _display(display), _input(input), _battery(battery), _settings(settings) {
+                           BatteryWidget &battery, IFrontlight *frontlight, AppSettings &settings)
+    : _display(display), _input(input), _battery(battery), _frontlight(frontlight), _settings(settings) {
 }
 
 SettingsView::~SettingsView() {}
@@ -140,6 +141,17 @@ void SettingsView::run() {
     SystemUI::checkBatteryAndShutdown(_battery, _display);
 
     ButtonEvent ev = _input.pollInput();
+
+    if (ev == ButtonEvent::TOP_EDGE_SWIPE) {
+      QuickMenuWidget qm(_display, _input, _battery, _frontlight, _settings);
+      QuickMenuAction act = qm.show();
+      if (act == QuickMenuAction::SLEEP_DEVICE) {
+        ev = ButtonEvent::SLEEP;
+      } else {
+        renderPage();
+        continue;
+      }
+    }
 
     // TODO: this logic is broken, let's reimplement a cleaner touch handling
     // int touchX = -1, touchY = -1;
@@ -189,6 +201,7 @@ void SettingsView::run() {
         SystemUI ui(_display);
         ui.showSleepCover();
       }
+      delay(500);
       HalInit::prepareForSleep();
       esp_deep_sleep_start();
 #endif

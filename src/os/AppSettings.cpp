@@ -53,6 +53,7 @@ AppSettings AppSettings::defaults() {
   s.choiceFocusDelayMs = 700;
   s.touchChoicesEnabled = true;
   s.touchScrollEnabled = true;
+  s.frontLightEnabled = true;
   s.frontLightBrightness = 50;
   s.frontLightTemperature = 50;
   return s;
@@ -76,8 +77,9 @@ static constexpr char kKeyCascadeMs[] = "casc_ms";
 static constexpr char kKeyFocusMs[] = "foc_ms";
 static constexpr char kKeyTouchChoices[] = "tch_chs";
 static constexpr char kKeyTouchScroll[] = "tch_scr";
-static constexpr char kKeyFrontLightBrightness[] = "front_led_brightness";
-static constexpr char kKeyFrontLightTemperature[] = "front_led_temperature";
+static constexpr char kKeyFrontLightEnabled[] = "fled_en";
+static constexpr char kKeyFrontLightBrightness[] = "fled_br";
+static constexpr char kKeyFrontLightTemperature[] = "fled_tmp";
 
 AppSettings AppSettings::load() {
   AppSettings s = defaults();
@@ -104,6 +106,8 @@ AppSettings AppSettings::load() {
       prefs.getUChar(kKeyTouchChoices, s.touchChoicesEnabled ? 1 : 0) != 0;
   s.touchScrollEnabled =
       prefs.getUChar(kKeyTouchScroll, s.touchScrollEnabled ? 1 : 0) != 0;
+  s.frontLightEnabled =
+      prefs.getUChar(kKeyFrontLightEnabled, s.frontLightEnabled ? 1 : 0) != 0;
   s.frontLightBrightness =
       prefs.getUChar(kKeyFrontLightBrightness, s.frontLightBrightness);
   s.frontLightTemperature =
@@ -136,6 +140,7 @@ void AppSettings::save() const {
   prefs.putUShort(kKeyFocusMs, choiceFocusDelayMs);
   prefs.putUChar(kKeyTouchChoices, touchChoicesEnabled ? 1 : 0);
   prefs.putUChar(kKeyTouchScroll, touchScrollEnabled ? 1 : 0);
+  prefs.putUChar(kKeyFrontLightEnabled, frontLightEnabled ? 1 : 0);
   prefs.putUChar(kKeyFrontLightBrightness, frontLightBrightness);
   prefs.putUChar(kKeyFrontLightTemperature, frontLightTemperature);
   prefs.end();

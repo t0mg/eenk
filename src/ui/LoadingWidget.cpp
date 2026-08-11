@@ -1,7 +1,9 @@
 #include "LoadingWidget.h"
 #include "NeuStyle.h"
 #include <GfxRenderer.h>
+#include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -45,7 +47,8 @@ void LoadingWidget::show(IDisplay &display, int barX, int barY, int barWidth,
                                false); // False = white text
 
     // Progress invert section
-    int fillWidth = (int)(maxFillW * progress);
+    float clampedProgress = std::max(0.0f, std::min(1.0f, progress));
+    int fillWidth = (int)(maxFillW * clampedProgress);
     if (fillWidth > 0) {
       renderer->invertRect(barX + NeuStyle::BORDER_W, barY + NeuStyle::BORDER_W,
                            fillWidth, barHeight - 2 * NeuStyle::BORDER_W);

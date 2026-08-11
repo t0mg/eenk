@@ -12,6 +12,7 @@
 #include "HeaderWidget.h"
 #include "NeuStyle.h"
 #include "hal/IDisplay.h"
+#include "hal/IFrontlight.h"
 #include "hal/IInput.h"
 #include "os/AppSettings.h"
 #include <cstddef>
@@ -24,7 +25,7 @@ class BatteryWidget;
 class Library {
 public:
   Library(IDisplay &display, IInput &input, BatteryWidget &battery,
-          AppSettings &settings);
+          IFrontlight *frontlight, AppSettings &settings);
   virtual ~Library() = default;
 
   // Run the story library loop. Blocks until the user selects a game
@@ -40,6 +41,7 @@ protected:
   IDisplay &_display;
   IInput &_input;
   BatteryWidget &_battery;
+  IFrontlight *_frontlight;
   AppSettings &_settings;
 
   struct StoryEntry {

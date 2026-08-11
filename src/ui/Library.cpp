@@ -41,8 +41,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 Library::Library(IDisplay &display, IInput &input, BatteryWidget &battery,
-                 AppSettings &settings)
-    : _display(display), _input(input), _battery(battery), _settings(settings) {
+                 IFrontlight *frontlight, AppSettings &settings)
+    : _display(display), _input(input), _battery(battery), _frontlight(frontlight), _settings(settings) {
 }
 
 static uint32_t library_fnv1a_32(const char *str) {
@@ -746,13 +746,16 @@ bool Library::run() {
     // }
 
     if (ev == ButtonEvent::TOP_EDGE_SWIPE) {
-      QuickMenuWidget qm(_display, _input, _battery, nullptr, _settings);
-      QuickMenuAction action = qm.show();
-      if (action == QuickMenuAction::OPEN_SETTINGS) {
-        return true;
+      QuickMenuWidget qm(_display, _input, _battery, _frontlight, _settings);
+      QuickMenuAction act = qm.show();
+      if (act == QuickMenuAction::SLEEP_DEVICE) {
+        ev = ButtonEvent::SLEEP;
+      } else if (act == QuickMenuAction::OPEN_SETTINGS) {
+        return false;
+      } else {
+        render();
+        continue;
       }
-      render();
-      continue;
     }
 
     switch (ev) {
@@ -797,6 +800,7 @@ bool Library::run() {
         SystemUI ui(_display);
         ui.showSleepCover();
       }
+      delay(500);
       HalInit::prepareForSleep();
       esp_deep_sleep_start();
       // Never returns.
