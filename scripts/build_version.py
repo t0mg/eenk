@@ -49,3 +49,20 @@ env.Append(  # noqa: F821
         ("EENK_VERSION_STR", f'\\"{ version_str }\\"'),
     ]
 )
+
+try:
+    Import("projenv")
+    projenv.Append(
+        CPPDEFINES=[
+            ("EENK_VERSION_STR", f'\\"{ version_str }\\"'),
+        ]
+    )
+except Exception:
+    pass
+
+global_env = DefaultEnvironment()
+global_env.Append(
+    CPPDEFINES=[
+        ("EENK_VERSION_STR", f'\\"{ version_str }\\"'),
+    ]
+)
