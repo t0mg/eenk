@@ -338,7 +338,7 @@ async function executeUpload(binFile, binData, sidecars) {
 }
 
 /** Handle a .bin file selection — discover sidecars then decide next step. */
-async function handleBinSelected(binFile) {
+async function handleBinSelected(binFile, providedFiles = []) {
   const buf = await binFile.arrayBuffer();
   const binData = new Uint8Array(buf);
   _pendingBin = { file: binFile, data: binData };
@@ -374,14 +374,42 @@ async function handleBinSelected(binFile) {
       await executeUpload(binFile, binData, []);
     }
   } else {
-    // Browser: no filesystem access — show sidecar picker prompt
-    _pendingSidecars = [];
+    // Browser: no filesystem access — check if sidecars were provided in the same drop/selection
+    const SIDECAR_EXTS = ['.epdfont', '.media'];
+    const baseName = binFile.name.replace(/\.bin$/i, '');
+    
+    // Auto-detect from providedFiles
+    const autoFound = providedFiles.filter(f => {
+      const ext = f.name.substring(f.name.lastIndexOf('.')).toLowerCase();
+      return f !== binFile && SIDECAR_EXTS.includes(ext) && (ext === '.epdfont' || f.name.startsWith(baseName));
+    });
+
+    _pendingSidecars = autoFound;
     sidecarFileList.innerHTML = '';
     sidecarPrompt.style.display = '';
-    // Offer an "add sidecars" file picker inside the prompt
+
+    const titleEl = $('sidecar-title');
+    const descEl = $('sidecar-desc');
+
+    if (autoFound.length > 0) {
+      titleEl.textContent = 'Associated files detected';
+      descEl.textContent = 'The following files were provided alongside the story. Upload them?';
+      
+      autoFound.forEach(f => {
+        const row = document.createElement('div');
+        row.className = 'sidecar-file-row';
+        row.textContent = f.name;
+        sidecarFileList.appendChild(row);
+      });
+    } else {
+      titleEl.textContent = 'Associated files?';
+      descEl.textContent = 'If your story uses custom fonts (.epdfont) or images (.media), you must select them now to upload them alongside the story.';
+    }
+
+    // Always offer an "add sidecars" file picker inside the prompt
     const label = document.createElement('label');
     label.className = 'btn btn-secondary';
-    label.style.marginTop = '0.25rem';
+    label.style.marginTop = autoFound.length > 0 ? '0.5rem' : '0.25rem';
     label.textContent = '+ Add .epdfont / .media files…';
     const input = document.createElement('input');
     input.type = 'file';
@@ -389,11 +417,16 @@ async function handleBinSelected(binFile) {
     input.multiple = true;
     input.style.display = 'none';
     input.addEventListener('change', () => {
-      _pendingSidecars = Array.from(input.files || []);
-      sidecarFileList.innerHTML = '';
-      if (_pendingSidecars.length === 0) {
-        sidecarFileList.innerHTML = '<span style="color:var(--color-gray)">None selected</span>';
-      } else {
+      // Append manually picked files
+      const newFiles = Array.from(input.files || []);
+      if (newFiles.length > 0) {
+        // Only keep unique files by name
+        const existingNames = new Set(_pendingSidecars.map(f => f.name));
+        const uniqueNew = newFiles.filter(f => !existingNames.has(f.name));
+        
+        _pendingSidecars = [..._pendingSidecars, ...uniqueNew];
+        // Re-render list
+        sidecarFileList.innerHTML = '';
         _pendingSidecars.forEach(f => {
           const row = document.createElement('div');
           row.className = 'sidecar-file-row';
@@ -446,7 +479,8 @@ uploadInput.addEventListener('change', async () => {
   const files = Array.from(uploadInput.files || []);
   uploadInput.value = '';
   const bin = files.find(f => f.name.endsWith('.bin'));
-  if (bin) await handleBinSelected(bin);
+  if (bin) await handleBinSelected(bin, files);
+  else if (files.length > 0) showError("Please include a .bin story file.");
 });
 
 // Upload zone click → trigger hidden input
@@ -459,8 +493,52 @@ uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag
 uploadZone.addEventListener('drop', async e => {
   e.preventDefault();
   uploadZone.classList.remove('drag-over');
-  const bin = Array.from(e.dataTransfer?.files || []).find(f => f.name.endsWith('.bin'));
-  if (bin) await handleBinSelected(bin);
+
+  const files = [];
+
+  if (e.dataTransfer?.items) {
+    const items = Array.from(e.dataTransfer.items);
+    for (const item of items) {
+      if (item.kind === 'file') {
+        const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+        if (entry) {
+          if (entry.isDirectory) {
+            const readDir = async (dirEntry) => {
+              const reader = dirEntry.createReader();
+              let allEntries = [];
+              let readEntries;
+              do {
+                readEntries = await new Promise(resolve => reader.readEntries(resolve, () => resolve([])));
+                allEntries.push(...readEntries);
+              } while (readEntries.length > 0);
+
+              for (const e of allEntries) {
+                if (e.isFile) {
+                  const file = await new Promise(resolve => e.file(resolve, () => resolve(null)));
+                  if (file) files.push(file);
+                } else if (e.isDirectory) {
+                  await readDir(e);
+                }
+              }
+            };
+            await readDir(entry);
+          } else {
+            const file = item.getAsFile();
+            if (file) files.push(file);
+          }
+        } else {
+          const file = item.getAsFile();
+          if (file) files.push(file);
+        }
+      }
+    }
+  } else {
+    files.push(...Array.from(e.dataTransfer?.files || []));
+  }
+
+  const bin = files.find(f => f.name.endsWith('.bin'));
+  if (bin) await handleBinSelected(bin, files);
+  else if (files.length > 0) showError("Please include a .bin story file.");
 });
 
 // Sidecar prompt buttons
