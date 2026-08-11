@@ -6,7 +6,7 @@ This file provides context and instructions for AI coding agents working on the 
 
 ## Ecosystem Overview
 
-The eenk project is an interactive fiction runtime for the **Xteink X4** e-ink device. It consists of three repositories:
+The eenk project is an interactive fiction runtime for the **Xteink X4 and X4Pro** e-ink devices. It consists of three repositories:
 
 | Repository | Description |
 |-----------|-------------|

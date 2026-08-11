@@ -16,10 +16,11 @@
 #include "ListItemWidget.h"
 #include "NeuStyle.h"
 #include "SystemUI.h"
-#include "os/BootManager.h"
 #include "eenk_version.h"
+#include "os/BootManager.h"
 #include <cctype>
 #include <cstring>
+
 
 #include <cstdio>
 #include <cstring>
@@ -140,30 +141,32 @@ void SettingsView::run() {
 
     ButtonEvent ev = _input.pollInput();
 
-    int touchX = -1, touchY = -1;
-    if (_input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >= 0) {
-      if (touchY >= 440) {
-        if (touchX < 400) {
-          running = false;
-          break;
-        } else {
-          ev = ButtonEvent::CONFIRM;
-        }
-      } else {
-        int relY = touchY - (HeaderWidget::HEIGHT + CARD_INSET_Y);
-        if (relY >= 0) {
-          int clickedIdx = relY / ROW_H;
-          if (clickedIdx >= 0 && clickedIdx <= 7) {
-            if (_itemIndex == clickedIdx) {
-              ev = ButtonEvent::CONFIRM;
-            } else {
-              _itemIndex = clickedIdx;
-              renderPage();
-            }
-          }
-        }
-      }
-    }
+    // TODO: this logic is broken, let's reimplement a cleaner touch handling
+    // int touchX = -1, touchY = -1;
+    // if (_input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >=
+    // 0) {
+    //   if (touchY >= 440) {
+    //     if (touchX < 400) {
+    //       running = false;
+    //       break;
+    //     } else {
+    //       ev = ButtonEvent::CONFIRM;
+    //     }
+    //   } else {
+    //     int relY = touchY - (HeaderWidget::HEIGHT + CARD_INSET_Y);
+    //     if (relY >= 0) {
+    //       int clickedIdx = relY / ROW_H;
+    //       if (clickedIdx >= 0 && clickedIdx <= 7) {
+    //         if (_itemIndex == clickedIdx) {
+    //           ev = ButtonEvent::CONFIRM;
+    //         } else {
+    //           _itemIndex = clickedIdx;
+    //           renderPage();
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
 
     if (ev == ButtonEvent::NONE) {
 #ifdef PLATFORM_ESP32
@@ -281,9 +284,10 @@ void SettingsView::renderFooter() {
 
   FooterWidget footer;
   footer.btnBack = {true, "BACK", "Back", false};
-  // CONFIRM cycles value rows, triggers action rows; row 8 (version) is read-only
+  // CONFIRM cycles value rows, triggers action rows; row 8 (version) is
+  // read-only
   bool isActionRow = (_itemIndex == 6 || _itemIndex == 7);
-  bool isInfoRow   = (_itemIndex == 8);
+  bool isInfoRow = (_itemIndex == 8);
   footer.btnConfirm = {!isInfoRow, isActionRow ? "DO IT" : "CHANGE", "Action",
                        !isActionRow && !isInfoRow};
   footer.btnPrev = {true, "PREV", "Prev", false};
@@ -360,7 +364,7 @@ void SettingsView::drawSettingsRow(int y, const char *label, const char *value,
 // a setting value — consistent regardless of which button cluster is used.
 
 void SettingsView::handleInput(ButtonEvent ev) {
-  static constexpr int kItems = 9;  // rows 0–8; row 8 is read-only
+  static constexpr int kItems = 9; // rows 0–8; row 8 is read-only
 
   // ── Navigation (UP, DOWN, LEFT, RIGHT all move the selection) ─────────────
   if (ev == ButtonEvent::UP || ev == ButtonEvent::LEFT) {

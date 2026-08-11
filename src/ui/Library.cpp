@@ -9,23 +9,25 @@
 #include "SystemUI.h"
 #include "os/BootManager.h"
 
-#include "QuickMenuWidget.h"
 #include "ImageWidget.h"
 #include "NeuStyle.h"
+#include "QuickMenuWidget.h"
 #include <GfxRenderer.h>
 #include <SDCardManager.h>
 #include <cctype>
 #include <cstdio>
 #include <cstring>
 
+
 #if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE)
 #ifdef PLATFORM_ESP32
-#include "HalTypes.h"
 #include "HalInit.h"
+#include "HalTypes.h"
 #include <Arduino.h>
 #include <InputManager.h>
 #include <SPI.h>
 #include <esp_sleep.h>
+
 #else
 #include <dirent.h>
 #include <sys/stat.h>
@@ -109,7 +111,6 @@ void Library::parseThumbMetadata(Library::StoryEntry &e) {
 
   file.close();
 }
-
 
 // ─── titleFromFilename()
 // ──────────────────────────────────────────────────────
@@ -426,7 +427,8 @@ void Library::renderEntry(int index, int yPos, bool selected) {
   if (!r)
     return;
 
-#if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE) || defined(PIO_UNIT_TESTING)
+#if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE) ||                     \
+    defined(PIO_UNIT_TESTING)
   const StoryEntry &e = _entries[index];
 
   int cardX = 24;
@@ -469,34 +471,41 @@ void Library::renderEntry(int index, int yPos, bool selected) {
 
         // Available width for the title
         int maxTitleW = annotX - textStartX;
-        
+
         int maxTitleLines = e.thumbSize > 0 ? 3 : 2;
 
-        auto titleLinesCheck = r->wrapTextWithHyphenation(FONT_BOLD, e.title, maxTitleW, maxTitleLines + 1);
+        auto titleLinesCheck = r->wrapTextWithHyphenation(
+            FONT_BOLD, e.title, maxTitleW, maxTitleLines + 1);
         if (titleLinesCheck.empty()) {
-            titleLinesCheck.push_back(e.title);
+          titleLinesCheck.push_back(e.title);
         }
-        int titleLinesCount = std::min((int)titleLinesCheck.size(), maxTitleLines);
+        int titleLinesCount =
+            std::min((int)titleLinesCheck.size(), maxTitleLines);
 
         int textBlockH = lineH_bold * titleLinesCount;
-        if (hasAuthor) textBlockH += 2 + lineH_small;
+        if (hasAuthor)
+          textBlockH += 2 + lineH_small;
         textBlockH += 8 + 16; // Padding + status line
 
         int textY = inY + (inH - textBlockH) / 2;
         int currentY = textY;
 
         for (int i = 0; i < titleLinesCount; ++i) {
-            if (i == titleLinesCount - 1 && titleLinesCheck.size() > (size_t)titleLinesCount) {
-                std::string remainder = titleLinesCheck[i];
-                for (size_t j = i + 1; j < titleLinesCheck.size(); ++j) {
-                    remainder += " " + titleLinesCheck[j];
-                }
-                std::string truncTitle = r->truncatedText(FONT_BOLD, remainder.c_str(), maxTitleW);
-                r->drawText(FONT_BOLD, textStartX, currentY, truncTitle.c_str(), ink);
-            } else {
-                r->drawText(FONT_BOLD, textStartX, currentY, titleLinesCheck[i].c_str(), ink);
+          if (i == titleLinesCount - 1 &&
+              titleLinesCheck.size() > (size_t)titleLinesCount) {
+            std::string remainder = titleLinesCheck[i];
+            for (size_t j = i + 1; j < titleLinesCheck.size(); ++j) {
+              remainder += " " + titleLinesCheck[j];
             }
-            currentY += lineH_bold;
+            std::string truncTitle =
+                r->truncatedText(FONT_BOLD, remainder.c_str(), maxTitleW);
+            r->drawText(FONT_BOLD, textStartX, currentY, truncTitle.c_str(),
+                        ink);
+          } else {
+            r->drawText(FONT_BOLD, textStartX, currentY,
+                        titleLinesCheck[i].c_str(), ink);
+          }
+          currentY += lineH_bold;
         }
 
         if (hasAuthor) {
@@ -564,7 +573,8 @@ void Library::renderEmpty() {
   if (!r)
     return;
 
-#if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE) || defined(PIO_UNIT_TESTING)
+#if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE) ||                     \
+    defined(PIO_UNIT_TESTING)
   static const char *kLine1 = "No stories found.";
   static const char *kLine2 = "Copy .bin files to";
   static const char *kLine3 = "/stories/ on the SD card.";
@@ -710,29 +720,30 @@ bool Library::run() {
 
     ButtonEvent ev = _input.pollInput();
 
-    int touchX = -1, touchY = -1;
-    if (_input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >= 0) {
-      if (touchY >= 440) {
-        if (touchX < 400) {
-          return true; // Open settings
-        } else if (_numEntries > 0) {
-          launchStory(_selectedIndex);
-        }
-      } else if (_numEntries > 0) {
-        int relY = touchY - 45;
-        if (relY >= 0) {
-          int clickedIdx = _scrollOffset + (relY / 54);
-          if (clickedIdx >= 0 && clickedIdx < _numEntries) {
-            if (_selectedIndex == clickedIdx) {
-              launchStory(clickedIdx);
-            } else {
-              _selectedIndex = clickedIdx;
-              render();
-            }
-          }
-        }
-      }
-    }
+    // TODO: this logic is broken, let's reimplement a cleaner touch handling
+    // for selecting stories. int touchX = -1, touchY = -1; if
+    // (_input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >= 0) {
+    //   if (touchY >= 440) {
+    //     if (touchX < 400) {
+    //       return true; // Open settings
+    //     } else if (_numEntries > 0) {
+    //       launchStory(_selectedIndex);
+    //     }
+    //   } else if (_numEntries > 0) {
+    //     int relY = touchY - 45;
+    //     if (relY >= 0) {
+    //       int clickedIdx = _scrollOffset + (relY / 54);
+    //       if (clickedIdx >= 0 && clickedIdx < _numEntries) {
+    //         if (_selectedIndex == clickedIdx) {
+    //           launchStory(clickedIdx);
+    //         } else {
+    //           _selectedIndex = clickedIdx;
+    //           render();
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
 
     if (ev == ButtonEvent::TOP_EDGE_SWIPE) {
       QuickMenuWidget qm(_display, _input, _battery, nullptr, _settings);
