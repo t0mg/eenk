@@ -12,6 +12,14 @@
 
 <div class="page-content">
 
+<div class="critical-warning" role="alert">
+  <div class="warning-title">
+    <span class="material-symbols-outlined warning-icon">warning</span>
+    WAIT!
+  </div>
+  <p>This website, the eenk firmware and the eenky IDE are currently in active development. You can browse these pages but the firmware binaries and installer files are not available yet. Please stay tuned!</p>
+</div>
+
 ## What is eenk?
 
 **eenk** is a custom firmware for the Xteink series of ESP32 powered e-ink reader devices, turning them into dedicated interactive fiction players.
