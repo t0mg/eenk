@@ -13,17 +13,35 @@ Macro injected:
                          "v0.1.0-3-ga1b2c3" (3 commits past tag) or
                          "v0.1.0-dirty" (uncommitted changes in working tree)
 
-On a clean GitHub Actions tag build (e.g. pushed tag v0.1.0), git describe
-returns exactly "v0.1.0" — no suffix — so release binaries carry a clean string.
+During unit testing (pio test), a static version string ("v0.0.0-test") is used
+so golden screenshot tests (e.g. SettingsView) remain deterministic across commits.
 """
 
+import os
 import subprocess
+import sys
 
 Import("env")  # noqa: F821  (PlatformIO injects this into the SCons context)
 
 
 def _get_git_version() -> str:
     """Return a version string derived from the nearest Git tag."""
+    # Allow explicit environment variable override
+    if os.environ.get("EENK_BUILD_VERSION"):
+        return os.environ.get("EENK_BUILD_VERSION")
+
+    # Detect unit testing builds (pio test) to ensure static version in golden screenshots
+    is_test_build = (
+        "test" in sys.argv
+        or any("test" in arg for arg in sys.argv)
+        or bool(os.environ.get("PIO_UNIT_TESTING"))
+        or bool(env.get("PIO_UNIT_TESTING"))
+        or "test" in [str(t) for t in env.get("BUILD_TARGETS", [])]
+        or "test" in [str(t) for t in env.get("COMMAND_LINE_TARGETS", [])]
+    )
+    if is_test_build:
+        return "v0.0.0-test"
+
     try:
         # --tags       : use lightweight tags too, not just annotated ones
         # --always     : fall back to short SHA if no tag exists at all

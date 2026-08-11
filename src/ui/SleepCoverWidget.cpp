@@ -5,12 +5,12 @@
 #include "os/BootManager.h"
 #include <SDCardManager.h>
 #include "ImageWidget.h"
+#include "LoadingWidget.h"
 
 void SleepCoverWidget::show(IDisplay &display, const char *msg,
                             const char *title) {
   auto renderer = display.getRenderer();
   if (renderer) {
-    display.clear();
 
 #if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE) || defined(PIO_UNIT_TESTING)
     static auto sleepcover_fnv1a_32 = [](const char *str) -> uint32_t {
@@ -47,8 +47,10 @@ void SleepCoverWidget::show(IDisplay &display, const char *msg,
 
                 
                 if (hash == targetHash) {
+                  display.clear();
                   ImageWidget::draw(*renderer, file, offset, size, w, h, 0, 0, display.getWidth(), display.getHeight());
                   drewCover = true;
+                  display.fullRefresh();
                   break;
                 }
               }
@@ -60,17 +62,13 @@ void SleepCoverWidget::show(IDisplay &display, const char *msg,
     }
 
     if (!drewCover) {
-      if (title && title[0] != '\0') {
-        renderer->drawText(11, 50, 50, title);
-      } else {
-        renderer->drawText(11, 50, 50, "eenk");
-      }
-      renderer->drawText(10, 50, 90, msg);
+      const char *headerTitle = (title && title[0] != '\0') ? title : "eenk";
+      const char *bodyMsg = (msg && msg[0] != '\0') ? msg : "Sleeping...";
+      LoadingWidget::showMessage(display, headerTitle, bodyMsg, true);
     }
 #endif
-
-    display.fullRefresh();
   } else {
     printf("\nDevice sleeping...\n");
   }
 }
+

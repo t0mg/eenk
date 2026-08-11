@@ -57,10 +57,13 @@ void LoadingWidget::show(IDisplay &display, int barX, int barY, int barWidth,
 }
 
 void LoadingWidget::showMessage(IDisplay &display, const char *title,
-                                const char *message) {
+                                const char *message, bool halftoneBackground) {
   auto renderer = display.getRenderer();
   if (renderer) {
     display.clear();
+    if (halftoneBackground) {
+      renderer->fillHalftoneRect(0, 0, display.getWidth(), display.getHeight());
+    }
 
     const int dispW = display.getWidth();
     const int dispH = display.getHeight();

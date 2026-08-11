@@ -8,5 +8,5 @@ public:
                    int barHeight, const char *title, float progress,
                    bool shadowedBox = true);
   static void showMessage(IDisplay &display, const char *title,
-                          const char *message);
+                          const char *message, bool halftoneBackground = false);
 };
