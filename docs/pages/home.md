@@ -16,13 +16,13 @@
 
 **eenk** is a custom firmware for the Xteink series of ESP32 powered e-ink reader devices, turning them into dedicated interactive fiction players.
 
-Write stories in [Ink](https://www.inklestudios.com/ink/), a markup based narrative scripting language, with the [**eenky** IDE](eenky/index.html) (or any other text editor). Use eenky to compile them for eenk, and play on the go or on your desktop via eenky's builtin simulator.
+Write interactive stories with the [**eenky** IDE](eenky/index.html) (or any other text editor), compile them for eenk using eenky's build pipeline, and play on the go or on your desktop on the built-in simulator.
 
 <div class="features-grid">
   <div class="feature-card">
     <h3><span class="feature-icon material-symbols-outlined">favorite</span>
     Pocketable Adventures</h3>
-    <p>Bring Interactive Fiction to your pocket and enjoy lofi, distraction-free e-paper adventures on a device you already love.</p>
+    <p>Bring Interactive Fiction to your pocket and enjoy a new kind of mobile gaming: lofi, distraction-free e-paper adventures!</p>
   </div>
   <div class="feature-card">
     <h3><span class="feature-icon material-symbols-outlined">menu_book</span>
@@ -57,13 +57,13 @@ Write stories in [Ink](https://www.inklestudios.com/ink/), a markup based narrat
   <div class="device-card">
     <div class="device-label">Xteink X3 (untested!)</div>
     <div class="device-img">
-      <model-viewer src="assets/glb/X3-En-Black.glb" alt="Xteink X3 3D Model" interaction-prompt="none" auto-rotate camera-controls shadow-intensity="1" touch-action="none"></model-viewer>
+      <model-viewer src="assets/glb/X3-En-Black.glb" alt="Xteink X3 3D Model" interaction-prompt="none" auto-rotate camera-controls shadow-intensity="1" touch-action="pan-y"></model-viewer>
     </div>
   </div>
   <div class="device-card">
     <div class="device-label">Xteink X4</div>
     <div class="device-img">
-      <model-viewer src="assets/glb/X4-En-White.glb" alt="Xteink X4 3D Model" interaction-prompt="none" auto-rotate camera-controls shadow-intensity="1" touch-action="none"></model-viewer>
+      <model-viewer src="assets/glb/X4-En-White.glb" alt="Xteink X4 3D Model" interaction-prompt="none" auto-rotate camera-controls shadow-intensity="1" touch-action="pan-y"></model-viewer>
     </div>
   </div>
   <div class="device-card">
@@ -74,20 +74,20 @@ Write stories in [Ink](https://www.inklestudios.com/ink/), a markup based narrat
   </div>
 </div>
 
-| Device | MCU | Display | Resolution | Notes |
-|--------|-----|---------|------------|-------|
-| **X3** | ESP32-C3 | UC8253 / UC8279 | 792 × 528 | Original model |
-| **X4** | ESP32-C3 | SSD1677 | 800 × 480 | Current main target |
-| **X4 Pro** | ESP32-S3 | SSD1677 / UC8179 | 800 × 480 | Brings a lot more RAM, backlight, and touch |
+| Device | MCU | Resolution | Notes |
+|--------|-----|------------|-------|
+| **X3** | ESP32-C3 | 792 × 528 | Original model |
+| **X4** | ESP32-C3 | 800 × 480 | Current main target |
+| **X4 Pro** | ESP32-S3 | 800 × 480 | Extra RAM and backlight |
 
 ## Quick Start
 
 Ready to get started? Flash the latest firmware directly from your browser, no installation required.
 
-<div class="hero-ctas">
+<p class="hero-ctas">
   <a href="flasher/index.html" class="btn btn-primary"><span class="material-symbols-outlined">bolt</span>Flash eenk now</a>
   <a href="userguide/index.html" class="btn btn-secondary">Read user guide</a>
   <a href="eenky/index.html" class="btn btn-secondary">Write Stories</a>
-</div>
+</p>
 
 </div>

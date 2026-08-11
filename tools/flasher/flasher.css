@@ -71,7 +71,7 @@ body.electron-embed .flasher-sidebar {
 
 .step-indicator {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 1rem;
   padding-bottom: 1.5rem;
   position: relative;
@@ -84,16 +84,11 @@ body.electron-embed .flasher-sidebar {
   top: 32px;
   bottom: 0;
   width: 2px;
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--color-bg);
 }
 
 .step-indicator.done::after {
-  background: var(--color-accent);
-  opacity: 0.6;
-}
-
-.step-indicator.active::after {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--color-border);
 }
 
 .step-dot {
@@ -117,6 +112,7 @@ body.electron-embed .flasher-sidebar {
   color: #FFF;
   border-color: var(--color-accent);
   box-shadow: var(--shadow-hard-sm);
+  z-index: 1;
 }
 
 .step-indicator.done .step-dot {
@@ -125,36 +121,22 @@ body.electron-embed .flasher-sidebar {
 }
 
 .step-label {
-  padding-top: 0.2rem;
+  padding: 0.3rem;
   color: var(--color-over-dither);
-}
-
-.step-label strong {
   display: block;
   font-family: var(--font-heading);
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.5);
 }
 
-.step-indicator.active .step-label strong {
-  color: #FFF;
+.step-indicator.active .step-label {
+  color: var(--color-accent);
+  background: var(--color-bg);
 }
 
-.step-indicator.done .step-label strong {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.step-label small {
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.4);
-  display: block;
-  margin-top: 0.1rem;
-}
-
-.step-indicator.active .step-label small {
-  color: rgba(255, 255, 255, 0.7);
+.step-indicator.done .step-label {
+  color: var(--color-fg);
 }
 
 /* ── Main Panel ─────────────────────────────────────────────── */
@@ -192,14 +174,16 @@ body.electron-embed .flasher-main {
   background: var(--color-fg);
   color: var(--color-bg);
   padding: 1.5rem;
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
 }
 
 /* ── Warning Box (Step 1) ───────────────────────────────────── */
 .critical-warning {
-  background: var(--color-accent);
-  color: #FFF;
-  border: var(--border);
-  box-shadow: var(--shadow-hard);
+  background: var(--color-accent-light);
+  border: var(--border-accent);
+  box-shadow: var(--shadow-hard-accent);
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
@@ -274,12 +258,18 @@ body.electron-embed .flasher-main {
   grid-template-columns: repeat(3, 1fr);
 }
 
+.selection-grid.two-col {
+  grid-template-columns: repeat(2, 1fr);
+}
+
 .selection-grid.one-col {
   grid-template-columns: 1fr;
 }
 
 @media (max-width: 600px) {
-  .selection-grid.three-col {
+
+  .selection-grid.three-col,
+  .selection-grid.two-col {
     grid-template-columns: 1fr;
   }
 }
@@ -293,8 +283,8 @@ body.electron-embed .flasher-main {
   transition: box-shadow 0.1s, transform 0.1s;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
   gap: 0.5rem;
-  user-select: none;
 }
 
 .select-card:hover {
@@ -320,7 +310,6 @@ body.electron-embed .flasher-main {
 }
 
 .select-card .card-title {
-  color: var(--color-fg);
   font-family: var(--font-heading);
   font-size: 0.95rem;
   font-weight: 800;
@@ -330,7 +319,6 @@ body.electron-embed .flasher-main {
 
 .select-card .card-desc {
   font-size: 0.82rem;
-  color: var(--color-gray);
   line-height: 1.5;
 }
 
@@ -386,13 +374,11 @@ select#version-select {
 
 .port-badge {
   display: inline-flex;
-  align-items: center;
+  color: var(--color-accent);
   gap: 0.4rem;
   font-size: 0.82rem;
-  font-family: 'Courier New', monospace;
-  border: 1px solid #DDD;
+  font-family: var(--font-body);
   padding: 0.3rem 0.75rem;
-  background: var(--color-light);
   max-width: 280px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -400,7 +386,6 @@ select#version-select {
 }
 
 .port-badge.connected {
-  border-color: var(--color-success);
   background: var(--color-success-bg);
   color: var(--color-success-fg);
 }
@@ -457,10 +442,16 @@ select#version-select {
 
 .nav-btns {
   display: flex;
+  position: relative;
   gap: 0.75rem;
   flex-wrap: wrap;
   margin-top: 0.5rem;
   justify-content: space-between;
+}
+
+.nav-btns .btn:only-child {
+  position: absolute;
+  right: 0;
 }
 
 /* ── Progress ───────────────────────────────────────────────── */
@@ -506,6 +497,7 @@ select#version-select {
   border: var(--border);
   white-space: pre-wrap;
   word-break: break-all;
+  user-select: initial;
 }
 
 body.electron-embed .flash-log {
@@ -525,58 +517,38 @@ body.electron-embed .flash-log {
 }
 
 /* ── CrossPoint Fallback ────────────────────────────────────── */
-.fallback-chain {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
 
-.fallback-step {
+.crosspoint-guide-box {
+  background: var(--color-bg);
   border: var(--border);
-  padding: 1rem 1.25rem;
+  box-shadow: var(--shadow-hard);
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  opacity: 0.5;
-  transition: opacity 0.2s;
+  gap: 0.75rem;
 }
 
-.fallback-step.active-fallback {
-  opacity: 1;
-  box-shadow: var(--shadow-hard-sm);
-}
-
-.fallback-step.completed {
-  opacity: 0.3;
-  text-decoration: line-through;
-}
-
-.fallback-step-title {
+.crosspoint-guide-box h3 {
   font-family: var(--font-heading);
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
+  border: none;
+  color: var(--color-bg);
+  background: var(--color-fg);
+  margin: -1.5rem -1.5rem 0 -1.5rem;
+  padding: 1rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 1em;
 }
 
-.fallback-step-title .step-num {
-  background: var(--color-fg);
-  color: var(--color-bg);
-  width: 20px;
-  height: 20px;
-  font-size: 0.7rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.fallback-step p {
-  font-size: 0.85rem;
+.crosspoint-guide-box ol {
   margin: 0;
-  color: var(--color-gray);
+  padding: 0;
+  list-style-position: inside;
+  line-height: 1.75em;
 }
 
 /* ── Summary (done state) ───────────────────────────────────── */

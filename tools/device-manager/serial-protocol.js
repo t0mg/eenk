@@ -10,7 +10,7 @@
  */
 
 // ── CRC32-LE (matches ESP32 <rom/crc.h> implementation) ──────────────────
-const makeCRCTable = function() {
+const makeCRCTable = function () {
     let c;
     const crcTable = [];
     for (let n = 0; n < 256; n++) {
@@ -24,7 +24,7 @@ const makeCRCTable = function() {
 };
 const crcTable = makeCRCTable();
 
-const crc32_le = function(crc, buf) {
+const crc32_le = function (crc, buf) {
     crc = crc ^ (-1);
     for (let i = 0; i < buf.length; i++) {
         crc = (crc >>> 8) ^ crcTable[(crc ^ buf[i]) & 0xFF];
@@ -43,7 +43,9 @@ class EenkSerialProtocol {
 
     async connect() {
         try {
-            this.port = await navigator.serial.requestPort();
+            this.port = await navigator.serial.requestPort({
+                filters: [{ usbVendorId: 12346, usbProductId: 4097 }],
+            });
             await this.port.open({ baudRate: 115200 });
 
             // Allow time for device to restart or clear buffers
@@ -58,7 +60,7 @@ class EenkSerialProtocol {
                     const response = await this._readLine(500);
                     if (response.startsWith('OK EENK')) {
                         const parts = response.split(' ');
-                        const version  = parts[2] || '1';
+                        const version = parts[2] || '1';
                         const freeBytes = parseInt(parts[3] || '0', 10);
                         this._readBuffer = new Uint8Array(0);
                         return { version, freeBytes };
@@ -78,15 +80,15 @@ class EenkSerialProtocol {
 
     async disconnect() {
         if (this.writer) {
-            try { await this._writeLine('DISCONNECT'); this.writer.releaseLock(); } catch (_) {}
+            try { await this._writeLine('DISCONNECT'); this.writer.releaseLock(); } catch (_) { }
             this.writer = null;
         }
         if (this.reader) {
-            try { await this.reader.cancel(); this.reader.releaseLock(); } catch (_) {}
+            try { await this.reader.cancel(); this.reader.releaseLock(); } catch (_) { }
             this.reader = null;
         }
         if (this.port) {
-            try { await this.port.close(); } catch (_) {}
+            try { await this.port.close(); } catch (_) { }
             this.port = null;
         }
         this._readBuffer = new Uint8Array(0);

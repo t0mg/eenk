@@ -6,7 +6,7 @@
 Welcome to **eenk**, a custom firmware designed to run **Ink** interactive fiction stories on the ESP32 based Xteink ereaders (X3, X4, X4 Pro), utilizing the [inkcpp](https://github.com/t0mg/inkcpp) C++ runtime.
 
 > [!TIP]
-> If you are interested in installing and using eenk rather than looking at firmware development, check out the [eenky website](https://t0mg.github.io/eenk/)!
+> If you are interested in installing and using eenk rather than looking at firmware development, check out the [eenk website](https://t0mg.github.io/eenk/)!
 
 This project supports four build configurations managed via PlatformIO:
 - **`native`**: A desktop simulation of the runtime, using an 800x480 SDL2 graphical window to simulate the e-ink display for testing.

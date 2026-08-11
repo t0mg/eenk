@@ -33,28 +33,24 @@
         <div class="step-dot">1</div>
         <div class="step-label">
           <strong>Safety</strong>
-          <small>USB unlock warning</small>
         </div>
       </div>
       <div class="step-indicator" data-step="2" id="sidebar-step-2">
         <div class="step-dot">2</div>
         <div class="step-label">
           <strong>Target</strong>
-          <small>Select hardware</small>
         </div>
       </div>
       <div class="step-indicator" data-step="3" id="sidebar-step-3">
         <div class="step-dot">3</div>
         <div class="step-label">
           <strong>Mode</strong>
-          <small>Flash type</small>
         </div>
       </div>
       <div class="step-indicator" data-step="4" id="sidebar-step-4">
         <div class="step-dot">4</div>
         <div class="step-label">
           <strong>Flash</strong>
-          <small>Connect &amp; burn</small>
         </div>
       </div>
     </aside>
@@ -113,19 +109,16 @@
 
         <div class="selection-grid three-col" role="radiogroup" aria-label="Hardware target">
           <button class="select-card" data-target="X3" role="radio" aria-checked="false" id="target-X3">
-            <span class="material-symbols-outlined card-icon">computer</span>
             <span class="card-title">Xteink X3</span>
-            <span class="card-desc">ESP32-C3 · 792×528<br>UC8253 / UC8279</span>
+            <span class="card-desc">ESP32-C3 · 792×528</span>
           </button>
           <button class="select-card" data-target="X4" role="radio" aria-checked="false" id="target-X4">
-            <span class="material-symbols-outlined card-icon">menu_book</span>
             <span class="card-title">Xteink X4</span>
-            <span class="card-desc">ESP32-C3 · 800×480<br>SSD1677</span>
+            <span class="card-desc">ESP32-C3 · 800×480</span>
           </button>
           <button class="select-card" data-target="X4Pro" role="radio" aria-checked="false" id="target-X4Pro">
-            <span class="material-symbols-outlined card-icon">star</span>
             <span class="card-title">Xteink X4 Pro</span>
-            <span class="card-desc">ESP32-S3 · 800×480<br>PSRAM · Frontlight</span>
+            <span class="card-desc">ESP32-S3 · 800×480</span>
           </button>
         </div>
 
@@ -142,7 +135,7 @@
         <span class="step-heading" id="step3-heading">Select Mode</span>
         <p>Choose what to flash onto the device.</p>
 
-        <div class="selection-grid one-col" role="radiogroup" aria-label="Flash mode">
+        <div class="selection-grid two-col" role="radiogroup" aria-label="Flash mode">
           <button class="select-card" data-mode="factory" role="radio" aria-checked="false" id="mode-factory">
             <span class="material-symbols-outlined card-icon">factory</span>
             <div>
@@ -153,7 +146,7 @@
               </span>
             </div>
           </button>
-          <button disabled class="select-card" data-mode="update" role="radio" aria-checked="false" id="mode-update">
+          <button class="select-card" data-mode="update" role="radio" aria-checked="false" id="mode-update">
             <span class="material-symbols-outlined card-icon">upload</span>
             <div>
               <span class="card-title">Update</span>
@@ -163,14 +156,22 @@
               </span>
             </div>
           </button>
-          <button disabled class="select-card" data-mode="crosspoint" role="radio" aria-checked="false"
-            id="mode-crosspoint">
+          <button class="select-card" data-mode="crosspoint" role="radio" aria-checked="false" id="mode-crosspoint">
             <span class="material-symbols-outlined card-icon">sync</span>
             <div>
               <span class="card-title">CrossPoint / Stock Restore</span>
               <span class="card-desc" style="display:block;margin-top:0.35rem;">
-                Restores the original vendor partition table and stock firmware.
-                Use this to revert to factory state or to re-unlock the device.
+                A guide to help you restore your device to the original vendor partition table and stock firmware.
+              </span>
+            </div>
+          </button>
+          <button class="select-card" data-mode="backup" role="radio" aria-checked="false" id="mode-backup">
+            <span class="material-symbols-outlined card-icon">download</span>
+            <div>
+              <span class="card-title">Backup Full Flash</span>
+              <span class="card-desc" style="display:block;margin-top:0.35rem;">
+                Reads and saves the complete 16 MB flash memory from your device to a binary backup file.
+                Recommended before modifying partitions or flashing custom firmware.
               </span>
             </div>
           </button>
@@ -186,7 +187,9 @@
       <!-- STEP 4: Version, Connect & Flash                     -->
       <!-- ════════════════════════════════════════════════════ -->
       <div class="step-panel" id="step-4" role="region" aria-labelledby="step4-heading">
-        <span class="step-heading" id="step4-heading">Connect &amp; Flash</span>
+        <h2 class="step-heading" id="step4-heading">Connect &amp; Flash
+          <div class="port-badge" id="port-badge" aria-live="polite">Not connected
+        </h2>
 
         <!-- Summary row -->
         <p id="flash-summary">
@@ -212,76 +215,51 @@
 
         <!-- CrossPoint binary section (shown only for crosspoint mode) -->
         <div id="crosspoint-section" style="display:none;">
-          <div class="fallback-chain" id="crosspoint-fallbacks">
-
-            <div class="fallback-step active-fallback" id="fallback-1">
-              <div class="fallback-step-title">
-                <span class="step-num">1</span>
-                Auto-download stock firmware
-              </div>
-              <p>Attempting to fetch the stock firmware directly from the CrossPoint / Xteink distribution…</p>
-              <button class="btn btn-secondary" id="crosspoint-auto-btn">Try Auto-Download</button>
-            </div>
-
-            <div class="fallback-step" id="fallback-2">
-              <div class="fallback-step-title">
-                <span class="step-num">2</span>
-                Download manually &amp; select
-              </div>
-              <p>
-                Download the correct factory firmware for your device from the
-                <a href="#" id="crosspoint-download-link" target="_blank" rel="noopener noreferrer">CrossPoint firmware
-                  page</a>
-                then select the file below.
-              </p>
-              <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:0.25rem;">
-                <input type="file" id="crosspoint-file" accept=".bin" style="display:none;" />
-                <button class="btn btn-secondary" id="crosspoint-file-btn">Select firmware .bin…</button>
-                <span id="crosspoint-file-name"
-                  style="font-size:0.82rem;align-self:center;color:var(--color-gray);font-family:monospace;"></span>
-              </div>
-            </div>
-
-            <div class="fallback-step" id="fallback-3">
-              <div class="fallback-step-title">
-                <span class="step-num">3</span>
-                Find firmware manually
-              </div>
-              <p>
-                Locate the correct <strong>factory image</strong> (not OTA — must include bootloader and partition
-                table)
-                for your <span id="fallback3-model">device</span>.
-                It is typically named <code>factory.bin</code> or includes <code>-full</code> or <code>-factory</code>
-                in the filename. Once you have it, select it above.
-              </p>
-            </div>
-
-            <div class="fallback-step" id="fallback-4">
-              <div class="fallback-step-title">
-                <span class="step-num">4</span>
-                Full erase + online flasher
-              </div>
-              <p>
-                Erase the device flash entirely, then use the CrossPoint / Xteink online flasher
-                to complete the restore.
-              </p>
-              <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:0.25rem;">
-                <button class="btn btn-secondary" id="crosspoint-erase-btn" disabled>Erase &amp; Open Online
-                  Flasher</button>
-              </div>
+          <div class="crosspoint-guide-box">
+            <h3>
+              Restoring CrossPoint / Stock Firmware
+            </h3>
+            <p>
+              To restore the original vendor partition layout and stock firmware on your device, you can use the
+              CrossPoint Reader debug tools page:
+            </p>
+            <ol>
+              <li>
+                Find the <strong>"Repair a device"</strong> section to restore the original partition layout.
+              </li>
+              <li>
+                Select your device type and desired partition layout.
+              </li>
+              <li>
+                Leave <strong>"Flash the latest stable CrossPoint firmware after repair"</strong> checked.
+              </li>
+              <li>
+                <em>Recommended:</em> Uncheck <strong>"Preserve device settings (NVS)"</strong>.
+              </li>
+              <li>
+                Click <strong>"Repair"</strong>.
+              </li>
+            </ol>
+            <p>Alternatively, you can also restore another factory firmware or previous backup via the
+              <strong>"Restore full flash"</strong> tool.
+            </p>
+            <div style="margin-top:0.35rem;">
+              <a href="https://crosspointreader.com/debug" target="_blank" rel="noopener noreferrer"
+                class="btn btn-secondary">
+                <span class="material-symbols-outlined">open_in_new</span> Open CrossPoint Debug Tools
+              </a>
             </div>
           </div>
         </div>
 
         <!-- Connect -->
-        <div class="connect-row">
+        <div class="connect-row" id="connect-row">
           <button class="btn btn-secondary" id="connect-btn" aria-label="Connect to device via Web Serial">
             <span class="material-symbols-outlined">usb</span> Connect Device
           </button>
           <button class="btn btn-ghost" id="disconnect-btn" style="display:none;" aria-label="Disconnect">
-            Disconnect
+            <span class="material-symbols-outlined">usb_off</span> Disconnect
           </button>
-          <div class="port-badge" id="port-badge" aria-live="polite">Not connected</div>
         </div>
 
         <!-- Flash button -->
@@ -306,8 +284,8 @@
 
         <!-- Done state -->
         <div class="flash-done" id="flash-done" style="display:none;" role="status">
-          <h3>Firmware flashed successfully!</h3>
-          <p style="font-size:0.9rem;">The device is rebooting. You may disconnect it now.</p>
+          <h3 id="done-title">Firmware flashed successfully!</h3>
+          <p id="done-desc" style="font-size:0.9rem;">The device is rebooting. You may disconnect it now.</p>
           <button class="btn btn-secondary" id="flash-again-btn">Flash Again</button>
         </div>
 

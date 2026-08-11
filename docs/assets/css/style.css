@@ -317,6 +317,8 @@ hr {
   font-size: clamp(2.5rem, 7vw, 5rem);
   box-shadow: var(--shadow-hard);
   margin-bottom: 1.25rem;
+  text-transform: none;
+  padding: 0 0.2em;
 }
 
 .hero .tagline {
@@ -663,6 +665,16 @@ body.is-module #main-content {
 
   .device-gallery {
     grid-template-columns: 1fr;
+  }
+
+  .device-card {
+    display: flex;
+    flex-direction: row;
+    height: 60vw;
+  }
+
+  .device-card .device-label {
+    flex-grow: 1;
   }
 
   .features-grid {
