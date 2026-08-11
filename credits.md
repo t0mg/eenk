@@ -20,4 +20,6 @@ The **eenk** core firmware runtime and hardware ecosystem are made possible by t
 
 - **[Inter](https://rsms.me/inter/)** - Designed by Rasmus Andersson.
 - **[Syne](https://github.com/BonjourMonde/Syne-Typeface)** - Designed by Bonjour Monde and Lucas Descroix.
+- **[Literata](https://fonts.google.com/specimen/Literata)** - Designed by TypeTogether.
 - **[Material Symbols Outlined](https://fonts.google.com/icons)** - Google. Icon font used across the documentation site, flasher, and device manager.
+- **Extra EpdFonts** from the [Papyrix project](https://github.com/bigbag/papyrix-reader/tree/master/lib/EpdFont/src/builtinFonts).
