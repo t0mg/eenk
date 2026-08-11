@@ -90,6 +90,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: false
+          fetch-depth: 0
 
       - name: Init required submodules (lib/inkcpp and lib/freeink-sdk)
         run: |
