@@ -636,6 +636,11 @@ body.is-module #main-content {
     gap: 0.5rem;
   }
 
+  .site-footer {
+    gap: 0;
+    align-content: center;
+  }
+
   .nav-links {
     overflow-x: auto;
     width: 100%;

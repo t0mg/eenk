@@ -45,7 +45,6 @@ bool SerialFileServer::poll() {
 }
 
 void SerialFileServer::runCommandLoop() {
-    Serial.println("[SerialFileServer] Entering command mode");
     char line[512];
 
     while (true) {

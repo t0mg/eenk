@@ -582,3 +582,16 @@ body.iframe-embed .dm-header-title {
   flex-shrink: 0;
   border-bottom: var(--border);
 }
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 700px) {
+
+  .dm-header {
+    padding: 0rem 1.25rem;
+  }
+
+  body.iframe-embed .dm-header-title,
+  .dm-header-title {
+    display: none;
+  }
+}

@@ -9,6 +9,7 @@
     --color-fg: #111111;
     --color-accent: #FF4D00;
     --color-accent-dark: #CC3D00;
+    --color-accent-transparent: #FF4D0045;
     --color-accent-light: #FFDCD1;
     --color-gray: #717171;
     --color-light: #F4F4F4;
@@ -68,12 +69,14 @@ body.dark {
 
 /* ── Global Neubrutalist Button Design System ────────────────── */
 button,
+div[role="button"],
 .primary-btn,
 .secondary-btn,
 .btn {
     position: relative;
     font-family: var(--font-body);
     font-size: 14px;
+    -webkit-tap-highlight-color: var(--color-accent-transparent);
 }
 
 .primary-btn {

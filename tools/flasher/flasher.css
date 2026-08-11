@@ -591,6 +591,10 @@ body.electron-embed .flash-log {
     gap: 0.5rem;
   }
 
+  .step-panel {
+    margin-bottom: 3rem;
+  }
+
   .step-indicator {
     padding-bottom: 0;
     gap: 0.5rem;

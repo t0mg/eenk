@@ -111,8 +111,11 @@ class EenkSerialProtocol {
 
     async deleteFile(path) {
         await this._writeLine(`DELETE ${path}`);
-        const response = await this._readLine();
-        if (!response.startsWith('OK')) throw new Error(response);
+        while (true) {
+            const response = await this._readLine();
+            if (response.startsWith('ERR')) throw new Error(response);
+            if (response.startsWith('OK')) return;
+        }
     }
 
     async uploadFile(path, data, onProgress) {
@@ -173,21 +176,24 @@ class EenkSerialProtocol {
     }
 
     async getInfo() {
-        this._readBuffer = new Uint8Array(0);
         await this._writeLine('INFO');
-        const response = await this._readLine();
-        if (response.startsWith('ERR')) throw new Error(response);
-        const parts = response.split(' ');
-        if (parts[0] === 'OK' && parts[1] === 'INFO' && parts.length >= 5) {
-            return { total: parseInt(parts[2], 10), used: parseInt(parts[3], 10), free: parseInt(parts[4], 10) };
+        while (true) {
+            const response = await this._readLine();
+            if (response.startsWith('ERR')) throw new Error(response);
+            const parts = response.split(' ');
+            if (parts[0] === 'OK' && parts[1] === 'INFO' && parts.length >= 5) {
+                return { total: parseInt(parts[2], 10), used: parseInt(parts[3], 10), free: parseInt(parts[4], 10) };
+            }
         }
-        return { total: 0, used: 0, free: 0 };
     }
 
     async mkdir(path) {
         await this._writeLine(`MKDIR ${path}`);
-        const response = await this._readLine();
-        if (!response.startsWith('OK')) throw new Error(`mkdir failed: ${response}`);
+        while (true) {
+            const response = await this._readLine();
+            if (response.startsWith('ERR')) throw new Error(`mkdir failed: ${response}`);
+            if (response.startsWith('OK')) return;
+        }
     }
 
     // ── Internal helpers ─────────────────────────────────────────────────

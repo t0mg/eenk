@@ -33,15 +33,15 @@ if (IS_IFRAME) document.body.classList.add('iframe-embed');
 
 /* ── State ──────────────────────────────────────────────────────── */
 const state = {
-  isConnected:     false,
-  isConnecting:    false,
+  isConnected: false,
+  isConnecting: false,
   protocolVersion: null,
-  sdInfo:          { total: 0, used: 0, free: 0 },
-  stories:         [],
-  saves:           [],
-  transferState:   null,
-  error:           null,
-  currentTab:      'stories',
+  sdInfo: { total: 0, used: 0, free: 0 },
+  stories: [],
+  saves: [],
+  transferState: null,
+  error: null,
+  currentTab: 'stories',
 };
 
 let protocol = null;
@@ -53,41 +53,41 @@ function setState(patch) {
 }
 
 /* ── DOM references ─────────────────────────────────────────────── */
-const $  = id => document.getElementById(id);
+const $ = id => document.getElementById(id);
 
-const connectBtn       = $('connect-btn');
-const disconnectBtn    = $('disconnect-btn');
-const refreshBtn       = $('refresh-btn');
-const statusDot        = $('status-dot');
-const statusText       = $('status-text');
-const sdBarRow         = $('sd-bar-row');
-const sdBar            = $('sd-bar');
-const sdSizeText       = $('sd-size-text');
-const emptyState       = $('empty-state');
-const panelStories     = $('panel-stories');
-const panelSaves       = $('panel-saves');
-const storiesList      = $('stories-list');
-const savesList        = $('saves-list');
-const uploadInput      = $('upload-input');
-const uploadZone       = $('upload-zone');
-const sidecarPrompt    = $('sidecar-prompt');
-const sidecarFileList  = $('sidecar-file-list');
+const connectBtn = $('connect-btn');
+const disconnectBtn = $('disconnect-btn');
+const refreshBtn = $('refresh-btn');
+const statusDot = $('status-dot');
+const statusText = $('status-text');
+const sdBarRow = $('sd-bar-row');
+const sdBar = $('sd-bar');
+const sdSizeText = $('sd-size-text');
+const emptyState = $('empty-state');
+const panelStories = $('panel-stories');
+const panelSaves = $('panel-saves');
+const storiesList = $('stories-list');
+const savesList = $('saves-list');
+const uploadInput = $('upload-input');
+const uploadZone = $('upload-zone');
+const sidecarPrompt = $('sidecar-prompt');
+const sidecarFileList = $('sidecar-file-list');
 const sidecarUploadBtn = $('sidecar-upload-btn');
-const sidecarSkipBtn   = $('sidecar-skip-btn');
-const transferFooter   = $('transfer-footer');
-const transferIcon     = $('transfer-icon');
+const sidecarSkipBtn = $('sidecar-skip-btn');
+const transferFooter = $('transfer-footer');
+const transferIcon = $('transfer-icon');
 const transferFilename = $('transfer-filename');
-const transferPct      = $('transfer-pct');
-const transferBar      = $('transfer-bar');
-const confirmModal     = $('confirm-modal');
-const confirmText      = $('confirm-text');
-const confirmOk        = $('confirm-ok');
-const confirmCancel    = $('confirm-cancel');
-const errorBanner      = $('error-banner');
-const errorText        = $('error-text');
+const transferPct = $('transfer-pct');
+const transferBar = $('transfer-bar');
+const confirmModal = $('confirm-modal');
+const confirmText = $('confirm-text');
+const confirmOk = $('confirm-ok');
+const confirmCancel = $('confirm-cancel');
+const errorBanner = $('error-banner');
+const errorText = $('error-text');
 
 /* ── Pending upload context (for sidecar prompt) ─────────────────── */
-let _pendingBin      = null;  // { file, data, folderName }
+let _pendingBin = null;  // { file, data, folderName }
 let _pendingSidecars = [];    // Array<File> from browser picker
 
 /* ── Render ─────────────────────────────────────────────────────── */
@@ -95,31 +95,31 @@ function render() {
   const { isConnected, isConnecting, sdInfo, stories, saves, transferState, error, currentTab } = state;
 
   // Header status
-  statusDot.className  = 'status-dot' + (isConnecting ? ' connecting' : isConnected ? ' connected' : '');
+  statusDot.className = 'status-dot' + (isConnecting ? ' connecting' : isConnected ? ' connected' : '');
   statusText.textContent = isConnecting
     ? 'Connecting…'
     : isConnected
       ? `Connected — Protocol v${state.protocolVersion ?? '?'}`
       : 'Not connected';
 
-  connectBtn.style.display    = isConnected || isConnecting ? 'none' : '';
+  connectBtn.style.display = isConnected || isConnecting ? 'none' : '';
   disconnectBtn.style.display = isConnected ? '' : 'none';
-  refreshBtn.style.display    = isConnected ? '' : 'none';
-  connectBtn.disabled         = isConnecting;
+  refreshBtn.style.display = isConnected ? '' : 'none';
+  connectBtn.disabled = isConnecting;
 
   // SD bar
   sdBarRow.style.display = isConnected ? '' : 'none';
   if (isConnected && sdInfo.total > 0) {
     const pct = Math.round((sdInfo.used / sdInfo.total) * 100);
-    sdBar.style.width    = `${pct}%`;
+    sdBar.style.width = `${pct}%`;
     sdSizeText.textContent = `${formatSize(sdInfo.used)} / ${formatSize(sdInfo.total)}`;
   }
 
   // Content area
   const showFiles = isConnected && !isConnecting;
-  emptyState.style.display    = showFiles ? 'none' : '';
-  panelStories.style.display  = showFiles && currentTab === 'stories' ? 'block' : 'none';
-  panelSaves.style.display    = showFiles && currentTab === 'saves'   ? 'block' : 'none';
+  emptyState.style.display = showFiles ? 'none' : '';
+  panelStories.style.display = showFiles && currentTab === 'stories' ? 'block' : 'none';
+  panelSaves.style.display = showFiles && currentTab === 'saves' ? 'block' : 'none';
 
   // Tab strip active state
   document.querySelectorAll('.dm-tab').forEach(btn => {
@@ -130,20 +130,20 @@ function render() {
 
   // File lists
   renderFileList(storiesList, stories, 'story');
-  renderFileList(savesList,   saves,   'save');
+  renderFileList(savesList, saves, 'save');
 
   // Transfer footer
   if (transferState) {
     transferFooter.classList.add('visible');
-    transferIcon.innerHTML       = transferState.type === 'upload'
+    transferIcon.innerHTML = transferState.type === 'upload'
       ? '<span class="material-symbols-outlined" style="vertical-align:middle;">upload</span>'
       : '<span class="material-symbols-outlined" style="vertical-align:middle;">download</span>';
     transferFilename.textContent = transferState.filename || '…';
     const pct = transferState.bytesTotal > 0
       ? Math.round((transferState.bytesTransferred / transferState.bytesTotal) * 100)
       : 0;
-    transferBar.style.width    = `${pct}%`;
-    transferPct.textContent    = transferState.bytesTotal > 0
+    transferBar.style.width = `${pct}%`;
+    transferPct.textContent = transferState.bytesTotal > 0
       ? `${formatSize(transferState.bytesTransferred)} / ${formatSize(transferState.bytesTotal)}`
       : '…';
   } else {
@@ -153,7 +153,7 @@ function render() {
   // Error
   if (error) {
     errorBanner.style.display = '';
-    errorText.textContent     = error;
+    errorText.textContent = error;
   } else {
     errorBanner.style.display = 'none';
   }
@@ -189,7 +189,7 @@ function renderFileList(container, items, kind) {
 function formatSize(bytes) {
   if (!bytes && bytes !== 0) return '';
   if (bytes === 0) return '0 B';
-  const units = ['B','KB','MB','GB'];
+  const units = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
 }
@@ -201,7 +201,7 @@ function setTransfer(type, filename, bytesTransferred = 0, bytesTotal = 0) {
 function clearTransfer() { setState({ transferState: null }); }
 
 function showError(msg) { setState({ error: msg }); }
-function clearError()   { setState({ error: null }); }
+function clearError() { setState({ error: null }); }
 
 /* ── Protocol actions ───────────────────────────────────────────── */
 async function connect() {
@@ -220,7 +220,7 @@ async function connect() {
 
 async function disconnect() {
   if (protocol) {
-    try { await protocol.disconnect(); } catch (_) {}
+    try { await protocol.disconnect(); } catch (_) { }
     protocol = null;
   }
   setState({
@@ -277,9 +277,9 @@ async function downloadFile(path, filename) {
     });
     // Trigger browser download
     const blob = new Blob([data]);
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
     a.download = filename;
     document.body.appendChild(a);
     a.click();
@@ -308,7 +308,7 @@ async function executeUpload(binFile, binData, sidecars) {
     }
     const folderName = title.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 32);
 
-    try { await protocol.mkdir(`/stories/${folderName}`); } catch (_) {}
+    try { await protocol.mkdir(`/stories/${folderName}`); } catch (_) { }
 
     // Upload main .bin
     setState({ transferState: { type: 'upload', filename: binFile.name, bytesTransferred: 0, bytesTotal: binData.length } });
@@ -318,7 +318,7 @@ async function executeUpload(binFile, binData, sidecars) {
 
     // Upload sidecars
     for (const sidecar of sidecars) {
-      const buf  = await sidecar.arrayBuffer();
+      const buf = await sidecar.arrayBuffer();
       const data = new Uint8Array(buf);
       setState({ transferState: { type: 'upload', filename: sidecar.name, bytesTransferred: 0, bytesTotal: data.length } });
       await protocol.uploadFile(`/stories/${folderName}/${sidecar.name}`, data, (transferred, total) => {
@@ -331,7 +331,7 @@ async function executeUpload(binFile, binData, sidecars) {
     showError('Upload failed: ' + e.message);
   } finally {
     clearTransfer();
-    _pendingBin      = null;
+    _pendingBin = null;
     _pendingSidecars = [];
     sidecarPrompt.style.display = 'none';
   }
@@ -339,9 +339,9 @@ async function executeUpload(binFile, binData, sidecars) {
 
 /** Handle a .bin file selection — discover sidecars then decide next step. */
 async function handleBinSelected(binFile) {
-  const buf    = await binFile.arrayBuffer();
+  const buf = await binFile.arrayBuffer();
   const binData = new Uint8Array(buf);
-  _pendingBin  = { file: binFile, data: binData };
+  _pendingBin = { file: binFile, data: binData };
 
   // Validate magic byte
   if (binData.length < 4 || new TextDecoder().decode(binData.slice(0, 4)) !== 'eenk') {
@@ -353,16 +353,16 @@ async function handleBinSelected(binFile) {
     // Electron: auto-discover sidecars via filesystem API
     try {
       const SIDECAR_EXTS = ['.epdfont', '.media'];
-      const dirPath  = await window.api.path.dirname(binFile.path);
+      const dirPath = await window.api.path.dirname(binFile.path);
       const baseName = await window.api.path.basename(binFile.path, '.bin');
-      const entries  = await window.api.fs.readdir(dirPath);
-      const found    = [];
+      const entries = await window.api.fs.readdir(dirPath);
+      const found = [];
 
       for (const entry of entries) {
         const ext = await window.api.path.extname(entry);
         if (SIDECAR_EXTS.includes(ext) && (ext === '.epdfont' || entry.startsWith(baseName))) {
           const fullPath = await window.api.path.join(dirPath, entry);
-          const rawBuf   = await window.api.fs.readFile(fullPath);
+          const rawBuf = await window.api.fs.readFile(fullPath);
           // Wrap in a pseudo-File so executeUpload can call .arrayBuffer()
           found.push({ name: entry, arrayBuffer: () => Promise.resolve(rawBuf.buffer ?? rawBuf) });
         }
@@ -384,7 +384,7 @@ async function handleBinSelected(binFile) {
     label.style.marginTop = '0.25rem';
     label.textContent = '+ Add .epdfont / .media files…';
     const input = document.createElement('input');
-    input.type   = 'file';
+    input.type = 'file';
     input.accept = '.epdfont,.media';
     input.multiple = true;
     input.style.display = 'none';
