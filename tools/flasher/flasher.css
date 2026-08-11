@@ -591,6 +591,19 @@ body.electron-embed .flash-log {
     gap: 0.5rem;
   }
 
+  .step-indicator {
+    padding-bottom: 0;
+    gap: 0.5rem;
+  }
+
+  .step-indicator .step-label {
+    display: none;
+  }
+
+  .step-indicator.active .step-label {
+    display: block;
+  }
+
   .step-indicator::after {
     display: none;
   }

@@ -38,7 +38,7 @@ git submodule update --init --recursive
 
 ---
 
-## Building the desktop simulator (`native`)
+## Building the desktop simulator
 
 > Note: currently only ever tested on Windows (MSYS2).
 
@@ -161,6 +161,7 @@ cd ..
 
 # 2. Package the app
 #    This creates the installer for your current operating system
+#    under /bin/<os-arch>/
 npm run dist
 ```
 

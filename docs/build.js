@@ -88,8 +88,41 @@ async function ensureEenkyCredits() {
 const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
 const { site, nav } = config;
 
-// ── marked options ─────────────────────────────────────────────────────────
-marked.setOptions({ gfm: true, breaks: false });
+// ── marked configuration & heading slugger ──────────────────────────────────
+let slugCounts = {};
+
+function resetSlugCounts() {
+  slugCounts = {};
+}
+
+function slugify(text) {
+  const plainText = text.replace(/<[^>]+>/g, '').trim();
+  let slug = plainText
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-');
+  if (!slug) slug = 'section';
+
+  if (slugCounts[slug]) {
+    const count = slugCounts[slug];
+    slugCounts[slug]++;
+    slug = `${slug}-${count}`;
+  } else {
+    slugCounts[slug] = 1;
+  }
+  return slug;
+}
+
+marked.use({
+  gfm: true,
+  breaks: false,
+  renderer: {
+    heading(text, level, raw) {
+      const id = slugify(raw || text);
+      return `<h${level} id="${id}">${text}</h${level}>\n`;
+    }
+  }
+});
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function ensureDir(dir) {
@@ -200,6 +233,7 @@ async function build() {
       bodyHtml = `<iframe src="app.html" title="${page.title}" class="module-iframe" allow="serial"></iframe>`;
       console.log(`  ✓ External module wrapper: ${page.id} (${outFile})`);
     } else {
+      resetSlugCounts();
       // Read primary markdown
       let mdContent = fs.readFileSync(path.join(DOCS_DIR, page.src), 'utf8');
 
