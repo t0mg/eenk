@@ -392,7 +392,7 @@ body.iframe-embed .dm-header-title {
   margin: 0 1.25rem 1rem;
   border: var(--border);
   border-color: var(--color-accent);
-  box-shadow: var(--shadow-hard);
+  box-shadow: var(--shadow-hard-accent);
   padding: 1rem 1.25rem;
   display: flex;
   flex-direction: column;

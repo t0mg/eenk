@@ -497,7 +497,7 @@ select#version-select {
   border: var(--border);
   white-space: pre-wrap;
   word-break: break-all;
-  user-select: initial;
+  user-select: all;
 }
 
 body.electron-embed .flash-log {
