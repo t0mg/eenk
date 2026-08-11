@@ -1,12 +1,10 @@
 <div class="page-content">
 
-# Build eenk
+# eenk development
 
-Everything you need to build eenk firmware from source and set up the eenky IDE.
+Everything you need to build the eenk firmware from source and set up the eenky IDE for development.
 
-<div class="info-box">
-  <strong>Just want to flash a device?</strong> Skip the build environment entirely and use the <a href="../flasher/index.html">Web Flasher</a> to install pre-built firmware in minutes.
-</div>
+> Note: **Just want to flash a device?** Skip the build environment entirely and use the [Web Flasher](../flasher/) to install pre-built firmware in minutes.
 
 ## Prerequisites
 
@@ -23,7 +21,7 @@ Before you begin, ensure the following are installed on your system:
 
 ---
 
-## 1. Clone the Repository
+## Cloning the repository
 
 eenk uses git submodules for its dependencies. Always clone recursively:
 
@@ -40,7 +38,9 @@ git submodule update --init --recursive
 
 ---
 
-## 2. Build the Desktop Simulator (`native`)
+## Building the desktop simulator (`native`)
+
+> Note: currently only ever tested on Windows (MSYS2).
 
 The native build compiles an SDL2 desktop application that simulates the e-ink display at 800×480px. This is the fastest way to test firmware changes without hardware.
 
@@ -69,7 +69,7 @@ Use `W`/`S` or arrow keys to navigate, `Enter` to confirm.
 
 ---
 
-## 3. Build Firmware for Hardware
+## Building the firmware
 
 ### Xteink X3 / X4 (`esp32c3`)
 
@@ -81,9 +81,9 @@ Outputs:
 - `.pio/build/esp32c3/firmware.bin` — app partition only
 - `.pio/build/esp32c3/firmware-factory.bin` — merged (bootloader + partitions + app), ready for Web Flasher
 
-### Xteink X4 OTA Updater (`esp32c3_updater`)
+### Xteink X3 / X4 OTA Updater (`esp32c3_updater`)
 
-The X4 has a separate 1 MB updater partition (`app1`). Build the updater *before* the main firmware if you want it included in the factory image:
+The partition table contains a separate 1 MB updater partition (`app1`) to fit a minimal recovery firmware that can flash an OTA update from SD. Build the updater *before* the main firmware if you want it included in the factory image:
 
 ```powershell
 pio run -e esp32c3_updater
@@ -101,9 +101,9 @@ Outputs:
 
 ---
 
-## 4. Run Unit Tests
+## Runing tests
 
-Unit tests run against the native simulator and regenerate golden screenshots in `test/golden/`:
+Unit tests with unsufficient coverage run against the native simulator and the simulator is used to generate "golden" screenshots testing various UI elements, which are saved into `test/golden/`:
 
 ```powershell
 pio test -e native
@@ -117,36 +117,7 @@ git diff test/golden/
 
 ---
 
-## 5. Install the eenky IDE
-
-eenky is the companion Electron-based IDE for authoring Ink stories, running the simulator, and managing your device.
-
-```powershell
-cd tools/eenky/app
-npm install
-npm run setup   # Builds and copies the simulator binary into place
-npm start       # Launch the IDE in development mode
-```
-
-<div class="info-box">
-  <strong>After firmware changes:</strong> Run <code>npm run setup</code> again (or manually copy the simulator binary) to update eenky with your latest native build.
-</div>
-
-```powershell
-# Quick copy after a native build
-pio run -e native
-Copy-Item ".pio\build\native\program.exe" "tools\eenky\app\main-process\ink\win\eenk-sim.exe" -Force
-```
-
----
-
-## 6. Flash to Hardware
-
-### Via Web Flasher (recommended)
-
-Use the [Web Flasher](../flasher/index.html) tab — no drivers or CLI tools needed.
-
-### Via PlatformIO
+## Flashing to Hardware
 
 Connect your device via USB and run:
 
@@ -160,8 +131,37 @@ or for the X4Pro:
 pio run -e esp32s3 -t upload
 ```
 
-### Via eenky IDE
+# eenky IDE development
 
-The eenky Device Manager window includes the same  [Web Flasher](../flasher/index.html) embedded directly in the IDE.
+eenky is the companion Electron-based IDE for authoring Ink stories, running the simulator, and managing the hardware device.
+
+## Cloning the repository
+
+The eenky repository has eenk as a git submodule in order to build the simulator, and import shared css styles and documentation files.
+
+```powershell
+git clone --recurse-submodules https://github.com/t0mg/eenky.git
+cd eenky/app
+npm install
+npm run setup   # Builds and copies the simulator binary into place
+npm start       # Launch the IDE in development mode
+```
+
+> Note: If you make changes in the eenk submodule that affect the `native` environment target and want to test them in eenky, you can manually rebuild and copy and rename the binary `program.exe` output binary into `app/main-process/ink/win/eenk-sim.exe` (Windows example).
+
+## Packaging for production
+
+eenky uses electron-builder to create distributable installers and binaries. To build a production package:
+
+```powershell
+# 1. Build the Vue renderer
+cd app/renderer
+npm run build
+cd ..
+
+# 2. Package the app
+#    This creates the installer for your current operating system
+npm run dist
+```
 
 </div>
