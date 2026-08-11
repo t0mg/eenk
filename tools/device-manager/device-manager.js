@@ -174,9 +174,9 @@ function renderFileList(container, items, kind) {
       <span class="file-name" title="${item.path}">${item.name}</span>
       <span class="file-size">${item.size ? formatSize(item.size) : ''}</span>
       <div class="file-actions">
-        <button class="icon-btn download-btn" data-path="${item.path}" data-name="${item.name}" aria-label="Download ${item.name}">
+        ${item.type === 'D' ? '' : `<button class="icon-btn download-btn" data-path="${item.path}" data-name="${item.name}" aria-label="Download ${item.name}">
           <span class="material-symbols-outlined" style="font-size:1em;">download</span> Download
-        </button>
+        </button>`}
         <button class="icon-btn delete-btn delete" data-path="${item.path}" data-name="${item.name}" aria-label="Delete ${item.name}">
           <span class="material-symbols-outlined" style="font-size:1em;">delete</span> Delete
         </button>
