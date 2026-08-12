@@ -17,29 +17,37 @@ if os.name == 'nt':
 
 
 # Static link order for MinGW + SDL2:
-#   -static must come first to force static resolution of all subsequent libs
-#   mingw32 → SDL2main → SDL2 → Windows system libs
-# Static link: force all libs to be linked statically
-env.Append(LINKFLAGS=["-static"])
+if os.name == 'nt':
+    env.Append(LINKFLAGS=["-static"])
+    env.Append(CPPPATH=["C:/msys64/mingw64/include/SDL2"])
+    env.Append(LIBPATH=["C:/msys64/mingw64/lib"])
+    env.Append(LIBS=[
+        "SDL2",
+        "dinput8",
+        "dxguid",
+        "dxerr8",
+        "user32",
+        "gdi32",
+        "winmm",
+        "imm32",
+        "ole32",
+        "oleaut32",
+        "shell32",
+        "setupapi",
+        "version",
+        "uuid",
+    ])
+else:
+    # Use sdl2-config for macOS/Linux
+    import subprocess
+    try:
+        env.ParseConfig("sdl2-config --cflags --libs")
+    except Exception as e:
+        print("Fallback sdl2 config...")
+        env.Append(CPPPATH=["/opt/homebrew/include/SDL2"])
+        env.Append(LIBPATH=["/opt/homebrew/lib"])
+        env.Append(LIBS=["SDL2"])
 
-# SDL2 and Windows system libraries needed for SDL2 static link
-env.Append(LIBPATH=["C:/msys64/mingw64/lib"])
-env.Append(LIBS=[
-    "SDL2",
-    "dinput8",
-    "dxguid",
-    "dxerr8",
-    "user32",
-    "gdi32",
-    "winmm",
-    "imm32",
-    "ole32",
-    "oleaut32",
-    "shell32",
-    "setupapi",
-    "version",
-    "uuid",
-])
 
 
 

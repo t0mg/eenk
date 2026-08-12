@@ -40,7 +40,7 @@ static constexpr size_t kDefaultBuiltinFontIndex = 0;
 inline const BuiltinFontEntry* findBuiltinByToken(const char* token) {
     if (!token || token[0] == '\0') return nullptr;
     for (size_t i = 0; i < kBuiltinFontCount; ++i) {
-#ifdef PLATFORM_NATIVE
+#if defined(PLATFORM_NATIVE) && defined(_WIN32)
         if (_stricmp(kBuiltinFonts[i].token, token) == 0)
 #else
         if (strcasecmp(kBuiltinFonts[i].token, token) == 0)
