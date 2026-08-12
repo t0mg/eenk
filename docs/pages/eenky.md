@@ -8,7 +8,7 @@
 
 ## Installation
 
-Download the latest eenky release for your platform from the [GitHub Releases](https://github.com/t0mg/eenky/releases) page, or build from source by following the [build instructions](/build/).
+Download the latest eenky release for your platform from the [GitHub Releases](https://github.com/t0mg/eenky/releases) page, or build from source by following the [build instructions](build/).
 
 ## Features
 
