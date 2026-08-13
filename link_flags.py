@@ -22,6 +22,8 @@ if os.name == 'nt':
     env.Append(CPPPATH=["C:/msys64/mingw64/include/SDL2"])
     env.Append(LIBPATH=["C:/msys64/mingw64/lib"])
     env.Append(LIBS=[
+        "mingw32",
+        "SDL2main",
         "SDL2",
         "dinput8",
         "dxguid",
