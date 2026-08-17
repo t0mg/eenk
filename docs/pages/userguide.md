@@ -4,9 +4,7 @@
 
 Welcome to the **eenk** User Guide! This guide covers everything you need to know about using your Xteink e-ink device running the eenk interactive fiction firmware.
 
----
-
-## 1. Overview & Supported Hardware
+## Overview & Supported Hardware
 
 **eenk** transforms your pocket e-reader into a dedicated, distraction-free Interactive Fiction player for stories written in [inkle's Ink](https://www.inklestudios.com/ink/) narrative language.
 
@@ -18,9 +16,7 @@ Welcome to the **eenk** User Guide! This guide covers everything you need to kno
 | **Xteink X4 Pro** | ESP32-S3 | Touch and backlight are supported; extra PSRAM is used for faster story loading |
 | **Xteink X3** | ESP32-C3 | **Untested** (theoretical support only, please report back if you try it out!) |
 
----
-
-## 2. Basic Device Interactions
+## Basic Device Interactions
 
 ### Power & Sleep / Wake
 
@@ -31,8 +27,6 @@ The Xteink devices feature a **hardware latching power circuit**. When the devic
 - **Auto-Sleep**: By default, the device will automatically save and sleep after 2 minutes of inactivity (configurable in Settings).
 
 > Note: When connected via **USB**, the microcontroller remains powered by the USB host. To test true deep sleep and battery longevity, disconnect the USB cable.
-
----
 
 ### Hardware Controls & Navigation
 
@@ -54,11 +48,9 @@ Generally speaking when there are modal windows or a footer with labels, the cor
 
 In the first example below the leftmost chin button (BACK) is used to close the modal window, and the rightmost (RIGHT) is used for the CONFIRL action (the 2 central chin buttons are not used in this case). In the second example BACK button is for BACK, CONFIRM button is for CHANGE, LEFT button for PREV and RIGHT button for NEXT.
 
-![Footer buttons](assets/images/chin.png)
+![Footer buttons](../assets/images/chin.png)
 
 > Note: In eenky's simulator, arrow keys are used for UP/DOWN/LEFT/RIGHT and the Enter key for CONFIRM.
-
----
 
 ### Touchscreen Controls (Xteink X4 Pro)
 
@@ -67,8 +59,6 @@ The X4 Pro features a capacitive touchscreen with full touch gestures offering a
 - **Scroll Narrative**: Swipe **UP** or **DOWN** anywhere on the screen to scroll through previous text.
 - **Select Choices**: Tap directly on any choice button on the screen to choose it.
 - **Quick Settings Menu**: Swiping **down from the top edge** of the screen opens the Quick Settings panel (see below).
-
----
 
 ### Quick Settings Menu (X4 Pro)
 
@@ -79,9 +69,7 @@ On the X4 Pro, swipe down from the top edge to access quick controls:
 - **Toggles**: Toggle backlight on/off and enable/disable touch controls for scrolling and story choices.
 - **Sleep Device**: Put the device to sleep instantly.
 
----
-
-## 3. Getting & Transferring Stories
+## Getting & Transferring Stories
 
 Stories in eenk are packaged into binary files (`.bin`) compiled by the companion [**eenky IDE**](../eenky/).
 
@@ -98,20 +86,16 @@ Stories in eenk are packaged into binary files (`.bin`) compiled by the companio
 
 TODO: Add a sample story here :)
 
----
-
 ### Method A: Transfer via USB Device Manager (Recommended)
 
 You can manage your story library directly from your computer without removing the SD card:
 
 1. Turn on your eenk device and stay on the **Library** screen.
 2. Connect the device to your computer via USB-C.
-3. Open the **Device Manager** in the [eenky IDE](../eenky/) if you have it installed, or use the [Web Device Manager](../../device-manager/) in a browser that [supports Web serial](https://caniuse.com/wf-serial) such as Chrome.
+3. Open the **Device Manager** in the [eenky IDE](../eenky/) if you have it installed, or use the [Web Device Manager](../device-manager/) in a browser that [supports Web serial](https://caniuse.com/wf-serial) such as Chrome.
 4. Click **Connect** and select your device port (typically named `USB JTAG/serial debug unit` or `USB Serial`).
 5. Click **Upload Story** and select your compiled `.bin` file. The Device Manager will remind you to add `.media` and `.epdfont` files as well if you have them around.
 6. Click **Disconnect**. Your device will automatically reboot and display the new story in the library.
-
----
 
 ### Method B: Manual Transfer via MicroSD Card
 
@@ -139,9 +123,7 @@ MicroSD Root
 
 4. Eject the SD card safely, insert it back into your eenk device, and turn it on.
 
----
-
-## 4. Playing Stories on eenk
+## Playing Stories on eenk
 
 ### The Library Browser
 
@@ -150,8 +132,6 @@ When you power on the device, the **Library** displays all available stories fou
 - Each entry displays the story's title, author, file size, and thumbnail preview.
 - Stories that are currently loaded or have existing save states display a badge indicator.
 - Use **UP / DOWN** to navigate and **CONFIRM** or a short press on **POWER** to launch a story.
-
----
 
 ### Loading & Memory Architecture
 
@@ -164,8 +144,6 @@ The loading process differs depending on your hardware model:
   
   > Note: A technical side effect is that the partition table on the X4Pro isn't too different from the e.g. Crosspoint firmware, unlike on X3/X4 where it's OTA partitions are assymetrical.
 
----
-
 ### Reading, Scrolling & Making Choices
 
 - **Reading**: Story text is automatically formatted, hyphenated, and paginated for the e-ink screen.
@@ -175,8 +153,6 @@ The loading process differs depending on your hardware model:
   - Selected choices display focused highlighting.
   - Press **CONFIRM** or short press **POWER** to make your choice and advance the story.
 
----
-
 ### Automatic Save States & Resuming
 
 eenk automatically saves your full story state whenever you exit or put the device to sleep:
@@ -185,8 +161,6 @@ eenk automatically saves your full story state whenever you exit or put the devi
 - The save file captures the complete Ink virtual machine state (variables, callstack, visited knots, and full reading history).
 - When you launch a previously played story from the library, eenk will automatically resume right where you left off.
 
----
-
 ### Exiting or Restarting a Story
 
 - **Exit during play**: Press **BACK / QUIT** at any time. A confirmation dialog will appear: choose **Confirm** to save and return to the library, or **Cancel** to continue reading.
@@ -194,9 +168,7 @@ eenk automatically saves your full story state whenever you exit or put the devi
   - **Exit Story**: Save and return to the library.
   - **Restart Story**: Clear the save file and begin again from the beginning.
 
----
-
-## 5. System Settings
+## System Settings
 
 Access the **Settings View** by pressing **BACK** or **MENU** from the Library screen.
 
@@ -214,9 +186,7 @@ This UI screen is still a work in progress and likely to be adjusted in the near
 | **Format SD** | Erase SD Card | Formats the MicroSD card to FAT32 filesystem. |
 | **Firmware** | Version String | Displays the currently installed eenk firmware version. | -->
 
----
-
-## 6. Font Management
+## Font Management
 
 eenk features a versatile typography engine adapted from the [Papyrix](https://github.com/bigbag/papyrix-reader) firmware.
 
@@ -240,20 +210,16 @@ You can add any custom font by placing `.epdfont` files into the `/fonts/` direc
 - **Synthetic Fallbacks**: If your custom font does not include separate bold or italic files, eenk automatically generates synthetic bold and oblique styles on the fly!
 - **Converting Fonts**: You can convert standard TrueType (`.ttf`) or OpenType (`.otf`) fonts to `.epdfont` format using the [eenky IDE](../eenky/).
 
----
-
-## 7. Updating Firmware
+## Updating Firmware
 
 ### Method 1: Web Flasher (Recommended)
 
 The easiest way to install or update eenk firmware is using your web browser:
 
 1. Connect your device via USB-C.
-2. Open the [**Web Flasher**](../../flasher/) in Google Chrome or Microsoft Edge.
+2. Open the [Web Flasher](../flasher/) in Google Chrome or Microsoft Edge.
 3. Select your device model (X4 or X4 Pro) and click **Connect**.
 4. Follow the on-screen wizard to flash the latest factory firmware in under 60 seconds.
-
----
 
 ### Method 2: Offline SD Card Update
 
@@ -265,9 +231,7 @@ TODO: refine this.
 2. Copy `firmware.bin` to the **root directory** of your MicroSD card.
 3. Insert the SD card and turn on the device. The bootloader will detect the update file, flash the new firmware, and rename the file to `firmware.bin.bak`. -->
 
----
-
-## 8. Recovery & Troubleshooting
+## Recovery & Troubleshooting
 
 If you ever encounter an issue or a corrupted firmware flash, eenk provides built-in recovery mechanisms:
 
@@ -279,8 +243,6 @@ If you ever encounter an issue or a corrupted firmware flash, eenk provides buil
   <!-- Turn on the device while holding the **LEFT** button (GPIO0). -->
 - **USB Bootloader Reflash**:
   If the device does not turn on normally, hold the **UP/BOOT** button while plugging in the USB cable to enter ESP32 ROM bootloader mode, then reflash using the [Web Flasher](../../flasher/).
-
----
 
 ### Frequently Asked Questions
 
