@@ -35,12 +35,24 @@ eenky
 ```
 
 > [!IMPORTANT]
-> After making changes in eenk that affect the simulator binary, update the eenky submodule pointer and rebuild:
-> ```sh
-> cd ../eenky     # in the eenky repo
-> git submodule update --remote eenk
-> npm run setup
-> ```
+> **Submodule Pointer & CI Release Synchronization**:
+> In Git, `eenky` pins a specific commit SHA of the `eenk` submodule. GitHub Actions CI (`build-executables.yaml`) checks out this exact pinned commit.
+> Whenever you make changes in `eenk` (such as firmware, simulator binaries, `WritingForEenk.md`, or documentation):
+> 1. Commit and push changes in the primary `eenk` repository.
+> 2. In `eenky`, run the one-step updater from `app/`:
+>    ```sh
+>    cd app
+>    npm run update-submodules
+>    ```
+>    *(This runs `git submodule update --remote`, rebuilds `eenk-sim.exe` & `inkcpp_cl.exe`, synchronizes `eenk_version.txt`, and rebuilds `CombinedDocumentation.md` & `embedded.html`).*
+> 3. Verify submodule status via `git submodule status` (a `+` prefix indicates your local submodule commit differs from the committed pointer).
+> 4. Stage and commit the updated submodule pointer and generated files in `eenky`:
+>    ```sh
+>    git add eenk app/main-process/ink/eenk_version.txt app/resources/Documentation/
+>    git commit -m "Update eenk submodule, binaries, and documentation"
+>    git push origin master
+>    ```
+> Failing to commit the updated submodule pointer in `eenky` will cause GitHub Actions packaging workflows to package old documentation and old simulator binaries.
 
 ---
 
@@ -237,14 +249,15 @@ See `WritingForEenk.md` for the full authoring-facing documentation of metadata 
 
 ```sh
 # From app/ directory:
-npm run setup   # Build/copy simulator and compiler binaries into place
-npm start       # Launch dev mode (Vite + Electron concurrently)
-npm run test    # Run Mocha unit tests
+npm run setup              # Build/copy simulator and compiler binaries into place
+npm run update-submodules  # Pull latest submodule commits, rebuild binaries, sync docs & version
+npm start                  # Launch dev mode (Vite + Electron concurrently)
+npm run test               # Run Mocha unit tests
 
 # From app/renderer/ directory:
-npm run test    # Run Vitest frontend tests
-npm run dev     # Vite dev server only
-npm run build   # Production build of the Vue renderer
+npm run test               # Run Vitest frontend tests
+npm run dev                # Vite dev server only
+npm run build              # Production build of the Vue renderer
 ```
 
 > [!IMPORTANT]
@@ -335,12 +348,22 @@ After making firmware changes in eenk:
 - [ ] `pio test -e native` passes (golden screenshots match or are intentionally updated)
 - [ ] If updater was touched: `pio run -e esp32c3_updater` builds and binary fits in 1 MB
 
-### Commit Workflow
+### Commit & Release Workflow
 
-1. Make firmware changes in the **primary eenk repo** only.
-2. If changes affect the simulator, update the eenky submodule pointer and run `npm run setup` in eenky.
-3. If inkcpp was modified, update the submodule pointer in both eenk and eenky.
-4. Test native, esp32c3, and esp32s3 targets before committing.
+1. Make firmware or documentation changes in the **primary eenk repo** and commit/push them to `origin/main`.
+2. Test `native`, `esp32c3`, and `esp32s3` targets before finishing firmware changes.
+3. If changes affect the simulator, `WritingForEenk.md`, or web tools:
+   - Switch to the `eenky` repository.
+   - Run `cd app && npm run update-submodules` to pull the latest `eenk` commit, recompile binaries, synchronize `eenk_version.txt`, and regenerate `CombinedDocumentation.md` / `embedded.html`.
+   - Run `git submodule status` to verify the `eenk` submodule is tracking the expected commit.
+   - Stage and commit the submodule pointer and generated assets:
+     ```sh
+     git add eenk app/main-process/ink/eenk_version.txt app/resources/Documentation/
+     git commit -m "Update eenk submodule, binaries, and documentation"
+     git push origin master
+     ```
+4. If `inkcpp` was modified, update and commit the submodule pointer in both `eenk` and `eenky`.
+5. Trigger GitHub Actions packaging workflow only **after** the submodule pointer in `eenky` has been pushed.
 
 ### Platform Macros
 
