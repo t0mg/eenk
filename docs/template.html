@@ -60,6 +60,46 @@
     </div>
   </footer>
 
-  </body>
+  <!-- ── Heading Anchor Copy Toast ──────────────────────────── -->
+  <div id="anchor-toast" class="anchor-toast" role="status" aria-live="polite" aria-atomic="true">
+    <span class="toast-icon">✓</span>
+    <span class="toast-text">Link copied to clipboard</span>
+  </div>
+
+  <script>
+    (function() {
+      let toastTimer = null;
+      const toast = document.getElementById('anchor-toast');
+
+      function showToast(message) {
+        if (!toast) return;
+        if (message) {
+          const textEl = toast.querySelector('.toast-text');
+          if (textEl) textEl.textContent = message;
+        }
+        toast.classList.add('show');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          toast.classList.remove('show');
+        }, 2200);
+      }
+
+      document.addEventListener('click', function(e) {
+        const anchor = e.target.closest('.heading-anchor');
+        if (!anchor) return;
+
+        const href = anchor.getAttribute('href');
+        if (!href || !href.startsWith('#')) return;
+
+        const targetUrl = new URL(href, window.location.href).href;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(targetUrl).then(() => {
+            showToast('Section link copied');
+          }).catch(() => {});
+        }
+      });
+    })();
+  </script>
+</body>
 
 </html>

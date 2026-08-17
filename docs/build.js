@@ -100,7 +100,9 @@ function slugify(text) {
   let slug = plainText
     .toLowerCase()
     .replace(/[^\w\s-]/g, '')
-    .replace(/\s+/g, '-');
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
   if (!slug) slug = 'section';
 
   if (slugCounts[slug]) {
@@ -117,9 +119,27 @@ marked.use({
   gfm: true,
   breaks: false,
   renderer: {
-    heading(text, level, raw) {
+    heading(tokenOrText, maybeLevel, maybeRaw) {
+      let text, level, raw;
+      if (typeof tokenOrText === 'object' && tokenOrText !== null) {
+        text = tokenOrText.text;
+        level = tokenOrText.depth;
+        raw = tokenOrText.raw;
+      } else {
+        text = tokenOrText;
+        level = maybeLevel;
+        raw = maybeRaw;
+      }
       const id = slugify(raw || text);
-      return `<h${level} id="${id}">${text}</h${level}>\n`;
+      const plainTitle = (raw || text).replace(/<[^>]+>/g, '').trim().replace(/"/g, '&quot;');
+      return `<h${level} id="${id}" class="heading-anchor-group">` +
+        `<span class="heading-text">${text}</span>` +
+        `<a href="#${id}" class="heading-anchor" aria-label="Link to section: ${plainTitle}" title="Direct link to section">` +
+          `<svg class="heading-anchor-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">` +
+            `<path d="M7.775 3.275a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 1 1 2.83 2.83l-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25zm-.02 9.45a.75.75 0 0 0-1.06-1.06l-1.25 1.25a2 2 0 0 1-2.83-2.83l2.5-2.5a2 2 0 0 1 2.83 0 .75.75 0 0 0 1.06-1.06 3.5 3.5 0 0 0-4.95 0l-2.5 2.5a3.5 3.5 0 0 0 4.95 4.95l1.25-1.25z"/>` +
+          `</svg>` +
+        `</a>` +
+      `</h${level}>\n`;
     }
   }
 });

@@ -41,7 +41,6 @@ a:hover {
   color: var(--color-accent-dark);
 }
 
-/* ── Typography ─────────────────────────────────────────────── */
 h1,
 h2,
 h3,
@@ -82,6 +81,131 @@ h3 {
 h4 {
   font-size: 1rem;
   margin: 1.25rem 0 0.5rem;
+}
+
+/* ── Heading Anchor Links (Wikipedia-style) ─────────────────── */
+.heading-anchor-group {
+  position: relative;
+}
+
+.heading-anchor-group:target .heading-text {
+  animation: heading-target-pulse 1.2s ease-out;
+}
+
+@keyframes heading-target-pulse {
+  0%, 25% {
+    color: var(--color-accent);
+  }
+  100% {
+    color: inherit;
+  }
+}
+
+.heading-anchor {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.35em;
+  color: var(--color-gray);
+  text-decoration: none;
+  opacity: 0;
+  vertical-align: middle;
+  transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out, color 0.15s ease-in-out;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.heading-anchor-icon {
+  width: 0.68em;
+  height: 0.68em;
+  fill: currentColor;
+  display: block;
+}
+
+.heading-anchor:hover {
+  color: var(--color-accent);
+  transform: scale(1.2);
+  text-decoration: none;
+}
+
+.heading-anchor:focus,
+.heading-anchor:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.heading-anchor-group:hover .heading-anchor {
+  opacity: 1;
+}
+
+/* Contextual color overrides per heading level */
+h1 .heading-anchor {
+  color: var(--color-gray);
+}
+
+h1 .heading-anchor:hover {
+  color: var(--color-accent-dark);
+}
+
+h2 .heading-anchor {
+  color: var(--color-accent);
+}
+
+h2 .heading-anchor:hover {
+  color: #FFFFFF;
+}
+
+/* Touch devices support (reveal subtly when hover is unavailable) */
+@media (hover: none) {
+  .heading-anchor {
+    opacity: 0.45;
+  }
+}
+
+/* ── Anchor Copy Toast Notification ────────────────────────── */
+.anchor-toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: var(--color-fg);
+  color: var(--color-bg);
+  border: var(--border);
+  box-shadow: var(--shadow-hard);
+  padding: 0.6rem 1rem;
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  z-index: 999;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.anchor-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.anchor-toast .toast-icon {
+  color: var(--color-accent);
+  font-weight: 900;
+}
+
+@media (max-width: 700px) {
+  .anchor-toast {
+    bottom: 1.25rem;
+    right: 1.25rem;
+    left: 1.25rem;
+    justify-content: center;
+  }
 }
 
 p {
