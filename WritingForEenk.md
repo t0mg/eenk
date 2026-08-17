@@ -52,6 +52,40 @@ If the engine cannot find those variants, synthetic variants are generated from 
 ### 4. Fallback
 If the requested font stem cannot be found in any of the above locations, eenk will gracefully fall back to the user's device default setting, or the builtin font.
 
+## Text Formatting
+
+eenk supports inline text styling in both narrative text and interactive choice options. You can use standard Markdown syntax or HTML tags (supported for backwards compatibility with Inky web exports).
+
+### Markdown Formatting
+
+| Style | Syntax | Example |
+|-------|--------|---------|
+| **Italic** | `*text*` or `_text_` | `*whispers quietly*` |
+| **Bold** | `**text**` or `__text__` | `**DANGER AHEAD**` |
+| **Bold & Italic** | `***text***` or `**_text_**` | `***CRITICAL ALERT***` |
+
+### HTML Tags (Backwards Compatibility)
+
+For backwards compatibility with classic Ink stories and Inky's HTML export, standard HTML formatting tags are also supported:
+
+- `<i>...</i>` or `<em>...</em>` for *italic* text
+- `<b>...</b>` or `<strong>...</strong>` for **bold** text
+- Nested tags such as `<b><i>...</i></b>` for ***bold italic*** text
+- `<br>`, `<br/>`, or `<br />` to insert explicit line breaks within paragraphs
+
+```ink
+The guard stepped forward. <b>"Halt!"</b> he yelled.<br><i>He did not look pleased.</i>
+
++ [**Fight** the guard] -> fight
++ [<i>Reason</i> with him] -> reason
+```
+
+### Font Variant Resolution for Formatted Text
+
+When formatted text is rendered:
+1. eenk will look for dedicated font files matching the style suffix: `-bold`, `-italic`, or `-bolditalic` (e.g. `literata-bold.epdfont`).
+2. If dedicated variant files are not present on the SD card, eenk automatically generates a **synthetic fallback** (algorithmic emboldening and obliquing), ensuring your formatted text always displays correctly without crashing or missing text.
+
 ## Images in eenk
 
 You can embed images in your story using the standard Ink `# IMAGE:` tag. eenky will automatically process these images during compilation and bundle them into an optimized `.media` sidecar file.

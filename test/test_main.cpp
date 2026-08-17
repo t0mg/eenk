@@ -980,6 +980,16 @@ void test_story_metadata_save_path(void) {
   TEST_ASSERT_EQUAL_STRING("/.eenk_saves/the_intercept.bin.sav",
                            saveBufRootFile);
 }
+
+void test_rich_text_parser(void) {
+  auto runs = InkRichTextParser::parse("Line 1<br>Line 2<br/>Line 3<br /><b>Bold</b> <i>Italic</i> **MDBold** *MDItalic*");
+  std::string fullText = "";
+  for (const auto &r : runs) {
+    fullText += r.text;
+  }
+  TEST_ASSERT_EQUAL_STRING("Line 1\nLine 2\nLine 3\nBold Italic MDBold MDItalic", fullText.c_str());
+  TEST_ASSERT_TRUE(runs.size() >= 5);
+}
 #endif
 
 int main(int argc, char **argv) {
@@ -987,6 +997,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_script_detector);
 #ifdef PLATFORM_NATIVE
   RUN_TEST(test_sd_font_catalogue);
+  RUN_TEST(test_rich_text_parser);
   RUN_TEST(test_battery_widget_screenshot);
   RUN_TEST(test_library_screenshot);
   RUN_TEST(test_settings_view_screenshot);

@@ -31,7 +31,16 @@ std::vector<TextRun> InkRichTextParser::parse(const char* text) {
   };
 
   while (*p != '\0') {
-    if (startsWith(p, "<b>") || startsWith(p, "<strong>")) {
+    if (startsWith(p, "<br/>")) {
+      currentText += '\n';
+      p += 5;
+    } else if (startsWith(p, "<br />")) {
+      currentText += '\n';
+      p += 6;
+    } else if (startsWith(p, "<br>")) {
+      currentText += '\n';
+      p += 4;
+    } else if (startsWith(p, "<b>") || startsWith(p, "<strong>")) {
       flush();
       isBold = true;
       p += (p[1] == 's') ? 8 : 3;
