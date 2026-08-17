@@ -4,11 +4,15 @@
 
 **eenky** is the desktop companion application for writing, compiling, and deploying Ink interactive fiction stories to your eenk device. It is forked from [inkle's Inky](https://github.com/inkle/inky) but uses a new code editor and is extended with the eenk compilation pipeline, a pixel-accurate device simulator, and a USB Device Manager.
 
-> Note: Only the Windows build is available at the moment, Linux and MacOS will come when/if I can find a development machine for them.
-
 ## Installation
 
 Download the latest eenky release for your platform from the [GitHub Releases](https://github.com/t0mg/eenky/releases) page, or build from source by following the [build instructions](../build/).
+
+> Note: pre-release builds are available for Windows, Mac and Linux (untested!). Currently those builds are unsigned so you might get blocked.
+> On Mac, Gatekeeper will automatically quarantine the downloaded build and will fail to open, possibly reporting that it is broken. To bypass this security feature:
+> 1. Move the `eenky.app` to your Applications folder.
+> 2. Open your Terminal.
+> 3. Run `xattr -cr /Applications/eenky.app`
 
 ## Features
 
