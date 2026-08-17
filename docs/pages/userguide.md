@@ -40,15 +40,17 @@ Buttons are used as follows in eenk:
 |---|---|---|---|
 | **UP / LEFT** | Scroll text up / Previous choice | Move selection up | Move selection up |
 | **DOWN / RIGHT** | Scroll text down / Next choice | Move selection down | Move selection down |
-| **BACK / QUIT / MENU ** | Open exit dialog (save & pause) | Open Settings panel | Exit Settings (saves automatically) |
+| **BACK / QUIT / MENU** | Open exit dialog (save & pause) | Open Settings panel | Exit Settings (saves automatically) |
 | **CONFIRM / SELECT / POWER (Short press)** | Confirm selected choice | Launch selected story | Cycle value / Run action |
 | **POWER (Long Press)** | Save progress and sleep | Save and sleep | Save settings and sleep |
 
 Generally speaking when there are modal windows or a footer with labels, the corresponding chin button should be used.
 
-In the first example below the leftmost chin button (BACK) is used to close the modal window, and the rightmost (RIGHT) is used for the CONFIRL action (the 2 central chin buttons are not used in this case). In the second example BACK button is for BACK, CONFIRM button is for CHANGE, LEFT button for PREV and RIGHT button for NEXT.
+In the first example below, the leftmost chin button (BACK) is used to close the modal window, and the rightmost (RIGHT) is used for the Confirm action (the 2 central chin buttons are not used in this case).
 
 ![Footer buttons](../assets/images/chin.png)
+
+In the second example above, BACK button is for Back, CONFIRM button is for Change, LEFT button for Prev and RIGHT button for Next.
 
 > Note: In eenky's simulator, arrow keys are used for UP/DOWN/LEFT/RIGHT and the Enter key for CONFIRM.
 
