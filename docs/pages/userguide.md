@@ -10,11 +10,36 @@ Welcome to the **eenk** User Guide! This guide covers everything you need to kno
 
 ### Supported Devices
 
+> Important: Only USB-unlocked Xteink devices are compatible with the eenk firmware.
+
 | Device | Processor | Notes |
 |---|---|---|
 | **Xteink X4** | ESP32-C3 | Reference platform |
 | **Xteink X4 Pro** | ESP32-S3 | Touch and backlight are supported; extra PSRAM is used for faster story loading |
 | **Xteink X3** | ESP32-C3 | **Untested** (theoretical support only, please report back if you try it out!) |
+
+
+## Flashing eenk
+
+### Method 1: Web Flasher (Recommended)
+
+The easiest way to install or update eenk firmware is using your web browser:
+
+1. Connect your device via USB-C.
+2. Open the [Flasher](../flasher/) in a browser that [supports Web serial](https://caniuse.com/wf-serial) such as Chrome.
+    > Note: you can also use it via the Device Manager window of the [eenky IDE](../eenky) if you have it installed.
+3. Select your device model and click **Connect**.
+4. Follow the on-screen wizard to flash the firmware. Select **Factory flash** if it's the first time you're flashing eenk, **Update** otherwise.
+
+### Method 2: Offline SD Card Update
+
+TODO: refine this.
+
+<!-- You can update firmware offline without a PC connection:
+
+1. Download the latest `firmware.bin` release for your device.
+2. Copy `firmware.bin` to the **root directory** of your MicroSD card.
+3. Insert the SD card and turn on the device. The bootloader will detect the update file, flash the new firmware, and rename the file to `firmware.bin.bak`. -->
 
 ## Basic Device Interactions
 
@@ -212,27 +237,6 @@ You can add any custom font by placing `.epdfont` files into the `/fonts/` direc
 - **Synthetic Fallbacks**: If your custom font does not include separate bold or italic files, eenk automatically generates synthetic bold and oblique styles on the fly!
 - **Converting Fonts**: You can convert standard TrueType (`.ttf`) or OpenType (`.otf`) fonts to `.epdfont` format using the [eenky IDE](../eenky/).
 
-## Updating Firmware
-
-### Method 1: Web Flasher (Recommended)
-
-The easiest way to install or update eenk firmware is using your web browser:
-
-1. Connect your device via USB-C.
-2. Open the [Web Flasher](../flasher/) in Google Chrome or Microsoft Edge.
-3. Select your device model (X4 or X4 Pro) and click **Connect**.
-4. Follow the on-screen wizard to flash the latest factory firmware in under 60 seconds.
-
-### Method 2: Offline SD Card Update
-
-TODO: refine this.
-
-<!-- You can update firmware offline without a PC connection:
-
-1. Download the latest `firmware.bin` release for your device.
-2. Copy `firmware.bin` to the **root directory** of your MicroSD card.
-3. Insert the SD card and turn on the device. The bootloader will detect the update file, flash the new firmware, and rename the file to `firmware.bin.bak`. -->
-
 ## Recovery & Troubleshooting
 
 If you ever encounter an issue or a corrupted firmware flash, eenk provides built-in recovery mechanisms:
@@ -244,7 +248,7 @@ If you ever encounter an issue or a corrupted firmware flash, eenk provides buil
 - **Xteink X4 Pro Recovery**: TODO: verify this
   <!-- Turn on the device while holding the **LEFT** button (GPIO0). -->
 - **USB Bootloader Reflash**:
-  If the device does not turn on normally, hold the **UP/BOOT** button while plugging in the USB cable to enter ESP32 ROM bootloader mode, then reflash using the [Web Flasher](../../flasher/).
+  If the device does not turn on normally, hold the **UP/BOOT** button while plugging in the USB cable to enter ESP32 ROM bootloader mode, then reflash using the [Web Flasher](../flasher/).
 
 ### Frequently Asked Questions
 
