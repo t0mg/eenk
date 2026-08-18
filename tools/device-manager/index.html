@@ -6,6 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="Manage stories on your eenk device over USB — no drivers required." />
   <title>Device Manager — eenk</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="../assets/favicon-16x16.png" />
+  <link rel="shortcut icon" href="../assets/favicon.ico" />
   <link rel="stylesheet" href="../assets/fonts/material-symbols-outlined.css" />
   <link rel="stylesheet" href="../assets/css/common.css" />
   <link rel="stylesheet" href="device-manager.css" />
@@ -94,7 +97,8 @@
         <!-- Sidecar prompt (browser context: shown after picking a .bin) -->
         <div class="sidecar-prompt" id="sidecar-prompt" style="display:none;">
           <h4 id="sidecar-title">Associated files detected</h4>
-          <p id="sidecar-desc">The following files are in the same folder as the selected story. Upload them alongside it?</p>
+          <p id="sidecar-desc">The following files are in the same folder as the selected story. Upload them alongside
+            it?</p>
           <div class="sidecar-file-list" id="sidecar-file-list"></div>
           <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
             <button class="btn btn-primary" id="sidecar-upload-btn">Upload All</button>
@@ -106,7 +110,8 @@
         <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Drop .bin file here to upload">
           <span class="upload-icon"><span class="material-symbols-outlined"
               style="font-size:2rem;">folder_open</span></span>
-          <span class="upload-hint">Drop your <strong>.bin</strong> story file or folder here, or click Upload Story above</span>
+          <span class="upload-hint">Drop your <strong>.bin</strong> story file or folder here, or click Upload Story
+            above</span>
         </div>
 
         <div class="file-list" id="stories-list"></div>

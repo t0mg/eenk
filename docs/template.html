@@ -14,6 +14,12 @@
   <meta property="og:type" content="website" />
   <meta property="og:url" content="{{CANONICAL_URL}}" />
 
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ASSET_ROOT}}assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ASSET_ROOT}}assets/favicon-16x16.png" />
+  <link rel="shortcut icon" href="{{ASSET_ROOT}}assets/favicon.ico" />
+  <link rel="apple-touch-icon" href="{{ASSET_ROOT}}assets/apple-touch-icon.png" />
+
   <!-- Preconnect for Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -67,7 +73,7 @@
   </div>
 
   <script>
-    (function() {
+    (function () {
       let toastTimer = null;
       const toast = document.getElementById('anchor-toast');
 
@@ -84,7 +90,7 @@
         }, 2200);
       }
 
-      document.addEventListener('click', function(e) {
+      document.addEventListener('click', function (e) {
         const anchor = e.target.closest('.heading-anchor');
         if (!anchor) return;
 
@@ -95,11 +101,11 @@
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(targetUrl).then(() => {
             showToast('Section link copied');
-          }).catch(() => {});
+          }).catch(() => { });
         }
       });
     })();
   </script>
-</body>
+  </body>
 
 </html>

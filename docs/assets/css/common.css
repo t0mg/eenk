@@ -11,7 +11,7 @@
     --color-accent-dark: #CC3D00;
     --color-accent-transparent: #FF4D0045;
     --color-accent-light: #FFDCD1;
-    --color-gray: #717171;
+    --color-gray: #313131;
     --color-light: #F4F4F4;
     --color-border: #111111;
     --color-border-subtle: #EEEEEE;
@@ -56,6 +56,7 @@ body.dark {
     --color-bg: #1A1A1A;
     --color-fg: #EEEEEE;
     --color-accent-light: #2A1A17;
+    --color-gray: #717171;
     --color-light: #2A2A2A;
     --color-border: #EEEEEE;
     --color-border-subtle: #333333;
