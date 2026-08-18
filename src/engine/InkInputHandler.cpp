@@ -28,11 +28,10 @@ void InkInputHandler::handleCommonNavigation(bool isStoryEnded, InkEngine& engin
 
   int scrollAmount = IDisplay.getHeight() * 3 / 4;
 
-  bool choicesVisible = display.isChoicesVisible();
-  bool revealDone = isStoryEnded ? true : display.isRevealComplete();
+  bool choicesRevealed = display.isChoicesRevealed();
 
   if (hasTouchTap) {
-    if (settings.touchChoicesEnabled && choicesVisible && display.getNumChoices() > 0 && revealDone) {
+    if (settings.touchChoicesEnabled && choicesRevealed && display.getNumChoices() > 0) {
       int clickedIdx = display.getChoiceIndexAtY(touchY);
       if (clickedIdx >= 0 && clickedIdx < display.getNumChoices()) {
         display.setSelectedChoice(clickedIdx);
@@ -45,10 +44,20 @@ void InkInputHandler::handleCommonNavigation(bool isStoryEnded, InkEngine& engin
          handleScroll(display, -scrollAmount);
          engine.requestRedraw();
          return;
-      } else if (touchY > IDisplay.getHeight() * 2 / 3 && !choicesVisible) {
-         handleScroll(display, scrollAmount);
-         engine.requestRedraw();
-         return;
+      } else if (touchY > IDisplay.getHeight() * 2 / 3) {
+         if (!choicesRevealed) {
+           if (display.getScrollY() >= display.getMaxScrollY()) {
+             display.revealChoices();
+           } else {
+             handleScroll(display, scrollAmount);
+           }
+           engine.requestRedraw();
+           return;
+         } else if (!display.isChoicesVisible()) {
+           handleScroll(display, scrollAmount);
+           engine.requestRedraw();
+           return;
+         }
       }
     }
   }
@@ -78,7 +87,15 @@ void InkInputHandler::handleCommonNavigation(bool isStoryEnded, InkEngine& engin
         engine.requestRedraw();
         return;
       } else if (ev == ButtonEvent::SWIPE_UP) {
-        handleScroll(display, scrollAmount);
+        if (!choicesRevealed) {
+          if (display.getScrollY() >= display.getMaxScrollY()) {
+            display.revealChoices();
+          } else {
+            handleScroll(display, scrollAmount);
+          }
+        } else {
+          handleScroll(display, scrollAmount);
+        }
         engine.requestRedraw();
         return;
       }
@@ -87,7 +104,7 @@ void InkInputHandler::handleCommonNavigation(bool isStoryEnded, InkEngine& engin
   switch (ev) {
   case ButtonEvent::LEFT:
   case ButtonEvent::UP: {
-    if (choicesVisible && revealDone && display.getNumChoices() > 0 &&
+    if (choicesRevealed && display.getNumChoices() > 0 &&
         display.getSelectedChoice() > 0) {
       display.setSelectedChoice(display.getSelectedChoice() - 1);
       display.scrollToSelectedChoice();
@@ -100,8 +117,12 @@ void InkInputHandler::handleCommonNavigation(bool isStoryEnded, InkEngine& engin
   }
   case ButtonEvent::RIGHT:
   case ButtonEvent::DOWN: {
-    if (!choicesVisible || !revealDone) {
-      handleScroll(display, scrollAmount);
+    if (!choicesRevealed) {
+      if (display.getScrollY() >= display.getMaxScrollY()) {
+        display.revealChoices();
+      } else {
+        handleScroll(display, scrollAmount);
+      }
       engine.requestRedraw();
     } else if (display.getNumChoices() > 0) {
       if (display.getSelectedChoice() < display.getNumChoices() - 1) {
@@ -117,8 +138,12 @@ void InkInputHandler::handleCommonNavigation(bool isStoryEnded, InkEngine& engin
     break;
   }
   case ButtonEvent::CONFIRM: {
-    if (!choicesVisible || !revealDone) {
-      handleScroll(display, scrollAmount);
+    if (!choicesRevealed) {
+      if (display.getScrollY() >= display.getMaxScrollY()) {
+        display.revealChoices();
+      } else {
+        handleScroll(display, scrollAmount);
+      }
       engine.requestRedraw();
     } else if (display.getNumChoices() > 0) {
       if (!isStoryEnded) {

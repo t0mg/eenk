@@ -438,6 +438,19 @@ void GfxRenderer::drawTriangleIcon(const int x, const int y, const int size,
   }
 }
 
+void GfxRenderer::drawDownTriangleIcon(const int x, const int y, const int size,
+                                       const bool black) const {
+  if (size <= 0)
+    return;
+  const int height = (size + 1) / 2;
+  for (int r = 0; r < height; r++) {
+    int w = size - (2 * r);
+    if (w <= 0)
+      break;
+    drawLine(x + r, y + r, x + r + w - 1, y + r, black);
+  }
+}
+
 void GfxRenderer::fillRect(const int x, const int y, const int width,
                            const int height, const bool state) const {
   if (width <= 0 || height <= 0)

@@ -208,6 +208,7 @@ class GfxRenderer {
   void drawShadowBox(int x, int y, int w, int h, int borderW, int shadowOff, bool centerCompensate = false) const;
   int drawPill(int fontId, int x, int y, const char* label, int paddingX, int pillH, int radius, bool inverted = true) const;
   void drawTriangleIcon(int x, int y, int size, bool black = true) const;
+  void drawDownTriangleIcon(int x, int y, int size, bool black = true) const;
 
   // Text
   int getTextWidth(int fontId, const char* text, EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;

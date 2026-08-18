@@ -46,13 +46,6 @@ public:
 
     int getImageHeight(const char* imagePath) const { return _storyManager.getImageHeight(imagePath); }
 
-    void setChoiceDelays(uint32_t cascadeMs, uint32_t focusMs) {
-        _cascadeOffsetMs = cascadeMs;
-        _focusDelayMs = focusMs;
-    }
-    uint32_t getCascadeOffsetMs() const { return _cascadeOffsetMs; }
-    uint32_t getFocusDelayMs() const { return _focusDelayMs; }
-
     enum class State {
         IDLE,
         RUNNING_TEXT,
@@ -88,14 +81,5 @@ private:
     bool _needsRedraw = false;
     int _refreshCount = 0;
 
-    uint32_t _choiceTurnStartMs = 0;
-    uint32_t _initialChoiceDelayMs = 0;
-    uint32_t _revealStartMs = 0;
-    uint32_t _lastAnimFrameMs = 0;
-
-    uint32_t _cascadeOffsetMs = 350;
-    uint32_t _focusDelayMs    = 700;
-
     void tickRunningText();
-    void updateAnimation();
 };

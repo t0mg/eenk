@@ -27,7 +27,7 @@ QuickMenuAction QuickMenuWidget::show() {
     int touchX = -1, touchY = -1;
     if (_input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >= 0) {
       // Tap outside card (bottom half of screen) -> close
-      if (touchY > 420) {
+      if (touchY > 430) {
         if (_dirty) {
           _settings.save();
           _dirty = false;
@@ -60,8 +60,8 @@ QuickMenuAction QuickMenuWidget::show() {
 #endif
           render();
         }
-      } else if (touchY >= 250 && touchY < 320) { // Toggles row
-        if (touchX >= 24 && touchX <= 123) {
+      } else if (touchY >= 250 && touchY < 330) { // Toggles row
+        if (touchX >= 20 && touchX <= 155) {
           _settings.frontLightEnabled = !_settings.frontLightEnabled;
           if (_frontlight) {
             if (_settings.frontLightEnabled) {
@@ -72,21 +72,18 @@ QuickMenuAction QuickMenuWidget::show() {
             }
           }
           _dirty = true;
-        } else if (touchX >= 135 && touchX <= 234) {
+        } else if (touchX >= 165 && touchX <= 305) {
           _settings.touchScrollEnabled = !_settings.touchScrollEnabled;
           _dirty = true;
-        } else if (touchX >= 246 && touchX <= 345) {
+        } else if (touchX >= 310 && touchX <= 450) {
           _settings.touchChoicesEnabled = !_settings.touchChoicesEnabled;
-          _dirty = true;
-        } else if (touchX >= 357 && touchX <= 456) {
-          _settings.choiceAnimationEnabled = !_settings.choiceAnimationEnabled;
           _dirty = true;
         }
 #ifdef PLATFORM_ESP32
         delay(16);
 #endif
         render();
-      } else if (touchY >= 330 && touchY < 400) { // Sleep button
+      } else if (touchY >= 330 && touchY < 410) { // Sleep button
         if (_dirty) {
           _settings.save();
           _dirty = false;
@@ -161,11 +158,10 @@ void QuickMenuWidget::render() {
     return;
 
   int cardW = _display.getWidth();
-  int cardH = 410;
+  int cardH = 420;
   int cardX = 0;
   int cardY = 0;
   int fontHeading = NeuStyle::FONT_HEADING;
-  int fontBody = NeuStyle::FONT_BODY;
 
   // Draw halftone background overlay
   r->fillHalftoneRect(0, 0, _display.getWidth(), _display.getHeight(), false);
@@ -209,7 +205,7 @@ void QuickMenuWidget::render() {
   if (!_settings.frontLightEnabled) {
     r->fillRect(cardX + 26, toggleY + 2, 122, 56, true);
   }
-  centerText(fontBody, cardX + 24, toggleY, 126, 60, "LIGHT",
+  centerText(fontHeading, cardX + 24, toggleY, 126, 60, "LIGHT",
              _settings.frontLightEnabled);
 
   // Touch Scroll Toggle
@@ -217,7 +213,7 @@ void QuickMenuWidget::render() {
   if (!_settings.touchScrollEnabled) {
     r->fillRect(cardX + 172, toggleY + 2, 122, 56, true);
   }
-  centerText(fontBody, cardX + 170, toggleY, 126, 60, "SWIPE",
+  centerText(fontHeading, cardX + 170, toggleY, 126, 60, "SWIPE",
              _settings.touchScrollEnabled);
 
   // Touch Choices Toggle
@@ -225,16 +221,16 @@ void QuickMenuWidget::render() {
   if (!_settings.touchChoicesEnabled) {
     r->fillRect(cardX + 318, toggleY + 2, 122, 56, true);
   }
-  centerText(fontBody, cardX + 316, toggleY, 126, 60, "CHOICES",
+  centerText(fontHeading, cardX + 316, toggleY, 126, 60, "CHOICES",
              _settings.touchChoicesEnabled);
 
   // Quick Action Buttons
   int btnY = cardY + 340;
   // Sleep button
-  r->drawShadowBox(cardX + 24, btnY, cardW - 48, 50, NeuStyle::BORDER_W, 4);
+  r->drawShadowBox(cardX + 24, btnY, cardW - 48, 60, NeuStyle::BORDER_W, 4);
   if (_selectedRow == 2)
-    r->fillRect(cardX + 26, btnY + 2, cardW - 52, 46, true);
-  centerText(fontBody, cardX + 24, btnY, cardW - 48, 50, "SLEEP DEVICE",
+    r->fillRect(cardX + 26, btnY + 2, cardW - 52, 56, true);
+  centerText(fontHeading, cardX + 24, btnY, cardW - 48, 60, "SLEEP DEVICE",
              _selectedRow != 2);
 
   _display.present();

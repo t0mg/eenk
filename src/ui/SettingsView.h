@@ -21,7 +21,6 @@ enum class SettingRow {
     STORY_FONT,
     CHOICE_FONT,
     MARGIN,
-    CHOICE_ANIMATION,
     FULL_REFRESH,
     SLEEP_TIMEOUT,
     OVERRIDE_FONT,

@@ -46,12 +46,15 @@ AppSettings AppSettings::defaults() {
   s.inputLayoutIndex = 0;
   s.refreshInterval = 10;
   s.overrideStoryFont = false;
-  s.choiceCascadeMs = 350;
-  s.choiceFocusDelayMs = 700;
-  s.choiceAnimationEnabled = true;
+#if defined(FREEINK_DEVICE_X4PRO) || defined(CONFIG_IDF_TARGET_ESP32S3)
   s.touchChoicesEnabled = true;
   s.touchScrollEnabled = true;
   s.frontLightEnabled = true;
+#else
+  s.touchChoicesEnabled = false;
+  s.touchScrollEnabled = false;
+  s.frontLightEnabled = false;
+#endif
   s.frontLightBrightness = 50;
   s.frontLightTemperature = 50;
   return s;
@@ -71,9 +74,6 @@ static constexpr char kKeySleep[] = "sleep";
 static constexpr char kKeyLayout[] = "layout";
 static constexpr char kKeyRefresh[] = "refresh";
 static constexpr char kKeyFontOverride[] = "sfont_ovr";
-static constexpr char kKeyCascadeMs[] = "casc_ms";
-static constexpr char kKeyFocusMs[] = "foc_ms";
-static constexpr char kKeyChoiceAnim[] = "chs_anim";
 static constexpr char kKeyTouchChoices[] = "tch_chs";
 static constexpr char kKeyTouchScroll[] = "tch_scr";
 static constexpr char kKeyFrontLightEnabled[] = "fled_en";
@@ -99,10 +99,6 @@ AppSettings AppSettings::load() {
   s.inputLayoutIndex = prefs.getUChar(kKeyLayout, s.inputLayoutIndex);
   s.refreshInterval = prefs.getUChar(kKeyRefresh, s.refreshInterval);
   s.overrideStoryFont = prefs.getUChar(kKeyFontOverride, 0) != 0;
-  s.choiceCascadeMs = prefs.getUShort(kKeyCascadeMs, s.choiceCascadeMs);
-  s.choiceFocusDelayMs = prefs.getUShort(kKeyFocusMs, s.choiceFocusDelayMs);
-  s.choiceAnimationEnabled =
-      prefs.getUChar(kKeyChoiceAnim, s.choiceAnimationEnabled ? 1 : 0) != 0;
   s.touchChoicesEnabled =
       prefs.getUChar(kKeyTouchChoices, s.touchChoicesEnabled ? 1 : 0) != 0;
   s.touchScrollEnabled =
@@ -137,9 +133,6 @@ void AppSettings::save() const {
   prefs.putUChar(kKeyLayout, inputLayoutIndex);
   prefs.putUChar(kKeyRefresh, refreshInterval);
   prefs.putUChar(kKeyFontOverride, overrideStoryFont ? 1 : 0);
-  prefs.putUShort(kKeyCascadeMs, choiceCascadeMs);
-  prefs.putUShort(kKeyFocusMs, choiceFocusDelayMs);
-  prefs.putUChar(kKeyChoiceAnim, choiceAnimationEnabled ? 1 : 0);
   prefs.putUChar(kKeyTouchChoices, touchChoicesEnabled ? 1 : 0);
   prefs.putUChar(kKeyTouchScroll, touchScrollEnabled ? 1 : 0);
   prefs.putUChar(kKeyFrontLightEnabled, frontLightEnabled ? 1 : 0);

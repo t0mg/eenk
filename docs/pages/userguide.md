@@ -175,7 +175,8 @@ The loading process differs depending on your hardware model:
 
 - **Reading**: Story text is automatically formatted, hyphenated, and paginated for the e-ink screen.
 - **Scrolling**: Use **UP / DOWN** or touch swipe to scroll through previous story paragraphs.
-- **Choices**: When you reach a branch point, choices appear with a clean reveal animation:
+- **Choices**: At the end of each turn's text output, a separator line and downward indicator (`▼`) indicate that choices are available:
+  - Scroll down (via **DOWN / RIGHT**, **SWIPE UP**, or **POWER** button click) to reveal all available choices.
   - Cycle through options with **UP / DOWN** (or tap directly on touch screens).
   - Selected choices display focused highlighting.
   - Press **CONFIRM** or short press **POWER** to make your choice and advance the story.

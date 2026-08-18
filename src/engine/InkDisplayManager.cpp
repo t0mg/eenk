@@ -315,9 +315,13 @@ InkDisplayManager::ChoiceLayout InkDisplayManager::getChoiceLayout(GfxRenderer *
   layout.marginY = _settings.marginPx;
   layout.choiceLineHeight = renderer->getLineHeight(FONT_CHOICE);
   layout.choicePadding = layout.choiceLineHeight / 3;
-  layout.minChoiceHeight = std::max(
-      layout.choiceLineHeight, _settings.touchChoicesEnabled ? 64 : layout.choiceLineHeight);
+  layout.minChoiceHeight = _settings.touchChoicesEnabled ? 64 : (layout.choiceLineHeight + 8);
   return layout;
+}
+
+int InkDisplayManager::getChoiceBlockHeight(const ChoiceLayout &l, int numLines) const {
+  int textHeight = numLines * l.choiceLineHeight;
+  return _settings.touchChoicesEnabled ? std::max(l.minChoiceHeight, textHeight) : (textHeight + 8);
 }
 
 int InkDisplayManager::getChoicesHeight() const {
@@ -330,12 +334,50 @@ int InkDisplayManager::getChoicesHeight() const {
 
   for (int i = 0; i < _numChoices; ++i) {
     int lines = std::max((size_t)1, _wrappedChoices[i].size());
-    int textHeight = lines * l.choiceLineHeight;
-    int choiceBlockHeight = std::max(l.minChoiceHeight, textHeight);
+    int choiceBlockHeight = getChoiceBlockHeight(l, lines);
     totalHeight += choiceBlockHeight;
   }
 
   return totalHeight + l.marginY + ((_numChoices - 1) * l.choicePadding);
+}
+
+int InkDisplayManager::getIndicatorHeight() const {
+  GfxRenderer *renderer = _display.getRenderer();
+  if (!renderer || _numChoices == 0)
+    return 0;
+  ChoiceLayout l = getChoiceLayout(renderer);
+  int triSize = 12;
+  int triHeight = (triSize + 1) / 2;
+  return l.marginY + 2 + 4 + triHeight + l.marginY;
+}
+
+void InkDisplayManager::updateMaxScrollY() {
+  GfxRenderer *renderer = _display.getRenderer();
+  if (!renderer)
+    return;
+
+  int height = _display.getHeight();
+  int marginY = 24;
+  int bottomExtraHeight = _choicesRevealed ? getChoicesHeight() : getIndicatorHeight();
+
+  int documentHeight = bottomExtraHeight;
+  for (const auto &w : _wrappedLines) {
+    documentHeight += w.getHeight(renderer);
+  }
+
+  int availableHeight = height - (2 * marginY);
+  _maxScrollY = std::max(0, documentHeight - availableHeight);
+  if (_scrollY > _maxScrollY) {
+    _scrollY = _maxScrollY;
+  }
+}
+
+void InkDisplayManager::revealChoices() {
+  if (_choicesRevealed)
+    return;
+  _choicesRevealed = true;
+  updateMaxScrollY();
+  setScrollToBottom();
 }
 
 void InkDisplayManager::doAutoScroll(int newLinesCount, bool showChoices) {
@@ -345,9 +387,9 @@ void InkDisplayManager::doAutoScroll(int newLinesCount, bool showChoices) {
 
   int height = _display.getHeight();
   int marginY = 24;
-  int choiceHeight = showChoices ? getChoicesHeight() : 0;
+  int bottomExtraHeight = showChoices ? getChoicesHeight() : getIndicatorHeight();
 
-  int documentHeight = choiceHeight;
+  int documentHeight = bottomExtraHeight;
   for (const auto &w : _wrappedLines) {
     documentHeight += w.getHeight(renderer);
   }
@@ -355,7 +397,7 @@ void InkDisplayManager::doAutoScroll(int newLinesCount, bool showChoices) {
   int availableHeight = height - (2 * marginY);
   _maxScrollY = std::max(0, documentHeight - availableHeight);
 
-  int newContentHeight = choiceHeight;
+  int newContentHeight = bottomExtraHeight;
   int startIndex = std::max(0, (int)_wrappedLines.size() - newLinesCount);
   for (size_t i = startIndex; i < _wrappedLines.size(); ++i) {
     const auto &w = _wrappedLines[i];
@@ -391,16 +433,14 @@ void InkDisplayManager::scrollToSelectedChoice() {
   for (int i = 0; i < _selectedChoice; ++i) {
      if (i > 0) docY += l.choicePadding;
      int lines = std::max((size_t)1, _wrappedChoices[i].size());
-     int textHeight = lines * l.choiceLineHeight;
-     docY += std::max(l.minChoiceHeight, textHeight);
+     docY += getChoiceBlockHeight(l, lines);
   }
   
   if (docY < l.marginY) {
      _scrollY += docY - l.marginY;
   } else {
      int lines = std::max((size_t)1, _wrappedChoices[_selectedChoice].size());
-     int textHeight = lines * l.choiceLineHeight;
-     int currentChoiceHeight = std::max(l.minChoiceHeight, textHeight);
+     int currentChoiceHeight = getChoiceBlockHeight(l, lines);
      if (docY + currentChoiceHeight > _display.getHeight() - l.marginY) {
         _scrollY += (docY + currentChoiceHeight) - (_display.getHeight() - l.marginY);
      }
@@ -422,29 +462,8 @@ bool InkDisplayManager::isChoicesVisible() const {
   return (_scrollY >= _maxScrollY - 2);
 }
 
-bool InkDisplayManager::isRevealComplete() const {
-  if (_numChoices == 0)
-    return true;
-  if (!_revealStarted)
-    return false;
-  return (_revealStep > _numChoices);
-}
-
-InkDisplayManager::ChoiceVisualState
-InkDisplayManager::getChoiceVisualState(int index) const {
-  if (index < 0 || index >= _numChoices)
-    return ChoiceVisualState::FULL;
-  if (!_revealStarted)
-    return ChoiceVisualState::HIDDEN;
-  if (index < _revealStep) {
-    return ChoiceVisualState::FULL;
-  } else {
-    return ChoiceVisualState::HIDDEN;
-  }
-}
-
 int InkDisplayManager::getChoiceIndexAtY(int touchY) const {
-  if (_numChoices == 0 || !isRevealComplete())
+  if (_numChoices == 0 || !_choicesRevealed)
     return -1;
   GfxRenderer *renderer = _display.getRenderer();
   if (!renderer)
@@ -468,8 +487,7 @@ int InkDisplayManager::getChoiceIndexAtY(int touchY) const {
       docY += l.choicePadding;
 
     int lines = std::max((size_t)1, _wrappedChoices[i].size());
-    int textHeight = lines * l.choiceLineHeight;
-    int choiceBlockHeight = std::max(l.minChoiceHeight, textHeight);
+    int choiceBlockHeight = getChoiceBlockHeight(l, lines);
 
     if (touchY >= docY && touchY < docY + choiceBlockHeight) {
       return i;
@@ -495,8 +513,12 @@ void InkDisplayManager::redraw(InkStoryManager &storyManager,
     }
     if (_numChoices > 0) {
       _display.drawSeparator();
-      for (int i = 0; i < _numChoices; ++i) {
-        _display.drawChoiceLine(i, _choiceText[i], i == _selectedChoice);
+      if (!_choicesRevealed) {
+        _display.drawNarrativeLine("    [ v ]");
+      } else {
+        for (int i = 0; i < _numChoices; ++i) {
+          _display.drawChoiceLine(i, _choiceText[i], i == _selectedChoice);
+        }
       }
     }
     if (settings.refreshInterval > 0 &&
@@ -553,55 +575,59 @@ void InkDisplayManager::redraw(InkStoryManager &storyManager,
     }
     y += (l.marginY / 2);
 
-    int indicatorWidth = 24;
-
-    for (int i = 0; i < _numChoices; ++i) {
-      if (i > 0)
-        y += l.choicePadding;
-
-      bool isSelected = (i == _selectedChoice) && isRevealComplete() && (_blinkingChoice != i);
-      int choiceBlockLines = std::max((size_t)1, _wrappedChoices[i].size());
-      int textHeight = choiceBlockLines * l.choiceLineHeight;
-      int choiceBlockHeight = std::max(l.minChoiceHeight, textHeight);
-      int verticalOffset = (choiceBlockHeight - textHeight) / 2;
-
-      ChoiceVisualState state = getChoiceVisualState(i);
-      if (state == ChoiceVisualState::HIDDEN) {
-        y += choiceBlockHeight;
-        continue;
+    if (!_choicesRevealed) {
+      int triSize = 12;
+      int triHeight = (triSize + 1) / 2;
+      int triX = marginX + (narrativeWidth - triSize) / 2;
+      int triY = y + 4;
+      if ((triY + triHeight > 0) && (triY < height)) {
+        renderer->drawDownTriangleIcon(triX, triY, triSize, true);
       }
+    } else {
+      int indicatorWidth = 24;
 
-      if ((y + choiceBlockHeight > 0) && (y < height)) {
-        if (isSelected) {
-          renderer->fillRect(marginX - 4, y, narrativeWidth + 8,
-                             choiceBlockHeight, true);
-        }
-      }
+      for (int i = 0; i < _numChoices; ++i) {
+        if (i > 0)
+          y += l.choicePadding;
 
-      // If selected (inverted), text and indicator are drawn white on solid black background.
-      // If unselected or blinking, text and indicator are drawn black on white background.
-      bool textBlack = !isSelected;
-      int iconSize = 10;
-      int iconX = marginX + 4;
+        bool isSelected = (i == _selectedChoice) && (_blinkingChoice != i);
+        int choiceBlockLines = std::max((size_t)1, _wrappedChoices[i].size());
+        int textHeight = choiceBlockLines * l.choiceLineHeight;
+        int choiceBlockHeight = getChoiceBlockHeight(l, choiceBlockLines);
+        int verticalOffset = (choiceBlockHeight - textHeight) / 2;
 
-      if (_wrappedChoices[i].empty()) {
-        if (isSelected) {
-          renderer->drawTriangleIcon(iconX, y + verticalOffset + (l.choiceLineHeight - iconSize) / 2, iconSize, textBlack);
-        }
-        y += choiceBlockHeight;
-      } else {
-        int textY = y + verticalOffset;
-        for (size_t l_idx = 0; l_idx < _wrappedChoices[i].size(); ++l_idx) {
-          if ((textY + l.choiceLineHeight > 0) && (textY < height)) {
-            if (l_idx == 0 && isSelected) {
-              renderer->drawTriangleIcon(iconX, textY + (l.choiceLineHeight - iconSize) / 2, iconSize, textBlack);
-            }
-            renderer->drawRichText(FONT_CHOICE, marginX + indicatorWidth, textY,
-                                   _wrappedChoices[i][l_idx], textBlack);
+        if ((y + choiceBlockHeight > 0) && (y < height)) {
+          if (isSelected) {
+            renderer->fillRect(marginX - 4, y, narrativeWidth + 8,
+                               choiceBlockHeight, true);
           }
-          textY += l.choiceLineHeight;
         }
-        y += choiceBlockHeight;
+
+        // If selected (inverted), text and indicator are drawn white on solid black background.
+        // If unselected or blinking, text and indicator are drawn black on white background.
+        bool textBlack = !isSelected;
+        int iconSize = 10;
+        int iconX = marginX + 4;
+
+        if (_wrappedChoices[i].empty()) {
+          if (isSelected) {
+            renderer->drawTriangleIcon(iconX, y + verticalOffset + (l.choiceLineHeight - iconSize) / 2, iconSize, textBlack);
+          }
+          y += choiceBlockHeight;
+        } else {
+          int textY = y + verticalOffset;
+          for (size_t l_idx = 0; l_idx < _wrappedChoices[i].size(); ++l_idx) {
+            if ((textY + l.choiceLineHeight > 0) && (textY < height)) {
+              if (l_idx == 0 && isSelected) {
+                renderer->drawTriangleIcon(iconX, textY + (l.choiceLineHeight - iconSize) / 2, iconSize, textBlack);
+              }
+              renderer->drawRichText(FONT_CHOICE, marginX + indicatorWidth, textY,
+                                     _wrappedChoices[i][l_idx], textBlack);
+            }
+            textY += l.choiceLineHeight;
+          }
+          y += choiceBlockHeight;
+        }
       }
     }
   }

@@ -250,11 +250,6 @@ void SettingsView::renderPage() {
       drawSettingsRow(y, "Margin", val, selected);
       break;
     }
-    case SettingRow::CHOICE_ANIMATION: {
-      const char *val = _settings.choiceAnimationEnabled ? "On" : "Off";
-      drawSettingsRow(y, "Choice Animation", val, selected);
-      break;
-    }
     case SettingRow::FULL_REFRESH: {
       const char *val = refreshName(_settings.refreshInterval);
       drawSettingsRow(y, "Full Refresh", val, selected);
@@ -427,10 +422,6 @@ void SettingsView::handleInput(ButtonEvent ev) {
       _settings.marginPx = kMargins[(cur + 1) % kMCount];
       break;
     }
-    case SettingRow::CHOICE_ANIMATION:
-      _dirty = true;
-      _settings.choiceAnimationEnabled = !_settings.choiceAnimationEnabled;
-      break;
     case SettingRow::FULL_REFRESH: {
       _dirty = true;
       static const uint8_t kRefresh[] = {0, 5, 10, 15, 20};

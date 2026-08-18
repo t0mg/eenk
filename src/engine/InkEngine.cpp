@@ -76,13 +76,6 @@ void InkEngine::applySettings(const AppSettings &settings) {
   g_marginPx = settings.marginPx;
   g_refreshInterval = settings.refreshInterval;
   _settings = settings;
-  if (settings.choiceAnimationEnabled) {
-    _cascadeOffsetMs = settings.choiceCascadeMs;
-    _focusDelayMs = settings.choiceFocusDelayMs;
-  } else {
-    _cascadeOffsetMs = 0;
-    _focusDelayMs = 0;
-  }
   _displayManager.applySettings(settings);
 }
 
@@ -180,93 +173,26 @@ void InkEngine::tickRunningText() {
 
   if (runner->has_choices()) {
     _displayManager.collectChoices(runner);
-    _displayManager.doAutoScroll(newLinesCount, true);
-    _choiceTurnStartMs = millis();
-    _initialChoiceDelayMs =
-        _settings.choiceAnimationEnabled
-            ? std::min((uint32_t)4000, (uint32_t)(newLinesCount * 200))
-            : 0;
-    _revealStartMs = 0;
-    _lastAnimFrameMs = 0;
-    if (!_settings.choiceAnimationEnabled) {
-      _displayManager.setRevealStarted(true);
-      _displayManager.setRevealStep(_displayManager.getNumChoices() + 1);
+    if (newLinesCount > 0) {
+      _displayManager.setChoicesRevealed(false);
+      _displayManager.doAutoScroll(newLinesCount, false);
     } else {
-      _displayManager.setRevealStarted(false);
-      _displayManager.setRevealStep(0);
+      _displayManager.setChoicesRevealed(true);
+      _displayManager.doAutoScroll(0, true);
     }
-    _state = State::SHOWING_CHOICES;
+    _state = State::WAITING_INPUT;
     _needsRedraw = true;
   } else {
     _displayManager.setupStoryEndedChoices();
-    _displayManager.doAutoScroll(newLinesCount, true);
-    _choiceTurnStartMs = millis();
-    _initialChoiceDelayMs =
-        _settings.choiceAnimationEnabled
-            ? std::min((uint32_t)4000, (uint32_t)(newLinesCount * 200))
-            : 0;
-    _revealStartMs = 0;
-    _lastAnimFrameMs = 0;
-    if (!_settings.choiceAnimationEnabled) {
-      _displayManager.setRevealStarted(true);
-      _displayManager.setRevealStep(_displayManager.getNumChoices() + 1);
+    if (newLinesCount > 0) {
+      _displayManager.setChoicesRevealed(false);
+      _displayManager.doAutoScroll(newLinesCount, false);
     } else {
-      _displayManager.setRevealStarted(false);
-      _displayManager.setRevealStep(0);
+      _displayManager.setChoicesRevealed(true);
+      _displayManager.doAutoScroll(0, true);
     }
     _state = State::STORY_ENDED;
     _needsRedraw = true;
-  }
-}
-
-void InkEngine::updateAnimation() {
-  if (!_settings.choiceAnimationEnabled) {
-    if (!_displayManager.getRevealStarted() ||
-        _displayManager.getRevealStep() <= _displayManager.getNumChoices()) {
-      _displayManager.setRevealStarted(true);
-      _displayManager.setRevealStep(_displayManager.getNumChoices() + 1);
-      _needsRedraw = true;
-    }
-    return;
-  }
-
-  uint32_t now = millis();
-  if (!_displayManager.getRevealStarted()) {
-    if ((now - _choiceTurnStartMs >= _initialChoiceDelayMs) &&
-        _displayManager.isChoicesVisible()) {
-      _displayManager.setRevealStarted(true);
-      _revealStartMs = now;
-      _lastAnimFrameMs = now;
-      if (_cascadeOffsetMs == 0 && _focusDelayMs == 0) {
-        _displayManager.setRevealStep(_displayManager.getNumChoices() + 1);
-      } else if (_cascadeOffsetMs == 0) {
-        _displayManager.setRevealStep(_displayManager.getNumChoices());
-      } else {
-        _displayManager.setRevealStep(1);
-      }
-      _needsRedraw = true;
-    }
-  } else if (_displayManager.getRevealStep() <=
-             _displayManager.getNumChoices()) {
-    uint32_t delay =
-        (_displayManager.getRevealStep() == _displayManager.getNumChoices())
-            ? _focusDelayMs
-            : _cascadeOffsetMs;
-    if (delay == 0) {
-      if (_displayManager.getRevealStep() == _displayManager.getNumChoices()) {
-        _displayManager.setRevealStep(_displayManager.getNumChoices() + 1);
-      } else if (_cascadeOffsetMs == 0) {
-        _displayManager.setRevealStep(_displayManager.getNumChoices());
-      } else {
-        _displayManager.setRevealStep(_displayManager.getRevealStep() + 1);
-      }
-      _lastAnimFrameMs = now;
-      _needsRedraw = true;
-    } else if (now - _lastAnimFrameMs >= delay) {
-      _lastAnimFrameMs = now;
-      _displayManager.setRevealStep(_displayManager.getRevealStep() + 1);
-      _needsRedraw = true;
-    }
   }
 }
 
@@ -282,14 +208,12 @@ void InkEngine::update() {
     _needsRedraw = true;
     break;
   case State::WAITING_INPUT: {
-    updateAnimation();
     _inputHandler.tickWaitingInput(*this, _displayManager, _storyManager,
                                    _display, _settings, _frontlight,
                                    _batteryWidget);
     break;
   }
   case State::STORY_ENDED: {
-    updateAnimation();
     _inputHandler.tickStoryEnded(*this, _displayManager, _storyManager,
                                  _display, _settings, _frontlight,
                                  _batteryWidget);

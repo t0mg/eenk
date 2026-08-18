@@ -48,13 +48,11 @@ public:
     void scrollToSelectedChoice();
 
     bool isChoicesVisible() const;
-    bool isRevealComplete() const;
-
-    enum class ChoiceVisualState {
-        HIDDEN,
-        FULL
-    };
-    ChoiceVisualState getChoiceVisualState(int index) const;
+    bool isChoicesRevealed() const { return _choicesRevealed; }
+    void setChoicesRevealed(bool revealed) { _choicesRevealed = revealed; }
+    void revealChoices();
+    void updateMaxScrollY();
+    int getIndicatorHeight() const;
 
     void redraw(InkStoryManager& storyManager, AppSettings& settings, int& refreshCount);
 
@@ -65,13 +63,8 @@ public:
         int minChoiceHeight;
     };
     ChoiceLayout getChoiceLayout(class GfxRenderer* renderer) const;
+    int getChoiceBlockHeight(const ChoiceLayout& l, int numLines) const;
 
-    // Animation state
-    void setRevealStarted(bool started) { _revealStarted = started; }
-    bool getRevealStarted() const { return _revealStarted; }
-    void setRevealStep(int step) { _revealStep = step; }
-    int getRevealStep() const { return _revealStep; }
-    
     int getNumChoices() const { return _numChoices; }
     void setSelectedChoice(int index) { _selectedChoice = index; }
     int getSelectedChoice() const { return _selectedChoice; }
@@ -100,6 +93,5 @@ private:
     int _scrollY = 0;
     int _maxScrollY = 0;
 
-    int _revealStep = 0;
-    bool _revealStarted = false;
+    bool _choicesRevealed = true;
 };

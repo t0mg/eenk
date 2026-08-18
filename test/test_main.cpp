@@ -656,7 +656,9 @@ void test_story_player_screenshot(void) {
   y += display.renderer.getLineHeight(choiceFont) + 10;
   display.renderer.fillRect(
       20, y - 2, 440, display.renderer.getLineHeight(choiceFont) + 4, true);
-  display.renderer.drawTriangleIcon(24, y + (display.renderer.getLineHeight(choiceFont) - iconSize) / 2, iconSize, false);
+  display.renderer.drawTriangleIcon(
+      24, y + (display.renderer.getLineHeight(choiceFont) - iconSize) / 2,
+      iconSize, false);
   display.renderer.drawText(choiceFont, 40, y, "2. Go back to sleep", false);
   y += display.renderer.getLineHeight(choiceFont) + 10;
   display.renderer.drawText(choiceFont, 40, y, "3. Yell for help", true);
@@ -702,9 +704,8 @@ void test_choice_states_screenshot(void) {
   y += 20;
 
   int choiceFont = 10; // UI 12
-  int choiceLineHeight = display.renderer.getLineHeight(choiceFont) + 4;
-  int minChoiceHeight = choiceLineHeight + 12;
-  int choicePadding = 10;
+  int choiceLineHeight = display.renderer.getLineHeight(choiceFont);
+  int choicePadding = choiceLineHeight / 3;
   int choiceContentWidth = narrativeWidth - indicatorWidth;
 
   auto drawChoiceItem = [&](const char *text, bool focused) {
@@ -713,7 +714,89 @@ void test_choice_states_screenshot(void) {
         display.renderer.wrapRichText(choiceFont, runs, choiceContentWidth, 10);
     int numLines = std::max((size_t)1, blocks.size());
     int textHeight = numLines * choiceLineHeight;
-    int blockHeight = std::max(minChoiceHeight, textHeight);
+    // Button mode: 4px top + 4px bottom padding (8px total)
+    int blockHeight = textHeight + 8;
+    int verticalOffset = 4;
+
+    if (focused) {
+      display.renderer.fillRect(marginX - 4, y, narrativeWidth + 8, blockHeight,
+                                true);
+    }
+
+    bool textBlack = !focused;
+    int iconSize = 10;
+    int iconX = marginX + 4;
+    int textY = y + verticalOffset;
+    for (size_t i = 0; i < blocks.size(); ++i) {
+      if (i == 0 && focused) {
+        display.renderer.drawTriangleIcon(
+            iconX, textY + (choiceLineHeight - iconSize) / 2, iconSize,
+            textBlack);
+      }
+      display.renderer.drawRichText(choiceFont, marginX + indicatorWidth, textY,
+                                    blocks[i], textBlack);
+      textY += choiceLineHeight;
+    }
+    y += blockHeight + choicePadding;
+  };
+
+  drawChoiceItem("Examine the runes on the archway", false);
+  drawChoiceItem("Step forward with your **drawn blade**", false);
+  drawChoiceItem("Turn back and <i>seal the heavy gate</i>", true);
+  drawChoiceItem("Search the stone walls for hidden mechanisms", false);
+
+  FooterWidget footer;
+  footer.btnBack = {true, "Menu", "Back"};
+  footer.btnConfirm = {true, "Select", "Confirm"};
+  footer.btnPrev = {true, "Up", "Prev"};
+  footer.btnNext = {true, "Down", "Next"};
+  footer.render(&display.renderer, display.getWidth(), display.getHeight());
+
+  saveBMP("test/golden/test_choices.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_choice_states_touch_screenshot(void) {
+  TestDisplay display;
+  display.clear();
+
+  int marginX = 24;
+  int width = display.getWidth();
+  int narrativeWidth = width - (2 * marginX);
+  int indicatorWidth = 24;
+
+  int y = 45;
+  int narrativeFont = 50; // Sans Medium
+
+  auto narrativeRuns = InkRichTextParser::parse(
+      "You stand at the threshold of the forgotten vault. A cold whisper "
+      "echoes from the darkness below, asking what path you will choose.");
+  auto narrativeBlocks = display.renderer.wrapRichText(
+      narrativeFont, narrativeRuns, narrativeWidth, 10);
+  for (const auto &b : narrativeBlocks) {
+    display.renderer.drawRichText(narrativeFont, marginX, y, b);
+    y += display.renderer.getLineHeight(narrativeFont);
+  }
+  y += 15;
+
+  // Separator divider
+  display.renderer.fillRect(marginX, y, narrativeWidth, 2, true);
+  y += 20;
+
+  int choiceFont = 10; // UI 12
+  int choiceLineHeight = display.renderer.getLineHeight(choiceFont);
+  int choicePadding = choiceLineHeight / 3;
+  int choiceContentWidth = narrativeWidth - indicatorWidth;
+
+  auto drawChoiceItem = [&](const char *text, bool focused) {
+    auto runs = InkRichTextParser::parse(text);
+    auto blocks =
+        display.renderer.wrapRichText(choiceFont, runs, choiceContentWidth, 10);
+    int numLines = std::max((size_t)1, blocks.size());
+    int textHeight = numLines * choiceLineHeight;
+    // Touch mode: 64px min-height
+    int blockHeight = std::max(64, textHeight);
     int verticalOffset = (blockHeight - textHeight) / 2;
 
     if (focused) {
@@ -727,7 +810,9 @@ void test_choice_states_screenshot(void) {
     int textY = y + verticalOffset;
     for (size_t i = 0; i < blocks.size(); ++i) {
       if (i == 0 && focused) {
-        display.renderer.drawTriangleIcon(iconX, textY + (choiceLineHeight - iconSize) / 2, iconSize, textBlack);
+        display.renderer.drawTriangleIcon(
+            iconX, textY + (choiceLineHeight - iconSize) / 2, iconSize,
+            textBlack);
       }
       display.renderer.drawRichText(choiceFont, marginX + indicatorWidth, textY,
                                     blocks[i], textBlack);
@@ -736,20 +821,9 @@ void test_choice_states_screenshot(void) {
     y += blockHeight + choicePadding;
   };
 
-  // 1. Default (Unfocused) Choice — Regular white background, black text
-  drawChoiceItem("1. Examine the glowing runes etched upon the stone archway", false);
-
-  // 2. Focused (Selected) Choice — Full inversion (solid black), white text, white triangle icon
-  drawChoiceItem("2. Step forward into the **shadows** with your blade drawn", true);
-
-  // 3. Unfocused Choice — Demonstrates rich italic text formatting
-  drawChoiceItem("3. Turn back and <i>seal the heavy iron gate</i> behind you", false);
-
-  // 4. Multiline Focused Choice — Demonstrates full wrapping with inversion and triangle icon
-  drawChoiceItem(
-      "4. Consult the ancient journal to decipher the meaning of the third "
-      "astrological symbol before making your final decision",
-      true);
+  drawChoiceItem("Examine the runes on the archway", true);
+  drawChoiceItem("Step forward with your **drawn blade**", false);
+  drawChoiceItem("Turn back and <i>seal the heavy gate</i>", false);
 
   FooterWidget footer;
   footer.btnBack = {true, "Menu", "Back"};
@@ -758,7 +832,7 @@ void test_choice_states_screenshot(void) {
   footer.btnNext = {true, "Down", "Next"};
   footer.render(&display.renderer, display.getWidth(), display.getHeight());
 
-  saveBMP("test/golden/test_choices.bmp", display.eink.getFrameBuffer(),
+  saveBMP("test/golden/test_choices_touch.bmp", display.eink.getFrameBuffer(),
           display.getWidth(), display.getHeight());
   TEST_ASSERT_EQUAL(1, 1);
 }
@@ -1021,21 +1095,31 @@ void test_image_widget_screenshot(void) {
 
   TEST_ASSERT_EQUAL(1, 1);
 }
-void test_zero_delay_choice_reveal(void) {
+void test_choice_reveal_interaction(void) {
   TestDisplay display;
   MockInput input;
   SDLStorage storage;
   InkEngine engine(display, input, storage);
 
   AppSettings settings = AppSettings::defaults();
-  settings.choiceAnimationEnabled = false;
   engine.applySettings(settings);
 
-  TEST_ASSERT_EQUAL_UINT32(0, engine.getCascadeOffsetMs());
-  TEST_ASSERT_EQUAL_UINT32(0, engine.getFocusDelayMs());
+  InkDisplayManager dm(display);
+  dm.setChoicesRevealed(false);
+  TEST_ASSERT_FALSE(dm.isChoicesRevealed());
+  TEST_ASSERT_EQUAL(0, dm.getIndicatorHeight()); // 0 when no choices
 
+  dm.setupStoryEndedChoices();
+  TEST_ASSERT_TRUE(dm.getIndicatorHeight() > 0);
+
+  dm.revealChoices();
+  TEST_ASSERT_TRUE(dm.isChoicesRevealed());
+
+  BootManager::setStoryPath("test/story/story.bin");
   engine.loadStory("test/story/story.bin");
   engine.update();
+
+  TEST_ASSERT_EQUAL(InkEngine::State::STORY_ENDED, engine.getState());
 }
 
 void test_story_metadata_save_path(void) {
@@ -1156,8 +1240,9 @@ int main(int argc, char **argv) {
   RUN_TEST(test_sleep_cover_image_screenshot);
   RUN_TEST(test_story_player_screenshot);
   RUN_TEST(test_choice_states_screenshot);
+  RUN_TEST(test_choice_states_touch_screenshot);
   RUN_TEST(test_image_widget_screenshot);
-  RUN_TEST(test_zero_delay_choice_reveal);
+  RUN_TEST(test_choice_reveal_interaction);
   RUN_TEST(test_story_metadata_save_path);
   RUN_TEST(test_quick_menu_screenshot);
   // StreamingEpdFontFamily unit tests
