@@ -33,11 +33,11 @@ By default, eenk uses the user's preferred font setting from the device menu. Ho
 The runtime will attempt to resolve your requested font stem in the following order:
 
 ### 1. Built-in Fonts
-The device comes with several built-in fonts that you can request directly by their token name:
-- `sans` (or `sans-medium`): The default readable sans-serif font (16pt).
-- `sans-small`: A smaller variant of the sans-serif font (14pt).
-- `serif` (or `serif-medium`): A classic serif font (Literata, if enabled in firmware).
-- `serif-large`: A larger variant of the serif font.
+The device comes with built-in fonts that you can request directly by their token name:
+- `sans` (or `sans-medium`): The default readable sans-serif font (Medium, ~16pt).
+- `sans-small`: A smaller variant of the sans-serif font (Small, ~14pt).
+- `serif` (or `serif-medium`): The classic serif font (Literata Medium, ~16pt).
+- `serif-small`: A smaller variant of the serif font (Literata Small, ~14pt).
 
 ### 2. Custom SD Card Fonts
 If the token doesn't match a built-in font, the engine will look for custom `.epdfont` font files on your SD card. The engine searches two locations in order:

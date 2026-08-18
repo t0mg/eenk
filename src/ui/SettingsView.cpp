@@ -2,10 +2,9 @@
 //
 // Font ID allocations (must not clash with InkEngine 0/1, SystemUI 10/11,
 // BatteryWidget 20):
-//   NeuStyle::FONT_HEADING (12)  Syne Bold 16pt — headings and actions
+//   NeuStyle::FONT_HEADING (12)  Syne Bold 10pt — headings and actions
 //   30  ui_12       (normal body text in settings rows)
 //   31  ui_bold_12  (bold labels)
-//   32  small14     (diagram labels)
 //   33  ui_10       (small supplementary text)
 //
 // Display geometry (480 × 800 portrait):
@@ -227,59 +226,68 @@ void SettingsView::renderPage() {
   header.render("OPTIONS", kFontHeading);
 
   int y = HeaderWidget::HEIGHT + CARD_INSET_Y;
+  static constexpr int kItems = static_cast<int>(SettingRow::COUNT);
 
-  // Row 0: Story Font
-  {
-    const char *val = "Default";
-    if (_fontCatalogue.getCount() > 0) {
-      val = _fontCatalogue.getEntries()[_currentFontIndex].displayName;
+  for (int r = 0; r < kItems; ++r) {
+    SettingRow row = static_cast<SettingRow>(r);
+    bool selected = (_itemIndex == r);
+    switch (row) {
+    case SettingRow::STORY_FONT: {
+      const char *val = "Default";
+      if (_fontCatalogue.getCount() > 0) {
+        val = _fontCatalogue.getEntries()[_currentFontIndex].displayName;
+      }
+      drawSettingsRow(y, "Story Font", val, selected);
+      break;
     }
-    drawSettingsRow(y, "Story Font", val, _itemIndex == 0);
+    case SettingRow::CHOICE_FONT: {
+      const char *val = AppSettings::CHOICE_FONT_NAMES[_settings.choiceFontIndex];
+      drawSettingsRow(y, "Choice Font", val, selected);
+      break;
+    }
+    case SettingRow::MARGIN: {
+      const char *val = marginName(_settings.marginPx);
+      drawSettingsRow(y, "Margin", val, selected);
+      break;
+    }
+    case SettingRow::CHOICE_ANIMATION: {
+      const char *val = _settings.choiceAnimationEnabled ? "On" : "Off";
+      drawSettingsRow(y, "Choice Animation", val, selected);
+      break;
+    }
+    case SettingRow::FULL_REFRESH: {
+      const char *val = refreshName(_settings.refreshInterval);
+      drawSettingsRow(y, "Full Refresh", val, selected);
+      break;
+    }
+    case SettingRow::SLEEP_TIMEOUT: {
+      const char *val = sleepName(_settings.sleepTimeoutSec);
+      drawSettingsRow(y, "Sleep & Save", val, selected);
+      break;
+    }
+    case SettingRow::OVERRIDE_FONT: {
+      const char *val = _settings.overrideStoryFont ? "On" : "Off";
+      drawSettingsRow(y, "Override Story Font", val, selected);
+      break;
+    }
+#if !defined(FREEINK_DEVICE_X4PRO) && !defined(CONFIG_IDF_TARGET_ESP32S3)
+    case SettingRow::REBOOT_UPDATER: {
+      drawSettingsRow(y, "Reboot to Updater", "OTA / App1", selected);
+      break;
+    }
+#endif
+    case SettingRow::FORMAT_SD: {
+      drawSettingsRow(y, "Format SD", "Erase SD Card", selected);
+      break;
+    }
+    case SettingRow::FIRMWARE_VERSION: {
+      drawSettingsRow(y, "Firmware", EENK_VERSION_STR, selected);
+      break;
+    }
+    default:
+      break;
+    }
     y += ROW_H;
-  }
-  // Row 1: Choice Font
-  {
-    const char *val = AppSettings::CHOICE_FONT_NAMES[_settings.choiceFontIndex];
-    drawSettingsRow(y, "Choice Font", val, _itemIndex == 1);
-    y += ROW_H;
-  }
-  // Row 2: Margin
-  {
-    const char *val = marginName(_settings.marginPx);
-    drawSettingsRow(y, "Margin", val, _itemIndex == 2);
-    y += ROW_H;
-  }
-  // Row 3: Full Refresh
-  {
-    const char *val = refreshName(_settings.refreshInterval);
-    drawSettingsRow(y, "Full Refresh", val, _itemIndex == 3);
-    y += ROW_H;
-  }
-  // Row 4: Sleep & Save
-  {
-    const char *val = sleepName(_settings.sleepTimeoutSec);
-    drawSettingsRow(y, "Sleep & Save", val, _itemIndex == 4);
-    y += ROW_H;
-  }
-  // Row 5: Override Story Font
-  {
-    const char *val = _settings.overrideStoryFont ? "On" : "Off";
-    drawSettingsRow(y, "Override Story Font", val, _itemIndex == 5);
-    y += ROW_H;
-  }
-  // Row 6: Reboot into Updater
-  {
-    drawSettingsRow(y, "Reboot to Updater", "OTA / App1", _itemIndex == 6);
-    y += ROW_H;
-  }
-  // Row 7: Format SD
-  {
-    drawSettingsRow(y, "Format SD", "Erase SD Card", _itemIndex == 7);
-    y += ROW_H;
-  }
-  // Row 8: Firmware version (read-only diagnostic)
-  {
-    drawSettingsRow(y, "Firmware", EENK_VERSION_STR, _itemIndex == 8);
   }
 
   renderFooter();
@@ -296,16 +304,10 @@ void SettingsView::renderFooter() {
     return;
 
   FooterWidget footer;
-  footer.btnBack = {true, "BACK", "Back", false};
-  // CONFIRM cycles value rows, triggers action rows; row 8 (version) is
-  // read-only
-  bool isActionRow = (_itemIndex == 6 || _itemIndex == 7);
-  bool isInfoRow = (_itemIndex == 8);
-  footer.btnConfirm = {!isInfoRow, isActionRow ? "DO IT" : "CHANGE", "Action",
-                       !isActionRow && !isInfoRow};
-  footer.btnPrev = {true, "PREV", "Prev", false};
-  footer.btnNext = {true, "NEXT", "Next", false};
-
+  footer.btnBack = {true, "Exit", "Back"};
+  footer.btnConfirm = {true, "Change", "Confirm"};
+  footer.btnPrev = {true, "Up", "Prev"};
+  footer.btnNext = {true, "Down", "Next"};
   footer.render(r, DISP_W, DISP_H);
 }
 
@@ -318,16 +320,6 @@ void SettingsView::drawSettingsRow(int y, const char *label, const char *value,
   if (!r)
     return;
 
-  // Heading line height and vertical centering
-  int headingH = r->getLineHeight(kFontHeading);
-  int bodyH = r->getLineHeight(kFontNormal);
-
-  // Label: uppercase heading font
-  char upperLabel[64];
-  strncpy(upperLabel, label, sizeof(upperLabel) - 1);
-  upperLabel[sizeof(upperLabel) - 1] = '\0';
-  toUpper(upperLabel);
-
   int cardX = CARD_INSET_X;
   int cardY = y + CARD_INSET_Y / 2;
   int cardW = CARD_W;
@@ -335,12 +327,21 @@ void SettingsView::drawSettingsRow(int y, const char *label, const char *value,
 
   ListItemWidget::draw(
       r, cardX, cardY, cardW, cardH, selected,
-      [&](int inX, int inY, int inW, int inH) {
-        int labelY = inY + (inH - headingH) / 2;
+      [r, label, value, selected](int inX, int inY, int inW, int inH) {
+        int labelH = r->getLineHeight(kFontHeading);
+        int bodyH = r->getLineHeight(kFontNormal);
+
+        // Convert label to uppercase for neubrutalist style
+        char upperLabel[64];
+        strncpy(upperLabel, label, sizeof(upperLabel) - 1);
+        upperLabel[sizeof(upperLabel) - 1] = '\0';
+        toUpper(upperLabel);
+
         int labelX = inX + LEFT_MARGIN;
+        int labelY = inY + (inH - labelH) / 2;
 
         if (selected) {
-          // Selected: render label as a pill
+          // Selected: draw label inside a rounded pill badge
           int pillY = inY + (inH - NeuStyle::PILL_H) / 2;
           r->drawPill(kFontHeading, labelX, pillY, upperLabel,
                       NeuStyle::PILL_PADDING_X, NeuStyle::PILL_H,
@@ -365,19 +366,9 @@ void SettingsView::drawSettingsRow(int y, const char *label, const char *value,
 
 // ─── handleInput()
 // ────────────────────────────────────────────────────────────
-//
-// Input model (unified for side buttons and bottom buttons):
-//   UP / LEFT  → navigate to previous row
-//   DOWN / RIGHT → navigate to next row
-//   CONFIRM    → cycle the value of the selected row (or trigger action rows)
-//   BACK       → exit settings
-//
-// This way the side buttons (UP/DOWN) and the bottom buttons (LEFT/RIGHT) both
-// navigate, while the power/action button (CONFIRM) is the sole way to change
-// a setting value — consistent regardless of which button cluster is used.
 
 void SettingsView::handleInput(ButtonEvent ev) {
-  static constexpr int kItems = 9; // rows 0–8; row 8 is read-only
+  static constexpr int kItems = static_cast<int>(SettingRow::COUNT);
 
   // ── Navigation (UP, DOWN, LEFT, RIGHT all move the selection) ─────────────
   if (ev == ButtonEvent::UP || ev == ButtonEvent::LEFT) {
@@ -393,24 +384,20 @@ void SettingsView::handleInput(ButtonEvent ev) {
 
   // ── CONFIRM / SLEEP: cycle value or trigger action ─────────────────────────
   if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::SLEEP) {
-    // Action rows
-    if (_itemIndex == 6) {
+    SettingRow row = static_cast<SettingRow>(_itemIndex);
+    switch (row) {
+#if !defined(FREEINK_DEVICE_X4PRO) && !defined(CONFIG_IDF_TARGET_ESP32S3)
+    case SettingRow::REBOOT_UPDATER:
       BootManager::bootUpdater();
       return;
-    }
-    if (_itemIndex == 7) {
+#endif
+    case SettingRow::FORMAT_SD:
       formatSD();
       return;
-    }
-    // Row 8 is read-only (firmware version); CONFIRM is a no-op.
-    if (_itemIndex == 8) {
-      return;
-    }
-
-    // Value rows: cycle forward
-    _dirty = true;
-    switch (_itemIndex) {
-    case 0:
+    case SettingRow::FIRMWARE_VERSION:
+      return; // Read-only
+    case SettingRow::STORY_FONT:
+      _dirty = true;
       if (_fontCatalogue.getCount() > 0) {
         _currentFontIndex = (_currentFontIndex + 1) % _fontCatalogue.getCount();
         const FontEntry &e = _fontCatalogue.getEntries()[_currentFontIndex];
@@ -421,11 +408,13 @@ void SettingsView::handleInput(ButtonEvent ev) {
         _settings.storyFont[sizeof(_settings.storyFont) - 1] = '\0';
       }
       break;
-    case 1:
+    case SettingRow::CHOICE_FONT:
+      _dirty = true;
       _settings.choiceFontIndex = (uint8_t)((_settings.choiceFontIndex + 1) %
                                             AppSettings::CHOICE_FONT_COUNT);
       break;
-    case 2: {
+    case SettingRow::MARGIN: {
+      _dirty = true;
       static const uint8_t kMargins[] = {8, 16, 24, 32};
       static const int kMCount = 4;
       int cur = 1;
@@ -438,7 +427,12 @@ void SettingsView::handleInput(ButtonEvent ev) {
       _settings.marginPx = kMargins[(cur + 1) % kMCount];
       break;
     }
-    case 3: {
+    case SettingRow::CHOICE_ANIMATION:
+      _dirty = true;
+      _settings.choiceAnimationEnabled = !_settings.choiceAnimationEnabled;
+      break;
+    case SettingRow::FULL_REFRESH: {
+      _dirty = true;
       static const uint8_t kRefresh[] = {0, 5, 10, 15, 20};
       static const int kRCount = 5;
       int cur = 0;
@@ -451,7 +445,8 @@ void SettingsView::handleInput(ButtonEvent ev) {
       _settings.refreshInterval = kRefresh[(cur + 1) % kRCount];
       break;
     }
-    case 4: {
+    case SettingRow::SLEEP_TIMEOUT: {
+      _dirty = true;
       static const uint16_t kSleep[] = {0, 60, 120, 300};
       static const int kSCount = 4;
       int cur = 0;
@@ -464,7 +459,8 @@ void SettingsView::handleInput(ButtonEvent ev) {
       _settings.sleepTimeoutSec = kSleep[(cur + 1) % kSCount];
       break;
     }
-    case 5:
+    case SettingRow::OVERRIDE_FONT:
+      _dirty = true;
       _settings.overrideStoryFont = !_settings.overrideStoryFont;
       break;
     default:

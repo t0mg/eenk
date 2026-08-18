@@ -258,6 +258,35 @@ blockquote {
   font-style: italic;
 }
 
+details {
+  border: var(--border);
+  background: var(--color-light);
+  box-shadow: var(--shadow-hard);
+  margin: 1.25rem 0;
+  padding: 0.75rem 1rem;
+}
+
+details[open] {
+  padding-bottom: 1rem;
+}
+
+summary {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  padding: 0.25rem 0;
+  outline: none;
+}
+
+summary:hover {
+  color: var(--color-accent);
+}
+
+details > *:not(summary) {
+  margin-top: 0.75rem;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

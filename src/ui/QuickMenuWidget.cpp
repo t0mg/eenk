@@ -61,7 +61,7 @@ QuickMenuAction QuickMenuWidget::show() {
           render();
         }
       } else if (touchY >= 250 && touchY < 320) { // Toggles row
-        if (touchX >= 24 && touchX <= 150) {
+        if (touchX >= 24 && touchX <= 123) {
           _settings.frontLightEnabled = !_settings.frontLightEnabled;
           if (_frontlight) {
             if (_settings.frontLightEnabled) {
@@ -72,11 +72,14 @@ QuickMenuAction QuickMenuWidget::show() {
             }
           }
           _dirty = true;
-        } else if (touchX >= 170 && touchX <= 296) {
+        } else if (touchX >= 135 && touchX <= 234) {
           _settings.touchScrollEnabled = !_settings.touchScrollEnabled;
           _dirty = true;
-        } else if (touchX >= 316 && touchX <= 442) {
+        } else if (touchX >= 246 && touchX <= 345) {
           _settings.touchChoicesEnabled = !_settings.touchChoicesEnabled;
+          _dirty = true;
+        } else if (touchX >= 357 && touchX <= 456) {
+          _settings.choiceAnimationEnabled = !_settings.choiceAnimationEnabled;
           _dirty = true;
         }
 #ifdef PLATFORM_ESP32
@@ -163,7 +166,6 @@ void QuickMenuWidget::render() {
   int cardY = 0;
   int fontHeading = NeuStyle::FONT_HEADING;
   int fontBody = NeuStyle::FONT_BODY;
-  int fontSmall = NeuStyle::FONT_SMALL;
 
   // Draw halftone background overlay
   r->fillHalftoneRect(0, 0, _display.getWidth(), _display.getHeight(), false);
@@ -204,27 +206,27 @@ void QuickMenuWidget::render() {
 
   // LED Toggle
   r->drawShadowBox(cardX + 24, toggleY, 126, 60, NeuStyle::BORDER_W, 4);
-  if (_settings.frontLightEnabled) {
+  if (!_settings.frontLightEnabled) {
     r->fillRect(cardX + 26, toggleY + 2, 122, 56, true);
   }
   centerText(fontBody, cardX + 24, toggleY, 126, 60, "LIGHT",
-             !_settings.frontLightEnabled);
+             _settings.frontLightEnabled);
 
   // Touch Scroll Toggle
   r->drawShadowBox(cardX + 170, toggleY, 126, 60, NeuStyle::BORDER_W, 4);
-  if (_settings.touchScrollEnabled) {
+  if (!_settings.touchScrollEnabled) {
     r->fillRect(cardX + 172, toggleY + 2, 122, 56, true);
   }
   centerText(fontBody, cardX + 170, toggleY, 126, 60, "SWIPE",
-             !_settings.touchScrollEnabled);
+             _settings.touchScrollEnabled);
 
   // Touch Choices Toggle
   r->drawShadowBox(cardX + 316, toggleY, 126, 60, NeuStyle::BORDER_W, 4);
-  if (_settings.touchChoicesEnabled) {
+  if (!_settings.touchChoicesEnabled) {
     r->fillRect(cardX + 318, toggleY + 2, 122, 56, true);
   }
   centerText(fontBody, cardX + 316, toggleY, 126, 60, "CHOICES",
-             !_settings.touchChoicesEnabled);
+             _settings.touchChoicesEnabled);
 
   // Quick Action Buttons
   int btnY = cardY + 340;

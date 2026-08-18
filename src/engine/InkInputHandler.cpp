@@ -122,6 +122,7 @@ void InkInputHandler::handleCommonNavigation(bool isStoryEnded, InkEngine& engin
       engine.requestRedraw();
     } else if (display.getNumChoices() > 0) {
       if (!isStoryEnded) {
+        display.flashChoiceActivation(story, settings, display.getSelectedChoice());
         display.markHistoryOld();
         if (story.runner()) {
            story.runner()->choose(static_cast<std::size_t>(display.getSelectedChoice()));

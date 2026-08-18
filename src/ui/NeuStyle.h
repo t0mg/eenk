@@ -36,8 +36,6 @@ constexpr int FONT_BODY = 10;
 constexpr int FONT_BODY_BOLD = 11;
 // Small font (existing ui_10)
 constexpr int FONT_SMALL = 13;
-// Diagram font (existing small14)
-constexpr int FONT_DIAGRAM = 14;
 
 // ── Bezel ────────────────────────────────────────────────────────────────────
 constexpr int BEZEL_OFFSET_Y = 4; // Offset to clear top display bezel

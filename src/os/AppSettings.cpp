@@ -15,14 +15,11 @@
 // ─── Static option tables
 // ─────────────────────────────────────────────────────
 
-// Choice / UI font names.
+// Choice / UI font names (streamlined to 2 size options: UI 10 and UI 12).
 //   0  ui_10.h        — "UI 10"
-//   1  ui_bold_10.h   — "UI Bold 10"
-//   2  ui_12.h        — "UI 12"        ← default
-//   3  ui_bold_12.h   — "UI Bold 12"
-//   4  small14.h      — "Small 14"
+//   1  ui_12.h        — "UI 12"        ← default
 const char *const AppSettings::CHOICE_FONT_NAMES[] = {
-    "UI 10", "UI Bold 10", "UI 12", "UI Bold 12", "Small 14",
+    "UI 10", "UI 12",
 };
 const int AppSettings::CHOICE_FONT_COUNT =
     static_cast<int>(sizeof(CHOICE_FONT_NAMES) / sizeof(CHOICE_FONT_NAMES[0]));
@@ -43,7 +40,7 @@ AppSettings AppSettings::defaults() {
   AppSettings s;
   strncpy(s.storyFont, "sans-medium", sizeof(s.storyFont));
   s.storyFont[sizeof(s.storyFont) - 1] = '\0';
-  s.choiceFontIndex = 2; // "UI 12"
+  s.choiceFontIndex = 1; // "UI 12"
   s.marginPx = 16;
   s.sleepTimeoutSec = 120;
   s.inputLayoutIndex = 0;
@@ -51,6 +48,7 @@ AppSettings AppSettings::defaults() {
   s.overrideStoryFont = false;
   s.choiceCascadeMs = 350;
   s.choiceFocusDelayMs = 700;
+  s.choiceAnimationEnabled = true;
   s.touchChoicesEnabled = true;
   s.touchScrollEnabled = true;
   s.frontLightEnabled = true;
@@ -75,6 +73,7 @@ static constexpr char kKeyRefresh[] = "refresh";
 static constexpr char kKeyFontOverride[] = "sfont_ovr";
 static constexpr char kKeyCascadeMs[] = "casc_ms";
 static constexpr char kKeyFocusMs[] = "foc_ms";
+static constexpr char kKeyChoiceAnim[] = "chs_anim";
 static constexpr char kKeyTouchChoices[] = "tch_chs";
 static constexpr char kKeyTouchScroll[] = "tch_scr";
 static constexpr char kKeyFrontLightEnabled[] = "fled_en";
@@ -102,6 +101,8 @@ AppSettings AppSettings::load() {
   s.overrideStoryFont = prefs.getUChar(kKeyFontOverride, 0) != 0;
   s.choiceCascadeMs = prefs.getUShort(kKeyCascadeMs, s.choiceCascadeMs);
   s.choiceFocusDelayMs = prefs.getUShort(kKeyFocusMs, s.choiceFocusDelayMs);
+  s.choiceAnimationEnabled =
+      prefs.getUChar(kKeyChoiceAnim, s.choiceAnimationEnabled ? 1 : 0) != 0;
   s.touchChoicesEnabled =
       prefs.getUChar(kKeyTouchChoices, s.touchChoicesEnabled ? 1 : 0) != 0;
   s.touchScrollEnabled =
@@ -138,6 +139,7 @@ void AppSettings::save() const {
   prefs.putUChar(kKeyFontOverride, overrideStoryFont ? 1 : 0);
   prefs.putUShort(kKeyCascadeMs, choiceCascadeMs);
   prefs.putUShort(kKeyFocusMs, choiceFocusDelayMs);
+  prefs.putUChar(kKeyChoiceAnim, choiceAnimationEnabled ? 1 : 0);
   prefs.putUChar(kKeyTouchChoices, touchChoicesEnabled ? 1 : 0);
   prefs.putUChar(kKeyTouchScroll, touchScrollEnabled ? 1 : 0);
   prefs.putUChar(kKeyFrontLightEnabled, frontLightEnabled ? 1 : 0);

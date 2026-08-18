@@ -20,7 +20,12 @@ static constexpr int FONT_CHOICE = 2;
 #include <builtinFonts/reader_medium_2b.h>
 #include <builtinFonts/reader_medium_bold_2b.h>
 #include <builtinFonts/reader_medium_italic_2b.h>
-#include <builtinFonts/small14.h>
+#include <builtinFonts/literata_medium_2b.h>
+#include <builtinFonts/literata_medium_bold_2b.h>
+#include <builtinFonts/literata_medium_italic_2b.h>
+#include <builtinFonts/literata_small_2b.h>
+#include <builtinFonts/literata_small_bold_2b.h>
+#include <builtinFonts/literata_small_italic_2b.h>
 #include <builtinFonts/ui_10.h>
 #include <builtinFonts/ui_12.h>
 #include <builtinFonts/ui_bold_10.h>
@@ -31,28 +36,30 @@ extern const BuiltinFontEntry kBuiltinFonts[] = {
      &reader_medium_italic_2b, nullptr},
     {"sans-small", "Sans S", &reader_2b, &reader_bold_2b, &reader_italic_2b,
      nullptr},
-#ifdef eenk_HAS_LITERATA
     {"serif-medium", "Serif M", &literata_medium_2b, &literata_medium_bold_2b,
      &literata_medium_italic_2b, nullptr},
-    {"serif-large", "Serif L", &literata_large_2b, &literata_large_bold_2b,
-     &literata_large_italic_2b, nullptr},
-#endif
+    {"serif-small", "Serif S", &literata_small_2b, &literata_small_bold_2b,
+     &literata_small_italic_2b, nullptr},
     {"sans", "Sans", &reader_medium_2b, &reader_medium_bold_2b,
      &reader_medium_italic_2b, nullptr},
-#ifdef eenk_HAS_LITERATA
     {"serif", "Serif", &literata_medium_2b, &literata_medium_bold_2b,
      &literata_medium_italic_2b, nullptr},
-#endif
 };
 
 extern const size_t kBuiltinFontCount =
     sizeof(kBuiltinFonts) / sizeof(kBuiltinFonts[0]);
 
-static const EpdFontData *const kChoiceFontData[] = {
-    &ui_10, &ui_bold_10, &ui_12, &ui_bold_12, &small14,
+struct ChoiceFontEntry {
+  const EpdFontData *regular;
+  const EpdFontData *bold;
+};
+
+static const ChoiceFontEntry kChoiceFontEntries[] = {
+    {&ui_10, &ui_bold_10},
+    {&ui_12, &ui_bold_12},
 };
 static constexpr int kChoiceFontCount =
-    static_cast<int>(sizeof(kChoiceFontData) / sizeof(kChoiceFontData[0]));
+    static_cast<int>(sizeof(kChoiceFontEntries) / sizeof(kChoiceFontEntries[0]));
 
 int WrappedLine::getHeight(GfxRenderer *renderer) const {
   if (!renderer)
@@ -79,11 +86,13 @@ void InkDisplayManager::applySettings(const AppSettings &settings) {
   if (renderer) {
     int idx = settings.choiceFontIndex;
     if (idx < 0 || idx >= kChoiceFontCount)
-      idx = 2; // default ui_12
-    static EpdFont choiceFont(kChoiceFontData[idx]);
-    static EpdFontFamily choiceFamily(&choiceFont);
-    choiceFont = EpdFont(kChoiceFontData[idx]);
-    choiceFamily = EpdFontFamily(&choiceFont);
+      idx = 1; // default ui_12
+    static EpdFont choiceReg(kChoiceFontEntries[idx].regular);
+    static EpdFont choiceBold(kChoiceFontEntries[idx].bold);
+    static EpdFontFamily choiceFamily(&choiceReg, &choiceBold);
+    choiceReg = EpdFont(kChoiceFontEntries[idx].regular);
+    choiceBold = EpdFont(kChoiceFontEntries[idx].bold);
+    choiceFamily = EpdFontFamily(&choiceReg, &choiceBold);
     renderer->insertFont(FONT_CHOICE, choiceFamily);
   }
 }
@@ -550,7 +559,7 @@ void InkDisplayManager::redraw(InkStoryManager &storyManager,
       if (i > 0)
         y += l.choicePadding;
 
-      bool selected = (i == _selectedChoice) && isRevealComplete();
+      bool isSelected = (i == _selectedChoice) && isRevealComplete() && (_blinkingChoice != i);
       int choiceBlockLines = std::max((size_t)1, _wrappedChoices[i].size());
       int textHeight = choiceBlockLines * l.choiceLineHeight;
       int choiceBlockHeight = std::max(l.minChoiceHeight, textHeight);
@@ -563,27 +572,32 @@ void InkDisplayManager::redraw(InkStoryManager &storyManager,
       }
 
       if ((y + choiceBlockHeight > 0) && (y < height)) {
-        if (selected) {
+        if (isSelected) {
           renderer->fillRect(marginX - 4, y, narrativeWidth + 8,
                              choiceBlockHeight, true);
         }
       }
 
+      // If selected (inverted), text and indicator are drawn white on solid black background.
+      // If unselected or blinking, text and indicator are drawn black on white background.
+      bool textBlack = !isSelected;
+      int iconSize = 10;
+      int iconX = marginX + 4;
+
       if (_wrappedChoices[i].empty()) {
-        if (selected) {
-          renderer->drawText(FONT_CHOICE, marginX, y + verticalOffset, ">",
-                             !selected);
+        if (isSelected) {
+          renderer->drawTriangleIcon(iconX, y + verticalOffset + (l.choiceLineHeight - iconSize) / 2, iconSize, textBlack);
         }
         y += choiceBlockHeight;
       } else {
         int textY = y + verticalOffset;
         for (size_t l_idx = 0; l_idx < _wrappedChoices[i].size(); ++l_idx) {
           if ((textY + l.choiceLineHeight > 0) && (textY < height)) {
-            if (l_idx == 0 && selected) {
-              renderer->drawText(FONT_CHOICE, marginX, textY, ">", !selected);
+            if (l_idx == 0 && isSelected) {
+              renderer->drawTriangleIcon(iconX, textY + (l.choiceLineHeight - iconSize) / 2, iconSize, textBlack);
             }
             renderer->drawRichText(FONT_CHOICE, marginX + indicatorWidth, textY,
-                                   _wrappedChoices[i][l_idx], !selected);
+                                   _wrappedChoices[i][l_idx], textBlack);
           }
           textY += l.choiceLineHeight;
         }
@@ -599,4 +613,24 @@ void InkDisplayManager::redraw(InkStoryManager &storyManager,
   } else {
     _display.present();
   }
+}
+
+void InkDisplayManager::flashChoiceActivation(InkStoryManager& storyManager, AppSettings& settings, int choiceIdx) {
+  _selectedChoice = choiceIdx;
+  int dummyRefresh = 0;
+
+  // Single crisp blink acknowledgment (Regular <-> Inverted)
+  // 1. Blink to Regular (white background, black text)
+  _blinkingChoice = choiceIdx;
+  redraw(storyManager, settings, dummyRefresh);
+#ifdef PLATFORM_NATIVE
+  delay(140);
+#endif
+
+  // 2. Return to Inverted (solid black background, white text)
+  _blinkingChoice = -1;
+  redraw(storyManager, settings, dummyRefresh);
+#ifdef PLATFORM_NATIVE
+  delay(140);
+#endif
 }

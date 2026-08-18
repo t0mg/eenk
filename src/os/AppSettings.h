@@ -17,6 +17,7 @@ struct AppSettings {
       choiceCascadeMs; // delay per choice item in ms (default 350, can be 0)
   uint16_t choiceFocusDelayMs;   // delay before initial selection focus in ms
                                  // (default 700, can be 0)
+  bool choiceAnimationEnabled;   // if true, choice cascade/focus animations are enabled
   bool touchChoicesEnabled;      // if true, choices can be selected via touch
   bool touchScrollEnabled;       // if true, history can be scrolled via touch
   bool frontLightEnabled;        // if true, front LED is on (using saved brightness/temp)

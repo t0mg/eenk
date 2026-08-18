@@ -8,7 +8,6 @@
 #include <StreamingEpdFont.h>
 #include <Utf8.h>
 
-#include <builtinFonts/small14.h>
 #include <builtinFonts/syne_bold_10.h>
 #include <builtinFonts/ui_10.h>
 #include <builtinFonts/ui_12.h>
@@ -29,9 +28,6 @@ static EpdFontFamily s_sysFamHeading(&s_sysFontHeading);
 
 static EpdFont s_sysFont10(&ui_10);
 static EpdFontFamily s_sysFam10(&s_sysFont10);
-
-static EpdFont s_sysFontSmall14(&small14);
-static EpdFontFamily s_sysFamSmall14(&s_sysFontSmall14);
 
 #define TAG "GFX"
 
@@ -205,12 +201,11 @@ void GfxRenderer::begin() {
   frameBuffer = einkDisplay.getFrameBuffer();
   assert(frameBuffer && "GfxRenderer::begin() called before display.begin()");
 
-  // Insert default system UI fonts (IDs 10..14 and legacy aliases 30..33)
+  // Insert default system UI fonts (IDs 10..13)
   insertFont(10, s_sysFam12);      // NeuStyle::FONT_BODY
   insertFont(11, s_sysFamBold12);  // NeuStyle::FONT_BODY_BOLD
   insertFont(12, s_sysFamHeading); // NeuStyle::FONT_HEADING
   insertFont(13, s_sysFam10);      // NeuStyle::FONT_SMALL
-  insertFont(14, s_sysFamSmall14); // NeuStyle::FONT_DIAGRAM
 }
 
 void GfxRenderer::drawPixel(const int x, const int y, const bool state) const {
@@ -426,6 +421,21 @@ void GfxRenderer::drawRect(const int x, const int y, const int width,
   drawLine(x + width - 1, y, x + width - 1, y + height - 1, state);
   drawLine(x + width - 1, y + height - 1, x, y + height - 1, state);
   drawLine(x, y, x, y + height - 1, state);
+}
+
+void GfxRenderer::drawTriangleIcon(const int x, const int y, const int size,
+                                   const bool black) const {
+  if (size <= 0)
+    return;
+  const int half = size / 2;
+  for (int r = 0; r < size; r++) {
+    int w = (r < half) ? ((r + 1) * size / half) : ((size - r) * size / half);
+    if (w > size)
+      w = size;
+    if (w < 1)
+      w = 1;
+    drawLine(x, y + r, x + w - 1, y + r, black);
+  }
 }
 
 void GfxRenderer::fillRect(const int x, const int y, const int width,

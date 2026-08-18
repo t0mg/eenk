@@ -36,6 +36,12 @@
 #include "ui/SettingsView.h"
 #include "ui/StoryMetadata.h"
 #include "ui/SystemUI.h"
+#include <builtinFonts/literata_medium_2b.h>
+#include <builtinFonts/literata_medium_bold_2b.h>
+#include <builtinFonts/literata_medium_italic_2b.h>
+#include <builtinFonts/literata_small_2b.h>
+#include <builtinFonts/literata_small_bold_2b.h>
+#include <builtinFonts/literata_small_italic_2b.h>
 #include <builtinFonts/reader_2b.h>
 #include <builtinFonts/reader_bold_2b.h>
 #include <builtinFonts/reader_italic_2b.h>
@@ -212,6 +218,16 @@ public:
   EpdFont readerSmallItalic;
   EpdFontFamily readerFamilySmall;
 
+  EpdFont literataNormal;
+  EpdFont literataBold;
+  EpdFont literataItalic;
+  EpdFontFamily literataFamily;
+
+  EpdFont literataSmallNormal;
+  EpdFont literataSmallBold;
+  EpdFont literataSmallItalic;
+  EpdFontFamily literataSmallFamily;
+
   TestDisplay()
       : renderer(eink), sysFontNormal(&ui_12), sysFamilyNormal(&sysFontNormal),
         sysFontBold(&ui_bold_12), sysFamilyBold(&sysFontBold),
@@ -222,7 +238,16 @@ public:
         readerFamily(&readerNormal, &readerBold, &readerItalic),
         readerSmall(&reader_2b), readerSmallBold(&reader_bold_2b),
         readerSmallItalic(&reader_italic_2b),
-        readerFamilySmall(&readerSmall, &readerSmallBold, &readerSmallItalic) {
+        readerFamilySmall(&readerSmall, &readerSmallBold, &readerSmallItalic),
+        literataNormal(&literata_medium_2b),
+        literataBold(&literata_medium_bold_2b),
+        literataItalic(&literata_medium_italic_2b),
+        literataFamily(&literataNormal, &literataBold, &literataItalic),
+        literataSmallNormal(&literata_small_2b),
+        literataSmallBold(&literata_small_bold_2b),
+        literataSmallItalic(&literata_small_italic_2b),
+        literataSmallFamily(&literataSmallNormal, &literataSmallBold,
+                            &literataSmallItalic) {
     renderer.begin();
     renderer.setOrientation(GfxRenderer::PortraitInverted);
     // Fallback
@@ -245,6 +270,8 @@ public:
     // Test Fonts
     renderer.insertFont(50, readerFamily);
     renderer.insertFont(60, readerFamilySmall);
+    renderer.insertFont(70, literataFamily);
+    renderer.insertFont(71, literataSmallFamily);
   }
   void clear() override { eink.clearScreen(0xFF); }
   void present() override {}
@@ -398,93 +425,76 @@ void test_fonts_screenshot(void) {
   TestDisplay display;
   display.clear();
 
-  int y = 50;
+  int y = 40;
 
   display.renderer.drawText(10, 20, y, "UI Normal 12: The quick brown fox");
-  y += display.renderer.getLineHeight(10) + 10;
+  y += display.renderer.getLineHeight(10) + 8;
 
   display.renderer.drawText(11, 20, y, "UI Bold 12: jumps over the lazy dog");
-  y += display.renderer.getLineHeight(11) + 10;
+  y += display.renderer.getLineHeight(11) + 8;
 
   display.renderer.drawText(
       20, 20, y, "UI Small 10: Sphynx of black quartz, judge my vow");
-  y += display.renderer.getLineHeight(20) + 30;
+  y += display.renderer.getLineHeight(20) + 16;
 
+  // Sans Medium
   display.renderer.drawText(50, 20, y,
-                            "Reader M Normal: The quick brown fox jumps", true,
+                            "Sans M Regular: The quick brown fox jumps", true,
                             EpdFontFamily::REGULAR);
-  y += display.renderer.getLineHeight(50) + 10;
+  y += display.renderer.getLineHeight(50) + 6;
 
   display.renderer.drawText(50, 20, y,
-                            "Reader M Italic: The quick brown fox jumps", true,
+                            "Sans M Italic: The quick brown fox jumps", true,
                             EpdFontFamily::ITALIC);
-  y += display.renderer.getLineHeight(50) + 10;
+  y += display.renderer.getLineHeight(50) + 6;
 
-  display.renderer.drawText(50, 20, y,
-                            "Reader M Bold: The quick brown fox jumps", true,
+  display.renderer.drawText(50, 20, y, "Sans M Bold: The quick brown fox jumps",
+                            true, EpdFontFamily::BOLD);
+  y += display.renderer.getLineHeight(50) + 16;
+
+  // Literata Serif Medium
+  display.renderer.drawText(70, 20, y,
+                            "Literata M Regular: The quick brown fox jumps",
+                            true, EpdFontFamily::REGULAR);
+  y += display.renderer.getLineHeight(70) + 6;
+
+  display.renderer.drawText(70, 20, y,
+                            "Literata M Italic: The quick brown fox jumps",
+                            true, EpdFontFamily::ITALIC);
+  y += display.renderer.getLineHeight(70) + 6;
+
+  display.renderer.drawText(70, 20, y,
+                            "Literata M Bold: The quick brown fox jumps", true,
                             EpdFontFamily::BOLD);
-  y += display.renderer.getLineHeight(50) + 20;
+  y += display.renderer.getLineHeight(70) + 16;
 
-  display.renderer.drawText(60, 20, y,
-                            "Reader S Normal: The quick brown fox jumps", true,
-                            EpdFontFamily::REGULAR);
-  y += display.renderer.getLineHeight(60) + 10;
-
-  display.renderer.drawText(60, 20, y,
-                            "Reader S Italic: The quick brown fox jumps", true,
-                            EpdFontFamily::ITALIC);
-  y += display.renderer.getLineHeight(60) + 10;
-
-  display.renderer.drawText(60, 20, y,
-                            "Reader S Bold: The quick brown fox jumps", true,
-                            EpdFontFamily::BOLD);
-  y += display.renderer.getLineHeight(60) + 20;
-
+  // Rich HTML & MD with Literata
   auto runs1 = InkRichTextParser::parse(
-      "Rich HTML: <i>Italic</i>, <b>Bold</b>, <b><i>Both</i></b>!");
-  FILE *f = fopen("test_runs.txt", "w");
-  auto blocks1 = display.renderer.wrapRichText(50, runs1, 440, 10);
+      "Literata HTML: <i>Italic</i>, <b>Bold</b>, <b><i>Both</i></b>!");
+  auto blocks1 = display.renderer.wrapRichText(70, runs1, 440, 10);
   for (const auto &b : blocks1) {
-    fprintf(f, "Line with %d runs\n", (int)b.runs.size());
-    for (const auto &r : b.runs) {
-      int w = display.renderer.getTextWidth(50, r.text.c_str(), r.style);
-
-      // SUPER DEBUG:
-      if (r.text == " ") {
-        fprintf(f, "  SUPERDEBUG SPACE: Calling getTextWidth again: %d ",
-                display.renderer.getTextWidth(50, " ", r.style));
-      }
-
-      fprintf(f, "  Run: [%s] len=%d style=%d width=%d firstchar=%d\n",
-              r.text.c_str(), (int)r.text.length(), (int)r.style, w,
-              (int)r.text[0]);
-    }
-    display.renderer.drawRichText(50, 20, y, b);
-    y += display.renderer.getLineHeight(50);
+    display.renderer.drawRichText(70, 20, y, b);
+    y += display.renderer.getLineHeight(70);
   }
-  fclose(f);
-  y += 10;
+  y += 6;
 
   auto runs2 =
-      InkRichTextParser::parse("Rich MD: *Italic*, **Bold**, **_Both_**!");
-  auto blocks2 = display.renderer.wrapRichText(50, runs2, 440, 10);
+      InkRichTextParser::parse("Literata MD: *Italic*, **Bold**, **_Both_**!");
+  auto blocks2 = display.renderer.wrapRichText(70, runs2, 440, 10);
   for (const auto &b : blocks2) {
-    display.renderer.drawRichText(50, 20, y, b);
-    y += display.renderer.getLineHeight(50);
+    display.renderer.drawRichText(70, 20, y, b);
+    y += display.renderer.getLineHeight(70);
   }
   y += 10;
 
-  // Test choice rich text (using FONT_CHOICE = 11 for bold, 10 for normal UI
-  // font in test) Actually ui_12 is 10, ui_bold_12 is 11 in test setup. wait,
-  // FONT_CHOICE is not defined here. Let's just use 10.
+  // Choice rich text (UI 12)
   auto runs3 =
-      InkRichTextParser::parse("Choice: *Italic*, **Bold**, **_Both_**!");
+      InkRichTextParser::parse("Choice UI: *Italic*, **Bold**, **_Both_**!");
   auto blocks3 = display.renderer.wrapRichText(10, runs3, 440, 10);
   for (const auto &b : blocks3) {
     display.renderer.drawRichText(10, 20, y, b);
     y += display.renderer.getLineHeight(10);
   }
-  y += 10;
 
   saveBMP("test/golden/test_fonts.bmp", display.eink.getFrameBuffer(),
           display.getWidth(), display.getHeight());
@@ -641,10 +651,12 @@ void test_story_player_screenshot(void) {
   y += display.renderer.getLineHeight(50) + 30;
 
   int choiceFont = 10;
+  int iconSize = 10;
   display.renderer.drawText(choiceFont, 40, y, "1. Look around", true);
   y += display.renderer.getLineHeight(choiceFont) + 10;
   display.renderer.fillRect(
       20, y - 2, 440, display.renderer.getLineHeight(choiceFont) + 4, true);
+  display.renderer.drawTriangleIcon(24, y + (display.renderer.getLineHeight(choiceFont) - iconSize) / 2, iconSize, false);
   display.renderer.drawText(choiceFont, 40, y, "2. Go back to sleep", false);
   y += display.renderer.getLineHeight(choiceFont) + 10;
   display.renderer.drawText(choiceFont, 40, y, "3. Yell for help", true);
@@ -657,6 +669,96 @@ void test_story_player_screenshot(void) {
   footer.render(&display.renderer, display.getWidth(), display.getHeight());
 
   saveBMP("test/golden/test_story_player.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_choice_states_screenshot(void) {
+  TestDisplay display;
+  display.clear();
+
+  int marginX = 24;
+  int width = display.getWidth();
+  int narrativeWidth = width - (2 * marginX);
+  int indicatorWidth = 24;
+
+  int y = 45;
+  int narrativeFont = 50; // Sans Medium
+
+  // Narrative paragraphs with proper rich-text wrapping
+  auto narrativeRuns = InkRichTextParser::parse(
+      "You stand at the threshold of the forgotten vault. A cold whisper "
+      "echoes from the darkness below, asking what path you will choose.");
+  auto narrativeBlocks = display.renderer.wrapRichText(
+      narrativeFont, narrativeRuns, narrativeWidth, 10);
+  for (const auto &b : narrativeBlocks) {
+    display.renderer.drawRichText(narrativeFont, marginX, y, b);
+    y += display.renderer.getLineHeight(narrativeFont);
+  }
+  y += 15;
+
+  // Separator divider
+  display.renderer.fillRect(marginX, y, narrativeWidth, 2, true);
+  y += 20;
+
+  int choiceFont = 10; // UI 12
+  int choiceLineHeight = display.renderer.getLineHeight(choiceFont) + 4;
+  int minChoiceHeight = choiceLineHeight + 12;
+  int choicePadding = 10;
+  int choiceContentWidth = narrativeWidth - indicatorWidth;
+
+  auto drawChoiceItem = [&](const char *text, bool focused) {
+    auto runs = InkRichTextParser::parse(text);
+    auto blocks =
+        display.renderer.wrapRichText(choiceFont, runs, choiceContentWidth, 10);
+    int numLines = std::max((size_t)1, blocks.size());
+    int textHeight = numLines * choiceLineHeight;
+    int blockHeight = std::max(minChoiceHeight, textHeight);
+    int verticalOffset = (blockHeight - textHeight) / 2;
+
+    if (focused) {
+      display.renderer.fillRect(marginX - 4, y, narrativeWidth + 8, blockHeight,
+                                true);
+    }
+
+    bool textBlack = !focused;
+    int iconSize = 10;
+    int iconX = marginX + 4;
+    int textY = y + verticalOffset;
+    for (size_t i = 0; i < blocks.size(); ++i) {
+      if (i == 0 && focused) {
+        display.renderer.drawTriangleIcon(iconX, textY + (choiceLineHeight - iconSize) / 2, iconSize, textBlack);
+      }
+      display.renderer.drawRichText(choiceFont, marginX + indicatorWidth, textY,
+                                    blocks[i], textBlack);
+      textY += choiceLineHeight;
+    }
+    y += blockHeight + choicePadding;
+  };
+
+  // 1. Default (Unfocused) Choice — Regular white background, black text
+  drawChoiceItem("1. Examine the glowing runes etched upon the stone archway", false);
+
+  // 2. Focused (Selected) Choice — Full inversion (solid black), white text, white triangle icon
+  drawChoiceItem("2. Step forward into the **shadows** with your blade drawn", true);
+
+  // 3. Unfocused Choice — Demonstrates rich italic text formatting
+  drawChoiceItem("3. Turn back and <i>seal the heavy iron gate</i> behind you", false);
+
+  // 4. Multiline Focused Choice — Demonstrates full wrapping with inversion and triangle icon
+  drawChoiceItem(
+      "4. Consult the ancient journal to decipher the meaning of the third "
+      "astrological symbol before making your final decision",
+      true);
+
+  FooterWidget footer;
+  footer.btnBack = {true, "Menu", "Back"};
+  footer.btnConfirm = {true, "Select", "Confirm"};
+  footer.btnPrev = {true, "Up", "Prev"};
+  footer.btnNext = {true, "Down", "Next"};
+  footer.render(&display.renderer, display.getWidth(), display.getHeight());
+
+  saveBMP("test/golden/test_choices.bmp", display.eink.getFrameBuffer(),
           display.getWidth(), display.getHeight());
   TEST_ASSERT_EQUAL(1, 1);
 }
@@ -925,7 +1027,10 @@ void test_zero_delay_choice_reveal(void) {
   SDLStorage storage;
   InkEngine engine(display, input, storage);
 
-  engine.setChoiceDelays(0, 0);
+  AppSettings settings = AppSettings::defaults();
+  settings.choiceAnimationEnabled = false;
+  engine.applySettings(settings);
+
   TEST_ASSERT_EQUAL_UINT32(0, engine.getCascadeOffsetMs());
   TEST_ASSERT_EQUAL_UINT32(0, engine.getFocusDelayMs());
 
@@ -982,13 +1087,52 @@ void test_story_metadata_save_path(void) {
 }
 
 void test_rich_text_parser(void) {
-  auto runs = InkRichTextParser::parse("Line 1<br>Line 2<br/>Line 3<br /><b>Bold</b> <i>Italic</i> **MDBold** *MDItalic*");
+  auto runs =
+      InkRichTextParser::parse("Line 1<br>Line 2<br/>Line 3<br /><b>Bold</b> "
+                               "<i>Italic</i> **MDBold** *MDItalic*");
   std::string fullText = "";
   for (const auto &r : runs) {
     fullText += r.text;
   }
-  TEST_ASSERT_EQUAL_STRING("Line 1\nLine 2\nLine 3\nBold Italic MDBold MDItalic", fullText.c_str());
+  TEST_ASSERT_EQUAL_STRING(
+      "Line 1\nLine 2\nLine 3\nBold Italic MDBold MDItalic", fullText.c_str());
   TEST_ASSERT_TRUE(runs.size() >= 5);
+}
+
+void test_builtin_literata_rendering(void) {
+  EpdFont fontReg(&literata_medium_2b);
+  EpdFont fontBold(&literata_medium_bold_2b);
+  EpdFont fontItalic(&literata_medium_italic_2b);
+
+  // Test space codepoint 32
+  const EpdGlyph *gSpace = fontReg.getGlyph(32);
+  TEST_ASSERT_NOT_NULL(gSpace);
+  TEST_ASSERT_TRUE(gSpace->advanceX > 0);
+
+  // Test basic letter
+  const EpdGlyph *gA = fontReg.getGlyph('A');
+  TEST_ASSERT_NOT_NULL(gA);
+  TEST_ASSERT_TRUE(gA->width > 0);
+  TEST_ASSERT_TRUE(gA->height > 0);
+
+  // Test dimensions
+  int w = 0, h = 0;
+  fontReg.getTextDimensions("Hello Literata serif text", &w, &h);
+  TEST_ASSERT_TRUE(w > 0);
+  TEST_ASSERT_TRUE(h > 0);
+
+  // Test family rendering with GfxRenderer
+  TestDisplay display;
+  display.clear();
+  EpdFontFamily litFamily(&fontReg, &fontBold, &fontItalic);
+  display.renderer.insertFont(70, litFamily);
+  display.renderer.drawText(
+      70, 20, 100,
+      "Literata Serif: The quick brown fox jumps over the lazy dog");
+  display.renderer.drawText(70, 20, 150, "Literata Italic text", true,
+                            EpdFontFamily::ITALIC);
+  display.renderer.drawText(70, 20, 200, "Literata Bold text", true,
+                            EpdFontFamily::BOLD);
 }
 #endif
 
@@ -998,6 +1142,7 @@ int main(int argc, char **argv) {
 #ifdef PLATFORM_NATIVE
   RUN_TEST(test_sd_font_catalogue);
   RUN_TEST(test_rich_text_parser);
+  RUN_TEST(test_builtin_literata_rendering);
   RUN_TEST(test_battery_widget_screenshot);
   RUN_TEST(test_library_screenshot);
   RUN_TEST(test_settings_view_screenshot);
@@ -1010,6 +1155,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_sleep_cover_screenshot);
   RUN_TEST(test_sleep_cover_image_screenshot);
   RUN_TEST(test_story_player_screenshot);
+  RUN_TEST(test_choice_states_screenshot);
   RUN_TEST(test_image_widget_screenshot);
   RUN_TEST(test_zero_delay_choice_reveal);
   RUN_TEST(test_story_metadata_save_path);

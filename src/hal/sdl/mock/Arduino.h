@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <fcntl.h>
+#include <thread>
 
 // Mock for Arduino PROGMEM
 #define PROGMEM
@@ -27,7 +28,9 @@ inline const void* pgm_read_ptr(const void* addr) {
 
 // Map Arduino types
 using String = std::string;
-inline void delay(uint32_t ms) {}
+inline void delay(uint32_t ms) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+}
 
 inline uint32_t millis() {
     using namespace std::chrono;

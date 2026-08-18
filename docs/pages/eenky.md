@@ -8,11 +8,34 @@
 
 Download the latest eenky release for your platform from the [GitHub Releases](https://github.com/t0mg/eenky/releases) page, or build from source by following the [build instructions](../build/).
 
-> Note: pre-release builds are available for Windows, Mac and Linux (untested!). Currently those builds are unsigned so you might get blocked.
-> On Mac, Gatekeeper will automatically quarantine the downloaded build and will fail to open, possibly reporting that it is broken. To bypass this security feature:
-> 1. Move the `eenky.app` to your Applications folder.
-> 2. Open your Terminal.
-> 3. Run `xattr -cr /Applications/eenky.app`
+### Security Warnings Troubleshooting
+
+This app is free, open-source software. Because official developer signing certificates carry significant annual fees, the current binaries are **not officially code-signed**. 
+
+As a result, your operating system might flag eenky as untrusted on first launch. Follow these quick steps to mute the false alarm:
+
+#### On macOS
+<details>
+<summary>"App is damaged and cannot be opened"</summary>
+
+Modern macOS Gatekeeper quarantines unnotarized binaries downloaded from the internet. To unblock it:
+1. Move the app to your `/Applications` folder.
+2. Open **Terminal** and run:
+```bash
+xattr -cr /Applications/eenky.app
+```
+3. Launch the app normally.
+</details>
+
+#### On Windows
+
+<details>
+<summary>"Windows protected your PC" / SmartScreen</summary>
+
+Microsoft Defender SmartScreen flags downloads from unverified publishers:
+1. When the blue banner appears, click **"More info"**.
+2. Click the **"Run anyway"** button at the bottom.
+</details>
 
 ## Features
 

@@ -75,6 +75,9 @@ public:
     int getNumChoices() const { return _numChoices; }
     void setSelectedChoice(int index) { _selectedChoice = index; }
     int getSelectedChoice() const { return _selectedChoice; }
+    void setBlinkingChoice(int index) { _blinkingChoice = index; }
+    int getBlinkingChoice() const { return _blinkingChoice; }
+    void flashChoiceActivation(InkStoryManager& storyManager, AppSettings& settings, int choiceIdx);
     
     // Y-coordinate mapping for touch interactions
     int getChoiceIndexAtY(int y) const;
@@ -90,8 +93,9 @@ private:
     static constexpr int MAX_CHOICES = 8;
     char  _choiceText[MAX_CHOICES][128] = {};
     std::vector<TextBlock> _wrappedChoices[MAX_CHOICES];
-    int   _numChoices     = 0;
-    int   _selectedChoice = 0;
+    int   _numChoices       = 0;
+    int   _selectedChoice   = 0;
+    int   _blinkingChoice   = -1;
 
     int _scrollY = 0;
     int _maxScrollY = 0;

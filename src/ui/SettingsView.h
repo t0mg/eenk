@@ -17,6 +17,22 @@
 
 class BatteryWidget;
 
+enum class SettingRow {
+    STORY_FONT,
+    CHOICE_FONT,
+    MARGIN,
+    CHOICE_ANIMATION,
+    FULL_REFRESH,
+    SLEEP_TIMEOUT,
+    OVERRIDE_FONT,
+#if !defined(FREEINK_DEVICE_X4PRO) && !defined(CONFIG_IDF_TARGET_ESP32S3)
+    REBOOT_UPDATER,
+#endif
+    FORMAT_SD,
+    FIRMWARE_VERSION,
+    COUNT
+};
+
 class SettingsView {
 public:
     SettingsView(IDisplay& display, IInput& input,
