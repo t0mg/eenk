@@ -21,7 +21,6 @@
 #include <cctype>
 #include <cstring>
 
-
 #include <cstdio>
 #include <cstring>
 
@@ -98,9 +97,10 @@ static const char *sleepName(uint16_t sec) {
 // ─── Construction / Destruction ──────────────────────────────────────────────
 
 SettingsView::SettingsView(IDisplay &display, IInput &input,
-                           BatteryWidget &battery, IFrontlight *frontlight, AppSettings &settings)
-    : _display(display), _input(input), _battery(battery), _frontlight(frontlight), _settings(settings) {
-}
+                           BatteryWidget &battery, IFrontlight *frontlight,
+                           AppSettings &settings)
+    : _display(display), _input(input), _battery(battery),
+      _frontlight(frontlight), _settings(settings) {}
 
 SettingsView::~SettingsView() {}
 
@@ -241,7 +241,8 @@ void SettingsView::renderPage() {
       break;
     }
     case SettingRow::CHOICE_FONT: {
-      const char *val = AppSettings::CHOICE_FONT_NAMES[_settings.choiceFontIndex];
+      const char *val =
+          AppSettings::CHOICE_FONT_NAMES[_settings.choiceFontIndex];
       drawSettingsRow(y, "Choice Font", val, selected);
       break;
     }
@@ -265,16 +266,12 @@ void SettingsView::renderPage() {
       drawSettingsRow(y, "Override Story Font", val, selected);
       break;
     }
-#if !defined(FREEINK_DEVICE_X4PRO) && !defined(CONFIG_IDF_TARGET_ESP32S3)
+#if !FREEINK_DEVICE_X4PRO
     case SettingRow::REBOOT_UPDATER: {
       drawSettingsRow(y, "Reboot to Updater", "OTA / App1", selected);
       break;
     }
 #endif
-    case SettingRow::FORMAT_SD: {
-      drawSettingsRow(y, "Format SD", "Erase SD Card", selected);
-      break;
-    }
     case SettingRow::FIRMWARE_VERSION: {
       drawSettingsRow(y, "Firmware", EENK_VERSION_STR, selected);
       break;
@@ -381,14 +378,11 @@ void SettingsView::handleInput(ButtonEvent ev) {
   if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::SLEEP) {
     SettingRow row = static_cast<SettingRow>(_itemIndex);
     switch (row) {
-#if !defined(FREEINK_DEVICE_X4PRO) && !defined(CONFIG_IDF_TARGET_ESP32S3)
+#if !FREEINK_DEVICE_X4PRO
     case SettingRow::REBOOT_UPDATER:
       BootManager::bootUpdater();
       return;
 #endif
-    case SettingRow::FORMAT_SD:
-      formatSD();
-      return;
     case SettingRow::FIRMWARE_VERSION:
       return; // Read-only
     case SettingRow::STORY_FONT:
@@ -460,29 +454,4 @@ void SettingsView::handleInput(ButtonEvent ev) {
     renderPage();
     return;
   }
-}
-
-// ─── Danger zone actions
-// ──────────────────────────────────────────────────────
-
-void SettingsView::formatSD() {
-  SystemUI ui(_display);
-  // Two-step confirm for the most destructive action.
-  if (!ui.showConfirmDialog(_input, "Format SD?",
-                            "ALL data will be erased. Are you sure?")) {
-    renderPage();
-    return;
-  }
-  if (!ui.showConfirmDialog(
-          _input, "FINAL WARNING",
-          "Press CONFIRM to erase everything on the SD card.")) {
-    renderPage();
-    return;
-  }
-
-#ifdef PLATFORM_ESP32
-  Serial.println("[Settings] Format SD requested.");
-#endif
-
-  renderPage();
 }

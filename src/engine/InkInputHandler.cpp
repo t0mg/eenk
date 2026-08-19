@@ -40,24 +40,25 @@ void InkInputHandler::handleCommonNavigation(bool isStoryEnded, InkEngine& engin
     }
     
     if (settings.touchScrollEnabled && ev != ButtonEvent::CONFIRM) {
-      if (touchY < IDisplay.getHeight() / 3) {
-         handleScroll(display, -scrollAmount);
-         engine.requestRedraw();
-         return;
-      } else if (touchY > IDisplay.getHeight() * 2 / 3) {
-         if (!choicesRevealed) {
-           if (display.getScrollY() >= display.getMaxScrollY()) {
-             display.revealChoices();
-           } else {
-             handleScroll(display, scrollAmount);
-           }
-           engine.requestRedraw();
-           return;
-         } else if (!display.isChoicesVisible()) {
-           handleScroll(display, scrollAmount);
-           engine.requestRedraw();
-           return;
-         }
+      if (touchY < IDisplay.getHeight() / 3 && display.getScrollY() > 0) {
+        handleScroll(display, -scrollAmount);
+        engine.requestRedraw();
+        return;
+      } else {
+        if (!choicesRevealed) {
+          if (display.getScrollY() >= display.getMaxScrollY()) {
+            display.revealChoices();
+          } else {
+            handleScroll(display, scrollAmount);
+          }
+          engine.requestRedraw();
+          return;
+        } else if (touchY > IDisplay.getHeight() * 2 / 3 &&
+                   !display.isChoicesVisible()) {
+          handleScroll(display, scrollAmount);
+          engine.requestRedraw();
+          return;
+        }
       }
     }
   }

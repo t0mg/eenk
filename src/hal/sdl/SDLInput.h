@@ -36,6 +36,7 @@ public:
      * returns the first meaningful button event found (or NONE).
      */
     ButtonEvent pollInput() override;
+    bool getTouchPosition(int& x, int& y) const override;
     uint32_t getLastActivityTime() const override { return _lastActivityMs; }
     void setAutoSleepTimeout(uint16_t seconds) override { _timeoutSec = seconds; }
 
@@ -43,6 +44,16 @@ private:
     class SDLDisplay* _display;
     uint32_t _lastActivityMs;
     uint16_t _timeoutSec;
+
+    // Mouse / touch tap emulation
+    mutable bool _hasTap = false;
+    mutable int  _tapX = -1;
+    mutable int  _tapY = -1;
+
+    bool     _isMouseDown = false;
+    int      _mouseDownX = 0;
+    int      _mouseDownY = 0;
+    uint32_t _mouseDownTime = 0;
 };
 
 #endif // PLATFORM_NATIVE

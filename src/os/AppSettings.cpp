@@ -46,7 +46,7 @@ AppSettings AppSettings::defaults() {
   s.inputLayoutIndex = 0;
   s.refreshInterval = 10;
   s.overrideStoryFont = false;
-#if defined(FREEINK_DEVICE_X4PRO) || defined(CONFIG_IDF_TARGET_ESP32S3)
+#if FREEINK_DEVICE_X4PRO || defined(PLATFORM_NATIVE)
   s.touchChoicesEnabled = true;
   s.touchScrollEnabled = true;
   s.frontLightEnabled = true;
@@ -99,6 +99,7 @@ AppSettings AppSettings::load() {
   s.inputLayoutIndex = prefs.getUChar(kKeyLayout, s.inputLayoutIndex);
   s.refreshInterval = prefs.getUChar(kKeyRefresh, s.refreshInterval);
   s.overrideStoryFont = prefs.getUChar(kKeyFontOverride, 0) != 0;
+#if FREEINK_DEVICE_X4PRO
   s.touchChoicesEnabled =
       prefs.getUChar(kKeyTouchChoices, s.touchChoicesEnabled ? 1 : 0) != 0;
   s.touchScrollEnabled =
@@ -109,6 +110,11 @@ AppSettings AppSettings::load() {
       prefs.getUChar(kKeyFrontLightBrightness, s.frontLightBrightness);
   s.frontLightTemperature =
       prefs.getUChar(kKeyFrontLightTemperature, s.frontLightTemperature);
+#else
+  s.touchChoicesEnabled = false;
+  s.touchScrollEnabled = false;
+  s.frontLightEnabled = false;
+#endif
   prefs.end();
 
   // Clamp indices to valid range (guards against corruption / version skew).

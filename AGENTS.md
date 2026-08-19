@@ -268,7 +268,7 @@ npm run build              # Production build of the Vue renderer
 > ```powershell
 > # From eenk/ directory
 > pio run -e native
-> Copy-Item -Path ".pio\build\native\program.exe" -Destination "tools\eenky\app\main-process\ink\win\eenk-sim.exe" -Force
+> Copy-Item -Path ".pio\build\native\program.exe" -Destination "..\eenky\app\main-process\ink\win\eenk-sim.exe" -Force
 > ```
 
 ### IDE Architecture
@@ -342,7 +342,7 @@ Shortcuts are defined in `app/main-process/appmenus.js`. Key shortcuts include `
 ### Build Verification Checklist
 
 After making firmware changes in eenk:
-- [ ] `pio run -e native; Copy-Item -Path ".pio\build\native\program.exe" -Destination "tools\eenky\app\main-process\ink\win\eenk-sim.exe" -Force` builds successfully
+- [ ] `pio run -e native; Copy-Item -Path ".pio\build\native\program.exe" -Destination "..\eenky\app\main-process\ink\win\eenk-sim.exe" -Force` builds successfully
 - [ ] `pio run -e esp32c3` builds successfully
 - [ ] `pio run -e esp32s3` builds successfully
 - [ ] `pio test -e native` passes (golden screenshots match or are intentionally updated)

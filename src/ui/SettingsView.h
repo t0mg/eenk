@@ -24,10 +24,9 @@ enum class SettingRow {
     FULL_REFRESH,
     SLEEP_TIMEOUT,
     OVERRIDE_FONT,
-#if !defined(FREEINK_DEVICE_X4PRO) && !defined(CONFIG_IDF_TARGET_ESP32S3)
+#if !FREEINK_DEVICE_X4PRO
     REBOOT_UPDATER,
 #endif
-    FORMAT_SD,
     FIRMWARE_VERSION,
     COUNT
 };
@@ -64,6 +63,5 @@ private:
     // selected: highlight this row
     void drawSettingsRow(int y, const char* label, const char* value, bool selected);
 
-    // Danger zone actions
-    void formatSD();
+
 };

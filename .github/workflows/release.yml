@@ -91,6 +91,7 @@ jobs:
         with:
           submodules: false
           fetch-depth: 0
+          fetch-tags: true
 
       - name: Init required submodules (lib/inkcpp and lib/freeink-sdk)
         run: |
@@ -108,6 +109,8 @@ jobs:
         run: pip install platformio
 
       - name: Build ${{ matrix.env }}
+        env:
+          EENK_BUILD_VERSION: ${{ needs.resolve-tag.outputs.tag }}
         run: pio run -e ${{ matrix.env }}
 
       - name: Rename and stage artifacts

@@ -3,11 +3,24 @@
 #include "SDLInput.h"
 #include "SDLDisplay.h" // for signalQuit()
 #include "mock/Arduino.h"
+#include <cstdlib>
 
 // ─────────────────────────────────────────────────────────────────────────────
 SDLInput::SDLInput(SDLDisplay* display)
     : _display(display), _lastActivityMs(millis()), _timeoutSec(0)
 {}
+
+bool SDLInput::getTouchPosition(int &x, int &y) const {
+    if (_hasTap) {
+        x = _tapX;
+        y = _tapY;
+        _hasTap = false;
+        return true;
+    }
+    x = -1;
+    y = -1;
+    return false;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 ButtonEvent SDLInput::pollInput()
@@ -18,6 +31,59 @@ ButtonEvent SDLInput::pollInput()
         case SDL_QUIT:
             if (_display) _display->signalQuit();
             return ButtonEvent::QUIT;
+
+        case SDL_MOUSEBUTTONDOWN:
+            if (ev.button.button == SDL_BUTTON_LEFT) {
+                _isMouseDown = true;
+                _mouseDownX = ev.button.x;
+                _mouseDownY = ev.button.y;
+                _mouseDownTime = millis();
+                _lastActivityMs = millis();
+            }
+            break;
+
+        case SDL_MOUSEBUTTONUP:
+            if (ev.button.button == SDL_BUTTON_LEFT && _isMouseDown) {
+                _isMouseDown = false;
+                int upX = ev.button.x;
+                int upY = ev.button.y;
+                int dx = upX - _mouseDownX;
+                int dy = upY - _mouseDownY;
+                uint32_t dt = millis() - _mouseDownTime;
+                _lastActivityMs = millis();
+
+                if (dt < 800) {
+                    if (abs(dy) > abs(dx) && abs(dy) > 50) {
+                        if (dy > 0) {
+                            if (_mouseDownY < 60) {
+                                return ButtonEvent::TOP_EDGE_SWIPE;
+                            } else {
+                                return ButtonEvent::SWIPE_DOWN;
+                            }
+                        } else {
+                            return ButtonEvent::SWIPE_UP;
+                        }
+                    } else if (abs(dx) > abs(dy) && abs(dx) > 50) {
+                        return (dx > 0) ? ButtonEvent::SWIPE_RIGHT : ButtonEvent::SWIPE_LEFT;
+                    } else if (abs(dx) < 30 && abs(dy) < 30) {
+                        _tapX = upX;
+                        _tapY = upY;
+                        _hasTap = true;
+                        return ButtonEvent::NONE;
+                    }
+                }
+            }
+            break;
+
+        case SDL_MOUSEWHEEL:
+            if (ev.wheel.y > 0) {
+                _lastActivityMs = millis();
+                return ButtonEvent::UP;
+            } else if (ev.wheel.y < 0) {
+                _lastActivityMs = millis();
+                return ButtonEvent::DOWN;
+            }
+            break;
 
         case SDL_KEYDOWN: {
             SDL_Keycode key = ev.key.keysym.sym;
@@ -54,6 +120,10 @@ ButtonEvent SDLInput::pollInput()
         default:
             break;
         }
+    }
+
+    if (_hasTap) {
+        return ButtonEvent::NONE;
     }
 
     if (_timeoutSec > 0 && _lastActivityMs > 0 && (millis() - _lastActivityMs > _timeoutSec * 1000UL)) {
