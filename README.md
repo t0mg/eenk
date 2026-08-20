@@ -1,8 +1,5 @@
 # eenk - Interactive Fiction Firmware for ESP32 based Xteink ereaders
 
-> [!CAUTION]
-> This project is a work in progress and very fresh off the oven, it's still quite warm and pretty rough around the edges. There are broken bits and missing parts. And bugs. **Please wait for the first stable release** if you are looking for a smooth ride.
-
 Welcome to **eenk**, a custom firmware designed to run **Ink** interactive fiction stories on the ESP32 based Xteink ereaders (X3, X4, X4 Pro), utilizing the [inkcpp](https://github.com/t0mg/inkcpp) C++ runtime.
 
 > [!TIP]
@@ -176,4 +173,4 @@ eenk builds upon the work of open-source firmware projects, drivers, and runtime
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT; see [LICENSE](LICENSE).
