@@ -31,13 +31,20 @@ BatteryWidget::BatteryWidget(GfxRenderer &renderer, BatteryMonitor &battery)
 
 // ─── tick() ──────────────────────────────────────────────────────────────────
 
-void BatteryWidget::tick() {
+bool BatteryWidget::tick() {
   unsigned long now = millis();
+  _stateChanged = false;
   if (_lastPollMs == 0 || (now - _lastPollMs) > POLL_INTERVAL_MS) {
-    _cachedPct = _battery.readPercentage();
-    _cachedCharging = _battery.isCharging();
+    uint16_t newPct = _battery.readPercentage();
+    bool newCharging = _battery.isCharging();
+    if (newPct != _cachedPct || newCharging != _cachedCharging) {
+      _stateChanged = true;
+    }
+    _cachedPct = newPct;
+    _cachedCharging = newCharging;
     _lastPollMs = now;
   }
+  return _stateChanged;
 }
 
 // ─── draw() ──────────────────────────────────────────────────────────────────
@@ -81,7 +88,7 @@ void BatteryWidget::draw(int x, int y, bool inverted) {
 #ifdef PIO_UNIT_TESTING
   bool isCharging = true;
 #else
-  bool isCharging = _battery.isCharging();
+  bool isCharging = _cachedCharging;
 #endif
 
   if (isCharging) {

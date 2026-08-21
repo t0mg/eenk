@@ -14,6 +14,7 @@ public:
     bool getTouchPosition(int& x, int& y) const override;
     uint32_t getLastActivityTime() const override { return _lastActivityMs; }
     void setAutoSleepTimeout(uint16_t seconds) override { _timeoutSec = seconds; }
+    void resetActivityTimer() override;
 
     // Touch access for Phase 2/3 UI
     Gt911Driver::TouchState getTouchState() const { return _lastTouch; }

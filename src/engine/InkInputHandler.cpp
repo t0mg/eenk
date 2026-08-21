@@ -26,6 +26,8 @@ void InkInputHandler::handleCommonNavigation(bool isStoryEnded, InkEngine& engin
 
   if (ev == ButtonEvent::NONE && !hasTouchTap) return;
 
+  _input.resetActivityTimer();
+
   int scrollAmount = IDisplay.getHeight() * 3 / 4;
 
   bool choicesRevealed = display.isChoicesRevealed();

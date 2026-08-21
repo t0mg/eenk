@@ -93,3 +93,53 @@ void FooterWidget::render(GfxRenderer* r, int displayWidth, int displayHeight) c
         }
     }
 }
+
+int FooterWidget::getSlotAt(int x, int y, int displayWidth, int displayHeight) const {
+    int startY = displayHeight - HEIGHT;
+    if (y < startY || y > displayHeight || x < 0 || x > displayWidth) {
+        return -1;
+    }
+
+    const FooterAction* actions[4] = {&btnBack, &btnConfirm, &btnPrev, &btnNext};
+    bool isOnlyOuterTwo = (actions[0]->hasAction && actions[3]->hasAction &&
+                           !actions[1]->hasAction && !actions[2]->hasAction);
+
+    if (isOnlyOuterTwo) {
+        if (x < displayWidth / 2) {
+            return 0; // Left (Back/Cancel)
+        } else {
+            return 3; // Right (Confirm/Next)
+        }
+    }
+
+    int slotW = displayWidth / 4;
+    if (slotW <= 0) slotW = 1;
+    int slot = x / slotW;
+    if (slot < 0) slot = 0;
+    if (slot > 3) slot = 3;
+    if (actions[slot]->hasAction) {
+        return slot;
+    }
+    return -1;
+}
+
+ButtonEvent FooterWidget::getButtonEventAt(int x, int y, int displayWidth, int displayHeight) const {
+    int slot = getSlotAt(x, y, displayWidth, displayHeight);
+    const FooterAction* actions[4] = {&btnBack, &btnConfirm, &btnPrev, &btnNext};
+    bool isOnlyOuterTwo = (actions[0]->hasAction && actions[3]->hasAction &&
+                           !actions[1]->hasAction && !actions[2]->hasAction);
+
+    if (isOnlyOuterTwo) {
+        if (slot == 0) return ButtonEvent::BACK;
+        if (slot == 3) return ButtonEvent::RIGHT; // In confirm dialog, right is Confirm
+        return ButtonEvent::NONE;
+    }
+
+    switch (slot) {
+        case 0: return ButtonEvent::BACK;
+        case 1: return ButtonEvent::CONFIRM;
+        case 2: return ButtonEvent::LEFT;
+        case 3: return ButtonEvent::RIGHT;
+        default: return ButtonEvent::NONE;
+    }
+}

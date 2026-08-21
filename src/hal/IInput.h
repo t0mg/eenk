@@ -56,4 +56,9 @@ public:
    * Set the inactivity timeout in seconds (0 = disabled).
    */
   virtual void setAutoSleepTimeout(uint16_t seconds) = 0;
+
+  /**
+   * Reset the inactivity timer to the current time.
+   */
+  virtual void resetActivityTimer() = 0;
 };

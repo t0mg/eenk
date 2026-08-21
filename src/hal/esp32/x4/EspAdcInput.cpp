@@ -8,6 +8,10 @@ EspAdcInput::EspAdcInput() : _lastActivityMs(millis()), _timeoutSec(0) {
   _input.begin();
 }
 
+void EspAdcInput::resetActivityTimer() {
+  _lastActivityMs = millis();
+}
+
 ButtonEvent EspAdcInput::pollInput() {
   _input.update();
 

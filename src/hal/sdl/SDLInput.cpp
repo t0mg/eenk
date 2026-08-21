@@ -10,11 +10,16 @@ SDLInput::SDLInput(SDLDisplay* display)
     : _display(display), _lastActivityMs(millis()), _timeoutSec(0)
 {}
 
+void SDLInput::resetActivityTimer() {
+    _lastActivityMs = millis();
+}
+
 bool SDLInput::getTouchPosition(int &x, int &y) const {
     if (_hasTap) {
         x = _tapX;
         y = _tapY;
         _hasTap = false;
+        const_cast<SDLInput*>(this)->_lastActivityMs = millis();
         return true;
     }
     x = -1;

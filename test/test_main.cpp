@@ -289,6 +289,7 @@ public:
   }
   uint32_t getLastActivityTime() const override { return 0; }
   void setAutoSleepTimeout(uint16_t seconds) override {}
+  void resetActivityTimer() override {}
 };
 
 void test_battery_widget_screenshot(void) {

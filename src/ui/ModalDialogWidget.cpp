@@ -141,10 +141,24 @@ bool ModalDialogWidget::show(IDisplay &display, IInput &input,
   // Wait for user response.
   while (true) {
     ButtonEvent ev = input.pollInput();
-    if (ev == ButtonEvent::QUIT || ev == ButtonEvent::LEFT)
+    int touchX = -1, touchY = -1;
+    if (input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >= 0) {
+      input.resetActivityTimer();
+      ButtonEvent touchEv = footer.getButtonEventAt(touchX, touchY, dispW, dispH);
+      if (touchEv == ButtonEvent::BACK) {
+        return false;
+      } else if (touchEv == ButtonEvent::RIGHT || touchEv == ButtonEvent::CONFIRM) {
+        return true;
+      }
+    }
+
+    if (ev == ButtonEvent::QUIT || ev == ButtonEvent::LEFT || ev == ButtonEvent::BACK) {
+      input.resetActivityTimer();
       return false;
-    else if (ev == ButtonEvent::RIGHT)
+    } else if (ev == ButtonEvent::RIGHT || ev == ButtonEvent::CONFIRM) {
+      input.resetActivityTimer();
       return true;
+    }
 #ifdef PLATFORM_ESP32
     delay(16);
 #endif

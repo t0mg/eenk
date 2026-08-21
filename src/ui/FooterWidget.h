@@ -10,6 +10,8 @@ struct FooterAction {
     bool isPill = false;      // Render as inverted pill (white text on black rounded rect)
 };
 
+#include "../hal/IInput.h"
+
 class FooterWidget {
 public:
     static constexpr int BEZEL_OFFSET_Y = 4;
@@ -25,4 +27,8 @@ public:
 
     // Renders the footer at the bottom of the screen.
     void render(GfxRenderer* r, int displayWidth, int displayHeight) const;
+
+    // Hit testing for touch interactions
+    int getSlotAt(int x, int y, int displayWidth, int displayHeight) const;
+    ButtonEvent getButtonEventAt(int x, int y, int displayWidth, int displayHeight) const;
 };

@@ -21,17 +21,35 @@ static constexpr int kUpdaterMarginY  = 20;
 static constexpr int kUpdaterDispW    = 480;   // portrait logical width
 static constexpr int kUpdaterLineH    = 20;    // approximate line height for ui_12
 
-// Render a message string on the display, honouring '\n' and wrapping long
-// lines at the right margin. Keeps the updater partition lean — no heap
-// allocation, no GfxRenderer wrap helpers.
+// Render a styled message screen on the display with a Neubrutalist header
+// and clean bordered status card. Keeps the updater partition lean.
 void drawMessage(const char* msg) {
     if (!display) return;
     auto* r = display->getRenderer();
     r->insertFont(kUpdaterFontId, s_fam12);
     display->clear();
 
-    int y = kUpdaterMarginY;
-    const int maxWidth = kUpdaterDispW - 2 * kUpdaterMarginX;
+    const int dispW = display->getWidth();
+    const int dispH = display->getHeight();
+
+    // ── 1. Top Header Bar (solid black bar with white text)
+    const int headerH = 40;
+    r->fillRect(0, 0, dispW, headerH, true);
+    r->drawText(kUpdaterFontId, 20, 10, "eenk UPDATER", false);
+
+    // ── 2. Content Card (bordered shadow box)
+    const int cardMargin = 24;
+    const int cardX = cardMargin;
+    const int cardY = headerH + 20;
+    const int cardW = dispW - 2 * cardMargin;
+    const int cardH = dispH - cardY - 40;
+    r->drawShadowBox(cardX, cardY, cardW, cardH, 4, 8);
+
+    // ── 3. Wrapped message text inside the card
+    const int paddingX = 20;
+    const int paddingY = 24;
+    int y = cardY + paddingY;
+    const int maxWidth = cardW - 2 * paddingX;
     const int spaceW = r->getSpaceWidth(kUpdaterFontId);
 
     const char* p = msg;
@@ -90,7 +108,7 @@ void drawMessage(const char* msg) {
             lineBuf[lineLen] = '\0';
 
             if (lineLen > 0) {
-                r->drawText(kUpdaterFontId, kUpdaterMarginX, y, lineBuf, true);
+                r->drawText(kUpdaterFontId, cardX + paddingX, y, lineBuf, true);
             }
             y += kUpdaterLineH;
 

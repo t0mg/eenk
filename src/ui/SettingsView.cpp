@@ -139,7 +139,61 @@ void SettingsView::run() {
   while (running) {
     SystemUI::checkBatteryAndShutdown(_battery, _display);
 
+    if (_battery.hasStateChanged()) {
+      renderPage();
+    }
+
     ButtonEvent ev = _input.pollInput();
+
+    int touchX = -1, touchY = -1;
+    if (_input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >= 0) {
+      _input.resetActivityTimer();
+      int dispW = _display.getWidth();
+      int dispH = _display.getHeight();
+
+      FooterWidget footer;
+      footer.btnBack = {true, "SAVE & EXIT", "Back", false};
+      footer.btnConfirm = {true, "CHANGE", "Confirm", true};
+      footer.btnPrev = {true, "PREV", "Prev", false};
+      footer.btnNext = {true, "NEXT", "Next", false};
+
+      ButtonEvent touchEv = footer.getButtonEventAt(touchX, touchY, dispW, dispH);
+      if (touchEv == ButtonEvent::BACK) {
+        running = false;
+        break;
+      } else if (touchEv == ButtonEvent::CONFIRM) {
+        ev = ButtonEvent::CONFIRM;
+      } else if (touchEv == ButtonEvent::LEFT) {
+        ev = ButtonEvent::LEFT;
+      } else if (touchEv == ButtonEvent::RIGHT) {
+        ev = ButtonEvent::RIGHT;
+      } else {
+        int rowTop = HeaderWidget::HEIGHT + CARD_INSET_Y;
+        int rowBottom = dispH - FooterWidget::HEIGHT;
+        if (touchY >= rowTop && touchY < rowBottom) {
+          int clickedIdx = (touchY - rowTop) / ROW_H;
+          static constexpr int kItems = static_cast<int>(SettingRow::COUNT);
+          if (clickedIdx >= 0 && clickedIdx < kItems) {
+            if (_itemIndex == clickedIdx) {
+              ev = ButtonEvent::CONFIRM;
+            } else {
+              _itemIndex = clickedIdx;
+              renderPage();
+            }
+          }
+        }
+      }
+    }
+
+    if (ev != ButtonEvent::NONE) {
+      _input.resetActivityTimer();
+    }
+
+    if (ev == ButtonEvent::SWIPE_UP) {
+      ev = ButtonEvent::DOWN;
+    } else if (ev == ButtonEvent::SWIPE_DOWN) {
+      ev = ButtonEvent::UP;
+    }
 
     if (ev == ButtonEvent::TOP_EDGE_SWIPE) {
       QuickMenuWidget qm(_display, _input, _battery, _frontlight, _settings);
@@ -151,33 +205,6 @@ void SettingsView::run() {
         continue;
       }
     }
-
-    // TODO: this logic is broken, let's reimplement a cleaner touch handling
-    // int touchX = -1, touchY = -1;
-    // if (_input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >=
-    // 0) {
-    //   if (touchY >= 440) {
-    //     if (touchX < 400) {
-    //       running = false;
-    //       break;
-    //     } else {
-    //       ev = ButtonEvent::CONFIRM;
-    //     }
-    //   } else {
-    //     int relY = touchY - (HeaderWidget::HEIGHT + CARD_INSET_Y);
-    //     if (relY >= 0) {
-    //       int clickedIdx = relY / ROW_H;
-    //       if (clickedIdx >= 0 && clickedIdx <= 7) {
-    //         if (_itemIndex == clickedIdx) {
-    //           ev = ButtonEvent::CONFIRM;
-    //         } else {
-    //           _itemIndex = clickedIdx;
-    //           renderPage();
-    //         }
-    //       }
-    //     }
-    //   }
-    // }
 
     if (ev == ButtonEvent::NONE) {
 #ifdef PLATFORM_ESP32

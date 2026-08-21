@@ -28,14 +28,16 @@ public:
   // Black on white, or white on black if inverted=true.
   void draw(int x, int y, bool inverted = false);
 
-  // Quick poll — only reads battery every 30 s to avoid ADC overhead.
-  void tick(); // call from main loop
+  // Quick poll — reads battery every second to detect cable connect/disconnect promptly.
+  // Returns true if percentage or charging state changed.
+  bool tick(); // call from main loop
 
   static constexpr int getWidth() { return kBodyW + kStem; }
   static constexpr int getHeight() { return kBodyH; }
 
   uint16_t getPercentage() const { return _cachedPct; }
   bool isCharging() const { return _cachedCharging; }
+  bool hasStateChanged() const { return _stateChanged; }
 
 private:
   static constexpr int kBodyW = 32;
@@ -46,6 +48,7 @@ private:
   BatteryMonitor &_battery;
   uint16_t _cachedPct = 100;
   bool _cachedCharging = false;
+  bool _stateChanged = false;
   unsigned long _lastPollMs = 0;
-  static constexpr unsigned long POLL_INTERVAL_MS = 30000;
+  static constexpr unsigned long POLL_INTERVAL_MS = 1000;
 };

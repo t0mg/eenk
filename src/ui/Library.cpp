@@ -718,32 +718,63 @@ bool Library::run() {
 
     SystemUI::checkBatteryAndShutdown(_battery, _display);
 
+    if (_battery.hasStateChanged()) {
+      render();
+    }
+
     ButtonEvent ev = _input.pollInput();
 
-    // TODO: this logic is broken, let's reimplement a cleaner touch handling
-    // for selecting stories. int touchX = -1, touchY = -1; if
-    // (_input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >= 0) {
-    //   if (touchY >= 440) {
-    //     if (touchX < 400) {
-    //       return true; // Open settings
-    //     } else if (_numEntries > 0) {
-    //       launchStory(_selectedIndex);
-    //     }
-    //   } else if (_numEntries > 0) {
-    //     int relY = touchY - 45;
-    //     if (relY >= 0) {
-    //       int clickedIdx = _scrollOffset + (relY / 54);
-    //       if (clickedIdx >= 0 && clickedIdx < _numEntries) {
-    //         if (_selectedIndex == clickedIdx) {
-    //           launchStory(clickedIdx);
-    //         } else {
-    //           _selectedIndex = clickedIdx;
-    //           render();
-    //         }
-    //       }
-    //     }
-    //   }
-    // }
+    int touchX = -1, touchY = -1;
+    if (_input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >= 0) {
+      _input.resetActivityTimer();
+      int dispW = _display.getWidth();
+      int dispH = _display.getHeight();
+
+      FooterWidget footer;
+      footer.btnBack = {true, "OPTIONS", "Back", false};
+      footer.btnConfirm = {true, "OPEN", "Confirm", true};
+      footer.btnPrev = {true, "PREV", "Prev", false};
+      footer.btnNext = {true, "NEXT", "Next", false};
+
+      ButtonEvent touchEv = footer.getButtonEventAt(touchX, touchY, dispW, dispH);
+      if (touchEv == ButtonEvent::BACK) {
+        return true; // Open settings
+      } else if (touchEv == ButtonEvent::CONFIRM) {
+        if (_numEntries > 0) {
+          launchStory(_selectedIndex);
+        }
+      } else if (touchEv == ButtonEvent::LEFT) {
+        ev = ButtonEvent::LEFT;
+      } else if (touchEv == ButtonEvent::RIGHT) {
+        ev = ButtonEvent::RIGHT;
+      } else {
+        int listTop = HeaderWidget::HEIGHT + 8;
+        int listBottom = dispH - FooterWidget::HEIGHT;
+        if (touchY >= listTop && touchY < listBottom && _numEntries > 0) {
+          int row = (touchY - listTop) / ITEM_H;
+          int clickedIdx = _scrollOffset + row;
+          if (clickedIdx >= 0 && clickedIdx < _numEntries &&
+              clickedIdx < _scrollOffset + VISIBLE_ITEMS) {
+            if (_selectedIndex == clickedIdx) {
+              launchStory(clickedIdx);
+            } else {
+              _selectedIndex = clickedIdx;
+              render();
+            }
+          }
+        }
+      }
+    }
+
+    if (ev != ButtonEvent::NONE) {
+      _input.resetActivityTimer();
+    }
+
+    if (ev == ButtonEvent::SWIPE_UP) {
+      ev = ButtonEvent::DOWN;
+    } else if (ev == ButtonEvent::SWIPE_DOWN) {
+      ev = ButtonEvent::UP;
+    }
 
     if (ev == ButtonEvent::TOP_EDGE_SWIPE) {
       QuickMenuWidget qm(_display, _input, _battery, _frontlight, _settings);
@@ -751,7 +782,7 @@ bool Library::run() {
       if (act == QuickMenuAction::SLEEP_DEVICE) {
         ev = ButtonEvent::SLEEP;
       } else if (act == QuickMenuAction::OPEN_SETTINGS) {
-        return false;
+        return true;
       } else {
         render();
         continue;

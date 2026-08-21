@@ -12,11 +12,16 @@ EspDigitalInput::EspDigitalInput()
   _touch.begin();
 }
 
+void EspDigitalInput::resetActivityTimer() {
+  _lastActivityMs = millis();
+}
+
 bool EspDigitalInput::getTouchPosition(int &x, int &y) const {
   if (_hasTap) {
     x = _tapX;
     y = _tapY;
     _hasTap = false;
+    const_cast<EspDigitalInput *>(this)->_lastActivityMs = millis();
     return true;
   }
   x = -1;
@@ -59,8 +64,10 @@ ButtonEvent EspDigitalInput::pollInput() {
       Serial.println("[Touch] HOME pressed");
 #endif
       ev = ButtonEvent::QUIT;
+      _lastActivityMs = millis();
       delay(200);
     } else if (_lastTouch.touched) {
+      _lastActivityMs = millis();
       if (!_isSwiping) {
         _isSwiping = true;
         _swipeStartX = _lastTouch.x;
@@ -77,6 +84,7 @@ ButtonEvent EspDigitalInput::pollInput() {
       }
     } else if (_isSwiping) {
       _isSwiping = false;
+      _lastActivityMs = millis();
       int dx = _swipeLastX - _swipeStartX;
       int dy = _swipeLastY - _swipeStartY;
       uint32_t dt = millis() - _swipeStartTime;
@@ -114,6 +122,7 @@ ButtonEvent EspDigitalInput::pollInput() {
           _tapX = _swipeStartX;
           _tapY = _swipeStartY;
           _hasTap = true;
+          _lastActivityMs = millis();
 #ifdef TOUCH_DEBUG
           Serial.printf("[Touch] -> TAP at (%d, %d)\n", _tapX, _tapY);
 #endif
@@ -132,7 +141,7 @@ ButtonEvent EspDigitalInput::pollInput() {
     }
   }
 
-  if (ev != ButtonEvent::NONE) {
+  if (ev != ButtonEvent::NONE || _hasTap) {
     _lastActivityMs = millis();
   } else if (_timeoutSec > 0 && _lastActivityMs > 0 &&
              (millis() - _lastActivityMs > _timeoutSec * 1000UL)) {

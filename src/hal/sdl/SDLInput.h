@@ -39,6 +39,7 @@ public:
     bool getTouchPosition(int& x, int& y) const override;
     uint32_t getLastActivityTime() const override { return _lastActivityMs; }
     void setAutoSleepTimeout(uint16_t seconds) override { _timeoutSec = seconds; }
+    void resetActivityTimer() override;
 
 private:
     class SDLDisplay* _display;
