@@ -64,7 +64,6 @@ h1 {
 
 h2 {
   font-size: clamp(1.4rem, 3vw, 2rem);
-  display: inline-block;
   background: var(--color-fg);
   color: var(--color-bg);
   padding: 0.1em 0.3em;
@@ -93,9 +92,12 @@ h4 {
 }
 
 @keyframes heading-target-pulse {
-  0%, 25% {
+
+  0%,
+  25% {
     color: var(--color-accent);
   }
+
   100% {
     color: inherit;
   }
@@ -283,7 +285,7 @@ summary:hover {
   color: var(--color-accent);
 }
 
-details > *:not(summary) {
+details>*:not(summary) {
   margin-top: 0.75rem;
 }
 
@@ -381,6 +383,9 @@ hr {
   margin: 0;
   gap: 0;
   flex: 1;
+  overflow-x: auto;
+  width: 100%;
+  scrollbar-width: thin;
 }
 
 .nav-links li {
@@ -792,12 +797,6 @@ body.is-module #main-content {
   .site-footer {
     gap: 0;
     align-content: center;
-  }
-
-  .nav-links {
-    overflow-x: auto;
-    width: 100%;
-    scrollbar-width: thin;
   }
 
   .nav-links a {
