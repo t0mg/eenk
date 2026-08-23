@@ -218,7 +218,7 @@ eenk also includes a basic EPUB reader so you can take the occasional break betw
 
 EPUB files can be uploaded on the SD card under `/books` or via the device manager. Books will appear in your Library, mixed in with your Ink-based stories.
 
-A bookmark is stored in `/.eenk_saves/` for each book you open. the `.eenk_cache` folder contains processed content such as images for faster loading between readings. This cache is cleaned up when you delete the book from the device manager.
+A bookmark is stored in `.eenk_saves/` for each book you open. The `.eenk_cache` folder contains processed content such as images for faster loading between readings. This cache is cleaned up when you delete the book from the device manager.
 
 ## Font Management
 
