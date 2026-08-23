@@ -32,24 +32,24 @@ By default, eenk uses the user's preferred font setting from the device menu. Ho
 
 The runtime will attempt to resolve your requested font stem in the following order:
 
-### 1. Built-in Fonts
+### Built-in Fonts
 The device comes with built-in fonts that you can request directly by their token name:
 - `sans` (or `sans-medium`): The default readable sans-serif font (Medium, ~16pt).
 - `sans-small`: A smaller variant of the sans-serif font (Small, ~14pt).
 - `serif` (or `serif-medium`): The classic serif font (Literata Medium, ~16pt).
 - `serif-small`: A smaller variant of the serif font (Literata Small, ~14pt).
 
-### 2. Custom SD Card Fonts
+### Custom SD Card Fonts
 If the token doesn't match a built-in font, the engine will look for custom `.epdfont` font files on your SD card. The engine searches two locations in order:
 - **Story Folder**: Next to your story file. E.g., if your story is `/eenk/mystory/mystory.bin`, it looks in `/eenk/mystory/my-custom-font.epdfont`.
 - **Global Font Folder**: A shared folder on the root of the SD card: `/fonts/my-custom-font.epdfont`.
 
-### 3. Variants for Custom Fonts
+### Variants for Custom Fonts
 Font variants may also be provided by adding a suffix to the font stem. If the story contains bold text, the engine will look for `my-custom-font-bold.epdfont`. Supported suffixes are `-bold`, `-italic`, `-bolditalic`.
 
 If the engine cannot find those variants, synthetic variants are generated from the base font as a fallback (but these are lower quality).
 
-### 4. Fallback
+### Fallback
 If the requested font stem cannot be found in any of the above locations, eenk will gracefully fall back to the user's device default setting, or the builtin font.
 
 ## Text Formatting
