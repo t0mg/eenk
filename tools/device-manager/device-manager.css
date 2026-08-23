@@ -513,6 +513,11 @@ body.iframe-embed .dm-header-title {
   white-space: nowrap;
 }
 
+.btn:not(:disabled):active {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
 .btn-primary {
   background: var(--color-accent);
   color: #FFF;
