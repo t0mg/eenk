@@ -10,7 +10,8 @@ enum class QuickMenuAction { NONE, CLOSE, OPEN_SETTINGS, SLEEP_DEVICE };
 class QuickMenuWidget {
 public:
   QuickMenuWidget(IDisplay &display, IInput &input, BatteryWidget &battery,
-                  IFrontlight *frontlight, AppSettings &settings);
+                  IFrontlight *frontlight, AppSettings &settings,
+                  bool choicesEnabled = true);
   ~QuickMenuWidget() = default;
 
   QuickMenuAction show();
@@ -21,6 +22,7 @@ private:
   BatteryWidget &_battery;
   IFrontlight *_frontlight;
   AppSettings &_settings;
+  bool _choicesEnabled = true;
   bool _dirty = false;
 
   int _selectedRow =

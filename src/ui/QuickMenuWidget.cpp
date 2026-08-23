@@ -12,9 +12,11 @@
 
 QuickMenuWidget::QuickMenuWidget(IDisplay &display, IInput &input,
                                  BatteryWidget &battery,
-                                 IFrontlight *frontlight, AppSettings &settings)
+                                 IFrontlight *frontlight, AppSettings &settings,
+                                 bool choicesEnabled)
     : _display(display), _input(input), _battery(battery),
-      _frontlight(frontlight), _settings(settings) {}
+      _frontlight(frontlight), _settings(settings),
+      _choicesEnabled(choicesEnabled) {}
 
 QuickMenuAction QuickMenuWidget::show() {
   render();
@@ -76,8 +78,10 @@ QuickMenuAction QuickMenuWidget::show() {
           _settings.touchScrollEnabled = !_settings.touchScrollEnabled;
           _dirty = true;
         } else if (touchX >= 310 && touchX <= 450) {
-          _settings.touchChoicesEnabled = !_settings.touchChoicesEnabled;
-          _dirty = true;
+          if (_choicesEnabled) {
+            _settings.touchChoicesEnabled = !_settings.touchChoicesEnabled;
+            _dirty = true;
+          }
         }
 #ifdef PLATFORM_ESP32
         delay(16);
@@ -218,11 +222,16 @@ void QuickMenuWidget::render() {
 
   // Touch Choices Toggle
   r->drawShadowBox(cardX + 316, toggleY, 126, 60, NeuStyle::BORDER_W, 4);
-  if (!_settings.touchChoicesEnabled) {
-    r->fillRect(cardX + 318, toggleY + 2, 122, 56, true);
+  if (!_choicesEnabled) {
+    centerText(fontHeading, cardX + 316, toggleY, 126, 60, "CHOICES", true);
+    r->fillHalftoneRect(cardX + 318, toggleY + 2, 122, 56, true);
+  } else {
+    if (!_settings.touchChoicesEnabled) {
+      r->fillRect(cardX + 318, toggleY + 2, 122, 56, true);
+    }
+    centerText(fontHeading, cardX + 316, toggleY, 126, 60, "CHOICES",
+               _settings.touchChoicesEnabled);
   }
-  centerText(fontHeading, cardX + 316, toggleY, 126, 60, "CHOICES",
-             _settings.touchChoicesEnabled);
 
   // Quick Action Buttons
   int btnY = cardY + 340;

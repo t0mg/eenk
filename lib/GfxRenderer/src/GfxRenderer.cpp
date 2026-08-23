@@ -725,7 +725,7 @@ void GfxRenderer::drawImage(const uint8_t bitmap[], const int x, const int y,
   const int panelW = einkDisplay.getDisplayWidth();
   const int panelH = einkDisplay.getDisplayHeight();
   const int stride = panelW / 8;
-  const int widthBytes = width / 8;
+  const int widthBytes = (width + 7) / 8;
   const int logicalW = getScreenWidth();
   const int logicalH = getScreenHeight();
 

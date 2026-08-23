@@ -18,6 +18,9 @@ struct AppSettings {
   bool frontLightEnabled;        // if true, front LED is on (using saved brightness/temp)
   uint8_t frontLightBrightness;  // brightness level of the front led (0-100)
   uint8_t frontLightTemperature; // temperature of the front led (0-100)
+  // ── EPUB reader settings ────────────────────────────────────────────────────
+  uint8_t epubTextAlign;         // 0=Justify, 1=Left
+  bool    epubHyphenation;       // enable/disable hyphenation in EPUB reader
   // ── Human-readable option lists (for UI display) ──────────────────────────
 
   // Choice / UI font names.

@@ -34,6 +34,10 @@ eenky
 └── inkcpp/  → t0mg/inkcpp (eenk-patches branch)
 ```
 
+> [!CAUTION]
+> **Never modify `lib/freeink-sdk` submodule files.**
+> `freeink-sdk` is an upstream hardware SDK. Do NOT make changes inside `lib/freeink-sdk/`. Any host/native build shims, wrappers, or mock headers must be placed in `src/hal/sdl/mock/` or within `eenk`'s own source tree, never directly in `freeink-sdk`.
+
 > [!IMPORTANT]
 > **Submodule Pointer & CI Release Synchronization**:
 > In Git, `eenky` pins a specific commit SHA of the `eenk` submodule. GitHub Actions CI (`build-executables.yaml`) checks out this exact pinned commit.
@@ -125,6 +129,12 @@ The ESP32-C3 (X4) and ESP32-S3 (X4 Pro) both use 16 MB flash chips, but their pa
 ```
 src/
 ├── main.cpp                  # Application entry point, main loop
+├── book/
+│   ├── BookEngine.cpp/.h     # Core EPUB reader runtime engine
+│   ├── BookFontManager.cpp/.h # FontChain builder and font loader
+│   ├── EpdBookFont.cpp/.h    # EpdFont/StreamingEpdFont to RenderFont adapter
+│   ├── SdBookSource.cpp/.h   # BookSource file I/O adapter (SD / stdio)
+│   └── SdCacheStorage.cpp/.h # CacheStorage cache directory adapter
 ├── engine/
 │   ├── InkEngine.cpp/.h      # Core Ink story execution engine
 ├── hal/

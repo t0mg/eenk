@@ -8,6 +8,7 @@
 enum class BootMode : uint8_t {
     MENU        = 0,
     INK_RUNTIME = 1,
+    BOOK_READER = 2,
 };
 
 class BootManager {

@@ -18,7 +18,6 @@
 #include <cstdio>
 #include <cstring>
 
-
 #if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE)
 #ifdef PLATFORM_ESP32
 #include "HalInit.h"
@@ -42,8 +41,8 @@
 
 Library::Library(IDisplay &display, IInput &input, BatteryWidget &battery,
                  IFrontlight *frontlight, AppSettings &settings)
-    : _display(display), _input(input), _battery(battery), _frontlight(frontlight), _settings(settings) {
-}
+    : _display(display), _input(input), _battery(battery),
+      _frontlight(frontlight), _settings(settings) {}
 
 static uint32_t library_fnv1a_32(const char *str) {
   uint32_t hash = 2166136261u;
@@ -110,6 +109,54 @@ void Library::parseThumbMetadata(Library::StoryEntry &e) {
   }
 
   file.close();
+}
+
+void Library::parseEpubThumbCache(StoryEntry &e) {
+  e.thumbPath[0] = '\0';
+
+  const char *lastSlash = strrchr(e.path, '/');
+#ifdef _WIN32
+  const char *lastBackslash = strrchr(e.path, '\\');
+  if (lastBackslash > lastSlash)
+    lastSlash = lastBackslash;
+#endif
+  const char *filename = lastSlash ? lastSlash + 1 : e.path;
+
+  char stem[128] = {};
+  strncpy(stem, filename, sizeof(stem) - 1);
+  char *dot = strrchr(stem, '.');
+  if (dot)
+    *dot = '\0';
+
+#ifdef PLATFORM_ESP32
+  const char *prefix = "/.eenk_cache/";
+#else
+  const char *prefix = ".eenk_cache/";
+#endif
+
+  char thumbPath[256];
+  snprintf(thumbPath, sizeof(thumbPath), "%s%s/thumb.bin", prefix, stem);
+
+  auto file = SDCardManager::getInstance().openFile(thumbPath);
+  if (!file)
+    return;
+
+  uint16_t width = 0, height = 0;
+  uint32_t reserved = 0;
+  if (file.read((uint8_t *)&width, 2) != 2 ||
+      file.read((uint8_t *)&height, 2) != 2 ||
+      file.read((uint8_t *)&reserved, 4) != 4) {
+    file.close();
+    return;
+  }
+  file.close();
+
+  e.thumbW = width;
+  e.thumbH = height;
+  e.thumbOffset = 8;
+  e.thumbSize = ((width + 7) / 8) * height;
+  strncpy(e.thumbPath, thumbPath, sizeof(e.thumbPath) - 1);
+  e.thumbPath[sizeof(e.thumbPath) - 1] = '\0';
 }
 
 // ─── titleFromFilename()
@@ -205,12 +252,12 @@ void Library::formatSize(uint32_t bytes, char *out, size_t outLen) {
     // Show as X.X MB
     uint32_t mb10 = (bytes * 10u) / (1024u * 1024u);
     if (mb10 % 10 == 0) {
-      snprintf(out, outLen, "%u MB", mb10 / 10);
+      snprintf(out, outLen, "%u MB", (unsigned int)(mb10 / 10));
     } else {
-      snprintf(out, outLen, "%u.%u MB", mb10 / 10, mb10 % 10);
+      snprintf(out, outLen, "%u.%u MB", (unsigned int)(mb10 / 10), (unsigned int)(mb10 % 10));
     }
   } else {
-    snprintf(out, outLen, "%u KB", (bytes + 512u) / 1024u);
+    snprintf(out, outLen, "%u KB", (unsigned int)((bytes + 512u) / 1024u));
   }
 }
 
@@ -286,7 +333,9 @@ void Library::scanSD() {
           self(self, subPath, depth + 1);
         }
       } else {
-        if (nameStr.endsWith(".bin") || nameStr.endsWith(".BIN")) {
+        bool isBin = nameStr.endsWith(".bin") || nameStr.endsWith(".BIN");
+        bool isEpub = nameStr.endsWith(".epub") || nameStr.endsWith(".EPUB");
+        if (isBin || isEpub) {
           StoryEntry &e = _entries[_numEntries];
 
           if (rawName[0] == '/') {
@@ -295,21 +344,31 @@ void Library::scanSD() {
             snprintf(e.path, sizeof(e.path), "%s/%s", dirPath, baseName);
           }
           e.sizeBytes = (uint32_t)f.size();
+          e.contentType = isEpub ? StoryEntry::ContentType::EPUB_BOOK
+                                 : StoryEntry::ContentType::INK_STORY;
 
-          StoryMetadata meta;
-          if (StoryMetadata::readFromSD(e.path, &meta)) {
-            e.hasMetadata = true;
-            strncpy(e.title, meta.title, sizeof(e.title) - 1);
-            strncpy(e.author, meta.author, sizeof(e.author) - 1);
-            e.title[sizeof(e.title) - 1] = '\0';
-            e.author[sizeof(e.author) - 1] = '\0';
+          if (isBin) {
+            StoryMetadata meta;
+            if (StoryMetadata::readFromSD(e.path, &meta)) {
+              e.hasMetadata = true;
+              strncpy(e.title, meta.title, sizeof(e.title) - 1);
+              strncpy(e.author, meta.author, sizeof(e.author) - 1);
+              e.title[sizeof(e.title) - 1] = '\0';
+              e.author[sizeof(e.author) - 1] = '\0';
 
-            if (e.title[0] == '\0') {
+              if (e.title[0] == '\0') {
+                titleFromPath(e.path, e.title, sizeof(e.title));
+              }
+            } else {
+              e.hasMetadata = false;
               titleFromPath(e.path, e.title, sizeof(e.title));
             }
           } else {
+            // EPUB: derive title from filename for now
+            // TODO: extract from OPF metadata via Book::open()
             e.hasMetadata = false;
             titleFromPath(e.path, e.title, sizeof(e.title));
+            e.author[0] = '\0';
           }
 
           char savePath[256];
@@ -320,6 +379,9 @@ void Library::scanSD() {
               (currentPath[0] != '\0' && strcmp(e.path, currentPath) == 0);
 
           parseThumbMetadata(e);
+          if (isEpub) {
+            parseEpubThumbCache(e);
+          }
 
           _numEntries++;
         }
@@ -330,6 +392,7 @@ void Library::scanSD() {
   };
 
   scanDirRecursive(scanDirRecursive, "/stories", 0);
+  scanDirRecursive(scanDirRecursive, "/books", 0);
 
 #else
   // ── Native: scan local stories/ directory recursively ────────────────────
@@ -362,27 +425,42 @@ void Library::scanSD() {
         }
       } else if (S_ISREG(st.st_mode)) {
         size_t nlen = strlen(name);
+        bool isBin = false;
+        bool isEpub = false;
         if (nlen >= 4) {
           const char *ext = name + nlen - 4;
-          if (ext[0] == '.' && (ext[1] == 'b' || ext[1] == 'B') &&
-              (ext[2] == 'i' || ext[2] == 'I') &&
-              (ext[3] == 'n' || ext[3] == 'N')) {
-            StoryEntry &e = _entries[_numEntries];
-            strncpy(e.path, fullPath, sizeof(e.path) - 1);
-            e.sizeBytes = (uint32_t)st.st_size;
-            e.hasMetadata = false;
-            titleFromPath(e.path, e.title, sizeof(e.title));
-            e.author[0] = '\0';
+          isBin = (ext[0] == '.' && (ext[1] == 'b' || ext[1] == 'B') &&
+                   (ext[2] == 'i' || ext[2] == 'I') &&
+                   (ext[3] == 'n' || ext[3] == 'N'));
+        }
+        if (nlen >= 5) {
+          const char *ext = name + nlen - 5;
+          isEpub = (ext[0] == '.' && (ext[1] == 'e' || ext[1] == 'E') &&
+                    (ext[2] == 'p' || ext[2] == 'P') &&
+                    (ext[3] == 'u' || ext[3] == 'U') &&
+                    (ext[4] == 'b' || ext[4] == 'B'));
+        }
+        if (isBin || isEpub) {
+          StoryEntry &e = _entries[_numEntries];
+          strncpy(e.path, fullPath, sizeof(e.path) - 1);
+          e.sizeBytes = (uint32_t)st.st_size;
+          e.hasMetadata = false;
+          e.contentType = isEpub ? StoryEntry::ContentType::EPUB_BOOK
+                                 : StoryEntry::ContentType::INK_STORY;
+          titleFromPath(e.path, e.title, sizeof(e.title));
+          e.author[0] = '\0';
 
-            char savePath[256];
-            StoryMetadata::getSavePath(e.path, savePath, sizeof(savePath));
-            e.hasSave = false; // native stub
-            e.isCurrentlyLoaded = false;
+          char savePath[256];
+          StoryMetadata::getSavePath(e.path, savePath, sizeof(savePath));
+          e.hasSave = false; // native stub
+          e.isCurrentlyLoaded = false;
 
-            parseThumbMetadata(e);
-
-            _numEntries++;
+          parseThumbMetadata(e);
+          if (isEpub) {
+            parseEpubThumbCache(e);
           }
+
+          _numEntries++;
         }
       }
     }
@@ -390,6 +468,7 @@ void Library::scanSD() {
   };
 
   scanNativeDirRecursive(scanNativeDirRecursive, "stories", 0);
+  scanNativeDirRecursive(scanNativeDirRecursive, "books", 0);
 #endif
 
   sortEntries();
@@ -449,13 +528,17 @@ void Library::renderEntry(int index, int yPos, bool selected) {
         // ── Left Side Square (Thumbnail)
         if (e.thumbSize > 0) {
           r->fillRect(inX, inY, squareW, inH, true);
+          const char *thumbFile = e.thumbPath[0] ? e.thumbPath : nullptr;
           char mediaPath[256];
-          snprintf(mediaPath, sizeof(mediaPath), "%s", e.path);
-          char *dot = strrchr(mediaPath, '.');
-          if (dot)
-            strcpy(dot, ".media");
+          if (!thumbFile) {
+            snprintf(mediaPath, sizeof(mediaPath), "%s", e.path);
+            char *dot = strrchr(mediaPath, '.');
+            if (dot)
+              strcpy(dot, ".media");
+            thumbFile = mediaPath;
+          }
 
-          auto file = SDCardManager::getInstance().openFile(mediaPath);
+          auto file = SDCardManager::getInstance().openFile(thumbFile);
           if (file) {
             ImageWidget::draw(*r, file, e.thumbOffset, e.thumbSize, e.thumbW,
                               e.thumbH, inX + (squareW - e.thumbW) / 2,
@@ -551,6 +634,13 @@ void Library::renderEntry(int index, int yPos, bool selected) {
         r->drawText(FONT_SMALL, currentX, statusY + textOffsetY, sizeStr, ink);
         currentX += sizeW + 12;
 
+        // EPUB type badge.
+        if (e.contentType == StoryEntry::ContentType::EPUB_BOOK) {
+          r->drawText(FONT_SMALL, currentX, statusY + textOffsetY, "[EPUB]",
+                      ink);
+          currentX += r->getTextWidth(FONT_SMALL, "[EPUB]") + 12;
+        }
+
         // Currently-loaded marker.
         if (e.isCurrentlyLoaded) {
           r->drawText(FONT_SMALL, currentX, statusY + textOffsetY, "[LOADED]",
@@ -575,9 +665,9 @@ void Library::renderEmpty() {
 
 #if defined(PLATFORM_ESP32) || defined(PLATFORM_NATIVE) ||                     \
     defined(PIO_UNIT_TESTING)
-  static const char *kLine1 = "No stories found.";
-  static const char *kLine2 = "Copy .bin files to";
-  static const char *kLine3 = "/stories/ on the SD card.";
+  static const char *kLine1 = "No content found.";
+  static const char *kLine2 = "Copy .bin or .epub files to";
+  static const char *kLine3 = "stories/ or books/ on the SD card.";
 
   int lineH = r->getLineHeight(FONT_NORMAL);
   int totalH = lineH * 3 + 8;
@@ -682,20 +772,27 @@ void Library::launchStory(int index) {
   if (index < 0 || index >= _numEntries)
     return;
 
+  const StoryEntry &e = _entries[index];
+
 #ifdef PLATFORM_ESP32
-  Serial.printf("[Library] Launching story: %s\n", _entries[index].path);
+  Serial.printf("[Library] Launching: %s\n", e.path);
 
   // Provide a visual cue that we registered the click before the ESP restarts
-  bool isLoaded = _entries[index].isCurrentlyLoaded;
-  const char *titleStr = isLoaded ? "Resuming story..." : "Loading story...";
+  bool isEpub = e.contentType == StoryEntry::ContentType::EPUB_BOOK;
+  const char *titleStr = isEpub ? (e.isCurrentlyLoaded ? "Resuming book..." : "Opening book...")
+                                : (e.isCurrentlyLoaded ? "Resuming story..." : "Loading story...");
   LoadingWidget::show(_display, titleStr, 1.0f);
 
-  // Release SPI peripherals so INK_RUNTIME boot can re-initialise them cleanly.
+  // Release SPI peripherals so the next boot can re-initialise them cleanly.
   SD_FS.end();
   SPI.end();
 #endif
-  BootManager::setBootMode(BootMode::INK_RUNTIME);
-  BootManager::setStoryPath(_entries[index].path);
+  if (e.contentType == StoryEntry::ContentType::EPUB_BOOK) {
+    BootManager::setBootMode(BootMode::BOOK_READER);
+  } else {
+    BootManager::setBootMode(BootMode::INK_RUNTIME);
+  }
+  BootManager::setStoryPath(e.path);
   BootManager::reboot();
   // reboot() never returns on ESP32 (ESP.restart()).
   // On native it calls exit(0).
@@ -736,7 +833,8 @@ bool Library::run() {
       footer.btnPrev = {true, "PREV", "Prev", false};
       footer.btnNext = {true, "NEXT", "Next", false};
 
-      ButtonEvent touchEv = footer.getButtonEventAt(touchX, touchY, dispW, dispH);
+      ButtonEvent touchEv =
+          footer.getButtonEventAt(touchX, touchY, dispW, dispH);
       if (touchEv == ButtonEvent::BACK) {
         return true; // Open settings
       } else if (touchEv == ButtonEvent::CONFIRM) {

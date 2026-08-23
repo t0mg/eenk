@@ -57,6 +57,8 @@ AppSettings AppSettings::defaults() {
 #endif
   s.frontLightBrightness = 50;
   s.frontLightTemperature = 50;
+  s.epubTextAlign = 0;       // Justify
+  s.epubHyphenation = true;  // Enabled by default
   return s;
 }
 
@@ -79,6 +81,8 @@ static constexpr char kKeyTouchScroll[] = "tch_scr";
 static constexpr char kKeyFrontLightEnabled[] = "fled_en";
 static constexpr char kKeyFrontLightBrightness[] = "fled_br";
 static constexpr char kKeyFrontLightTemperature[] = "fled_tmp";
+static constexpr char kKeyEpubTextAlign[] = "epub_aln";
+static constexpr char kKeyEpubHyphenation[] = "epub_hyp";
 
 AppSettings AppSettings::load() {
   AppSettings s = defaults();
@@ -115,6 +119,8 @@ AppSettings AppSettings::load() {
   s.touchScrollEnabled = false;
   s.frontLightEnabled = false;
 #endif
+  s.epubTextAlign = prefs.getUChar(kKeyEpubTextAlign, s.epubTextAlign);
+  s.epubHyphenation = prefs.getUChar(kKeyEpubHyphenation, s.epubHyphenation ? 1 : 0) != 0;
   prefs.end();
 
   // Clamp indices to valid range (guards against corruption / version skew).
@@ -124,6 +130,8 @@ AppSettings AppSettings::load() {
   // Bounds check other things
   if (s.choiceFontIndex >= static_cast<uint8_t>(CHOICE_FONT_COUNT))
     s.choiceFontIndex = defaults().choiceFontIndex;
+  if (s.epubTextAlign > 1)
+    s.epubTextAlign = 0;
 
   return s;
 }
@@ -144,6 +152,8 @@ void AppSettings::save() const {
   prefs.putUChar(kKeyFrontLightEnabled, frontLightEnabled ? 1 : 0);
   prefs.putUChar(kKeyFrontLightBrightness, frontLightBrightness);
   prefs.putUChar(kKeyFrontLightTemperature, frontLightTemperature);
+  prefs.putUChar(kKeyEpubTextAlign, epubTextAlign);
+  prefs.putUChar(kKeyEpubHyphenation, epubHyphenation ? 1 : 0);
   prefs.end();
 }
 

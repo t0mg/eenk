@@ -13,6 +13,7 @@
 #ifdef PLATFORM_NATIVE
 // ════════════════════════════════════════════════════════════════════════════
 
+#include "book/BookEngine.h"
 #include "engine/InkEngine.h"
 #include "hal/sdl/SDLDisplay.h"
 #include "hal/sdl/SDLInput.h"
@@ -40,8 +41,25 @@ int main(int argc, char *argv[]) {
 
   // Check the story file exists before init
   if (!storage.fileExists(storyPath)) {
-    fprintf(stderr, "ERROR: Story not found: %s\n", storyPath);
+    fprintf(stderr, "ERROR: File not found: %s\n", storyPath);
     return 1;
+  }
+
+  bool isEpub = (strlen(storyPath) > 5 &&
+                 strcasecmp(storyPath + strlen(storyPath) - 5, ".epub") == 0);
+  if (isEpub) {
+    BookEngine bookEngine(display, input);
+    AppSettings settings = AppSettings::load();
+    bookEngine.applySettings(settings);
+    input.setAutoSleepTimeout(settings.sleepTimeoutSec);
+    if (!bookEngine.loadBook(storyPath)) {
+      fprintf(stderr, "ERROR: Failed to load book: %s\n", storyPath);
+      return 1;
+    }
+    while (!bookEngine.isDone() && !display.shouldQuit()) {
+      bookEngine.update();
+    }
+    return 0;
   }
 
   // Run the engine
@@ -75,6 +93,7 @@ int main(int argc, char *argv[]) {
 #elif defined(PLATFORM_ESP32)
 // ════════════════════════════════════════════════════════════════════════════
 
+#include "book/BookEngine.h"
 #include "engine/InkEngine.h"
 
 #include "HalInit.h"
@@ -116,6 +135,7 @@ FlashCache *flashCache = nullptr;
 #endif
 #endif
 InkEngine *engine = nullptr;
+BookEngine *bookEngine = nullptr;
 SystemUI *systemUI = nullptr;
 BatteryMonitor *batteryMonitor = nullptr;
 BatteryWidget *batteryWidget = nullptr;
@@ -134,7 +154,7 @@ void setup() {
 #endif
   Serial.print("\x1B[2J\x1B[H");
   Serial.println("=== eenk Interactive Fiction Runtime ===");
-  Serial.printf("Free heap before init: %u bytes\n", ESP.getFreeHeap());
+  Serial.printf("Free heap before init: %u bytes\n", (unsigned int)ESP.getFreeHeap());
 
   // ── Initialise NVS (must be first — BootManager and AppSettings both use it)
   BootManager::init();
@@ -209,6 +229,64 @@ void setup() {
       }
     }
     // Unreachable: Library reboots the device when a story is launched.
+  }
+
+  // ── BOOK_READER — load and run the EPUB selected in the library ───────────
+  if (mode == BootMode::BOOK_READER) {
+    Serial.println("[Boot] BOOK_READER — loading book...");
+#ifdef HAS_SD_CARD
+    sdStorage = new StorageType();
+    if (!sdStorage->begin()) {
+      Serial.println("[SD] SD mount failed for book reader.");
+      systemUI->showMessage("SD ERROR", "Failed to mount SD card.\n\nPress BACK to return to menu.");
+      while (true) {
+        ButtonEvent ev = input->pollInput();
+        if (ev == ButtonEvent::BACK || ev == ButtonEvent::CONFIRM || ev == ButtonEvent::QUIT) {
+          BootManager::setBootMode(BootMode::MENU);
+          delay(500);
+          BootManager::reboot();
+        }
+        delay(10);
+      }
+    }
+
+    char bookPath[128] = {0};
+    if (!BootManager::getStoryPath(bookPath, sizeof(bookPath)) || bookPath[0] == '\0') {
+      systemUI->showMessage("BOOK ERROR", "No book selected.\n\nPress BACK to return to menu.");
+      while (true) {
+        ButtonEvent ev = input->pollInput();
+        if (ev == ButtonEvent::BACK || ev == ButtonEvent::CONFIRM || ev == ButtonEvent::QUIT) {
+          BootManager::setBootMode(BootMode::MENU);
+          delay(500);
+          BootManager::reboot();
+        }
+        delay(10);
+      }
+    }
+
+    bookEngine = new BookEngine(*display, *input);
+    bookEngine->setFrontlight(frontlight);
+    bookEngine->setBatteryWidget(batteryWidget);
+    bookEngine->applySettings(settings);
+
+    if (!bookEngine->loadBook(bookPath)) {
+      systemUI->showMessage("BOOK ERROR", "Failed to open book.\n\nPress BACK to return to menu.");
+      while (true) {
+        ButtonEvent ev = input->pollInput();
+        if (ev == ButtonEvent::BACK || ev == ButtonEvent::CONFIRM || ev == ButtonEvent::QUIT) {
+          BootManager::setBootMode(BootMode::MENU);
+          delay(500);
+          BootManager::reboot();
+        }
+        delay(10);
+      }
+    }
+
+    return; // setup() done, loop() will run bookEngine
+#else
+    systemUI->showMessage("SD ERROR", "SD card not supported on this build.");
+    while (true) { delay(100); }
+#endif
   }
 
   // ── INK_RUNTIME — load and run the story selected in the library ──────────
@@ -463,7 +541,7 @@ void setup() {
     }
   }
 
-  Serial.printf("Free heap after load: %u bytes\n", ESP.getFreeHeap());
+  Serial.printf("Free heap after load: %u bytes\n", (unsigned int)ESP.getFreeHeap());
   delay(2000); // Give user time to see RAM stats
 }
 
@@ -547,6 +625,32 @@ void saveProgress() {
 
 void loop() {
   SystemUI::checkBatteryAndShutdown(*batteryWidget, *display);
+
+  if (bookEngine) {
+    if (bookEngine->shouldSleep()) {
+#ifdef PLATFORM_ESP32
+      BootManager::setBootMode(BootMode::BOOK_READER);
+      Serial.println("Power off requested. Entering deep sleep...");
+      systemUI->showSleepCover("Sleeping...", "Book Reader");
+      delay(500);
+      HalInit::prepareForSleep();
+      esp_deep_sleep_start();
+#endif
+    } else if (!bookEngine->isDone()) {
+      bookEngine->update();
+    } else {
+#ifdef PLATFORM_ESP32
+      Serial.println("Book done. Returning to MENU...");
+      if (systemUI) {
+        systemUI->showLoading("Loading...", 1.0f);
+      }
+      BootManager::setBootMode(BootMode::MENU);
+      delay(500);
+      ESP.restart();
+#endif
+    }
+    return;
+  }
 
   if (engine && engine->shouldSleep()) {
 #ifdef PLATFORM_ESP32

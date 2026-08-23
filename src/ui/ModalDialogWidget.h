@@ -10,5 +10,5 @@ public:
   // or CANCEL).
   static bool show(IDisplay &display, IInput &input,
                    BatteryWidget *batteryWidget, const char *title,
-                   const char *message);
+                   const char *message, const char *headerTitle = "");
 };

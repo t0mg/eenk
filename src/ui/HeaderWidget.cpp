@@ -19,26 +19,40 @@ void HeaderWidget::render(const char *title, int fontIndex) const {
   // Neubrutalist header: solid black background.
   r->fillRect(0, 0, displayW, HEIGHT, true /*black*/);
 
-  // Left: Title in heading font, white on black, vertically centred.
-  int fontH = r->getLineHeight(fontIndex);
-  int textY = BEZEL_OFFSET_Y + (HEIGHT - BEZEL_OFFSET_Y - fontH) / 2;
-
-  // Convert title to uppercase for neubrutalist style.
-  if (title && title[0] != '\0') {
-    char upper[64];
-    int i = 0;
-    for (; title[i] && i < 62; i++) {
-      upper[i] = toupper((unsigned char)title[i]);
-    }
-    upper[i] = '\0';
-    r->drawText(fontIndex, LEFT_MARGIN, textY, upper, false /*white*/);
-  }
-
   // Right: battery widget (inverted = white on black).
   int batX = displayW - BatteryWidget::getWidth() - LEFT_MARGIN;
   int batY = BEZEL_OFFSET_Y +
              (HEIGHT - BEZEL_OFFSET_Y - BatteryWidget::getHeight()) / 2;
   _battery.draw(batX, batY, true /*inverted — white on black*/);
+
+  // Left: Title in heading font, white on black, vertically centred.
+  int fontH = r->getLineHeight(fontIndex);
+  int textY = BEZEL_OFFSET_Y + (HEIGHT - BEZEL_OFFSET_Y - fontH) / 2;
+  // Battery widget icon (44px) + label (up to ~110px) + spacing: allocate 180px on the right
+  int maxTitleW = displayW - 180;
+
+  // Convert title to uppercase for neubrutalist style.
+  if (title && title[0] != '\0') {
+    char upper[64];
+    int i = 0;
+    for (; title[i] && i < 60; i++) {
+      upper[i] = toupper((unsigned char)title[i]);
+    }
+    upper[i] = '\0';
+
+    if (r->getTextWidth(fontIndex, upper) > maxTitleW) {
+      // Shorten string and append ellipsis
+      while (i > 3 && r->getTextWidth(fontIndex, upper) > maxTitleW) {
+        i--;
+        upper[i - 3] = '.';
+        upper[i - 2] = '.';
+        upper[i - 1] = '.';
+        upper[i] = '\0';
+      }
+    }
+
+    r->drawText(fontIndex, LEFT_MARGIN, textY, upper, false /*white*/);
+  }
 
 #else
   (void)title;

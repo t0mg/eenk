@@ -13,7 +13,7 @@
 
 bool ModalDialogWidget::show(IDisplay &display, IInput &input,
                              BatteryWidget *batteryWidget, const char *title,
-                             const char *message) {
+                             const char *message, const char *headerTitle) {
   auto renderer = display.getRenderer();
   if (!renderer)
     return false;
@@ -87,12 +87,10 @@ bool ModalDialogWidget::show(IDisplay &display, IInput &input,
   renderer->drawShadowBox(dlgX, dlgY, DLG_W, DLG_H, NeuStyle::BORDER_W,
                           NeuStyle::SHADOW_OFFSET);
 
-#ifdef PLATFORM_ESP32
   if (batteryWidget) {
     HeaderWidget header(display, *batteryWidget);
-    header.render("", fontHeading);
+    header.render(headerTitle ? headerTitle : "", fontHeading);
   }
-#endif
 
   // Title bar: solid black rectangle overlapping the dialog top border
   int currY = dlgY + paddingTop;

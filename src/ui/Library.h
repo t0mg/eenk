@@ -1,10 +1,11 @@
 // eenk — Library
-// Scrollable story browser shown in MENU boot mode.
-// Scans /eenk/ on the SD card for .bin files, displays title/author/size,
-// and lets the user select a story to launch or navigate to settings.
+// Scrollable content browser shown in MENU boot mode.
+// Scans /stories/, /books/, and root on the SD card for .bin and .epub files,
+// displays title/author/size, and lets the user select content to launch or
+// navigate to settings.
 //
 // run() blocks until:
-//   - The user selects a story  → sets BootManager to INK_RUNTIME and reboots
+//   - The user selects an item  → sets BootManager and reboots
 //   - The user presses RIGHT or BACK → returns false (caller shows
 //   SettingsView)
 #pragma once
@@ -45,17 +46,22 @@ protected:
   AppSettings &_settings;
 
   struct StoryEntry {
-    char path[128];         // "/eenk/filename.bin"
+    char path[128];         // "/eenk/filename.bin" or "/books/book.epub"
     char title[64];         // From metadata or derived from filename
     char author[32];        // From metadata or empty
     uint32_t sizeBytes;     // File size in bytes
     bool hasSave;           // Has a save in /.eenk_saves/<stem>.sav
     bool isCurrentlyLoaded; // Path matches NVS boot.story_path
     bool hasMetadata;       // Whether eenk header was found
+    enum class ContentType : uint8_t {
+      INK_STORY = 0,
+      EPUB_BOOK = 1,
+    } contentType;
     uint32_t thumbOffset;   // Optional thumbnail offset in .media sidecar
     uint32_t thumbSize;     // Optional thumbnail size
     uint16_t thumbW;
     uint16_t thumbH;
+    char thumbPath[128];    // EPUB cached thumbnail path
   };
 
   static constexpr int MAX_STORIES = 32;
@@ -68,6 +74,7 @@ protected:
       12; // left/right text margin within an entry
 
   void parseThumbMetadata(StoryEntry &e);
+  void parseEpubThumbCache(StoryEntry &e);
   // SystemUI 10/11, or BatteryWidget 20).
   static constexpr int FONT_NORMAL = NeuStyle::FONT_BODY;      // 10
   static constexpr int FONT_BOLD   = NeuStyle::FONT_BODY_BOLD; // 11

@@ -28,7 +28,7 @@ public:
     void cleanupGrayscaleBuffers(uint8_t* fb) const {}
     
     void drawImage(const uint8_t* bitmap, int x, int y, int w, int h) const {
-        const int imageWidthBytes = w / 8;
+        const int imageWidthBytes = (w + 7) / 8;
         for (int row = 0; row < h; row++) {
             int destY = y + row;
             if (destY >= DISPLAY_HEIGHT) break;

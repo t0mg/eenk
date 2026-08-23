@@ -39,11 +39,11 @@ void SystemUI::showSleepCover(const char *msg, const char *title) {
 }
 
 bool SystemUI::showConfirmDialog(IInput &input, const char *title,
-                                 const char *message) {
+                                 const char *message, const char *headerTitle) {
 #ifdef PLATFORM_ESP32
-  return ModalDialogWidget::show(_display, input, batteryWidget, title, message);
+  return ModalDialogWidget::show(_display, input, batteryWidget, title, message, headerTitle);
 #else
-  return ModalDialogWidget::show(_display, input, nullptr, title, message);
+  return ModalDialogWidget::show(_display, input, nullptr, title, message, headerTitle);
 #endif
 }
 

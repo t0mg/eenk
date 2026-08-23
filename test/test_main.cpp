@@ -20,6 +20,7 @@
 #include "InkRichTextParser.h"
 #include "StreamingEpdFont.h"
 #include "StreamingEpdFontFamily.h"
+#include "book/BookEngine.h"
 #include "engine/InkEngine.h"
 #include "hal/sdl/mock/EInkDisplay.h"
 #include "os/AppSettings.h"
@@ -31,6 +32,7 @@
 #include "ui/FooterWidget.h"
 #include "ui/ImageWidget.h"
 #include "ui/Library.h"
+#include "ui/ModalDialogWidget.h"
 #include "ui/NeuStyle.h"
 #include "ui/QuickMenuWidget.h"
 #include "ui/SettingsView.h"
@@ -292,6 +294,42 @@ public:
   void resetActivityTimer() override {}
 };
 
+class QueueMockInput : public IInput {
+public:
+  std::vector<ButtonEvent> queue;
+  size_t index = 0;
+  mutable int tapX = -1;
+  mutable int tapY = -1;
+  mutable bool hasTap = false;
+
+  void push(ButtonEvent ev) { queue.push_back(ev); }
+  void pushTap(int x, int y) {
+    tapX = x;
+    tapY = y;
+    hasTap = true;
+  }
+  ButtonEvent pollInput() override {
+    if (index < queue.size()) {
+      return queue[index++];
+    }
+    return ButtonEvent::NONE;
+  }
+  bool getTouchPosition(int& x, int& y) const override {
+    if (hasTap) {
+      x = tapX;
+      y = tapY;
+      hasTap = false;
+      return true;
+    }
+    x = -1;
+    y = -1;
+    return false;
+  }
+  uint32_t getLastActivityTime() const override { return 0; }
+  void setAutoSleepTimeout(uint16_t seconds) override {}
+  void resetActivityTimer() override {}
+};
+
 void test_battery_widget_screenshot(void) {
   TestDisplay display;
   BatteryMonitor battery;
@@ -403,6 +441,109 @@ void test_library_screenshot(void) {
   library.run();
 
   saveBMP("test/golden/test_library.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+class TestLibraryWithEpub : public Library {
+public:
+  TestLibraryWithEpub(IDisplay &display, IInput &input, BatteryWidget &battery,
+                      IFrontlight *frontlight, AppSettings &settings)
+      : Library(display, input, battery, frontlight, settings) {}
+
+protected:
+  void scanSD() override {
+    _numEntries = 8;
+
+    snprintf(_entries[0].title, sizeof(_entries[0].title),
+             "The Hitchhiker's Guide");
+    snprintf(_entries[0].author, sizeof(_entries[0].author), "Douglas Adams");
+    snprintf(_entries[0].path, sizeof(_entries[0].path),
+             "test/story/story.bin");
+    _entries[0].sizeBytes = 1500000;
+    _entries[0].hasMetadata = true;
+    _entries[0].hasSave = true;
+    _entries[0].isCurrentlyLoaded = true;
+    _entries[0].contentType = StoryEntry::ContentType::INK_STORY;
+    parseThumbMetadata(_entries[0]);
+
+    snprintf(_entries[1].title, sizeof(_entries[1].title),
+             "Dr Jekyll and Mr Hyde");
+    snprintf(_entries[1].author, sizeof(_entries[1].author), "R. L. Stevenson");
+    snprintf(_entries[1].path, sizeof(_entries[1].path),
+             "test/the-strange-case-of-dr-jekyll-and-mr-hyde.epub");
+    _entries[1].sizeBytes = 145000;
+    _entries[1].hasMetadata = false;
+    _entries[1].hasSave = false;
+    _entries[1].isCurrentlyLoaded = false;
+    _entries[1].contentType = StoryEntry::ContentType::EPUB_BOOK;
+    parseEpubThumbCache(_entries[1]);
+
+    snprintf(_entries[2].title, sizeof(_entries[2].title), "Anchorhead");
+    snprintf(_entries[2].author, sizeof(_entries[2].author), "Michael Gentry");
+    _entries[2].sizeBytes = 800000;
+    _entries[2].hasMetadata = true;
+    _entries[2].hasSave = true;
+    _entries[2].contentType = StoryEntry::ContentType::INK_STORY;
+
+    snprintf(_entries[3].title, sizeof(_entries[3].title),
+             "A Mind Forever Voyaging");
+    snprintf(_entries[3].author, sizeof(_entries[3].author), "Steve Meretzky");
+    _entries[3].sizeBytes = 250000;
+    _entries[3].hasMetadata = true;
+    _entries[3].hasSave = false;
+    _entries[3].contentType = StoryEntry::ContentType::INK_STORY;
+
+    snprintf(_entries[4].title, sizeof(_entries[4].title), "Spider and Web");
+    snprintf(_entries[4].author, sizeof(_entries[4].author), "Andrew Plotkin");
+    _entries[4].sizeBytes = 320000;
+    _entries[4].hasMetadata = true;
+    _entries[4].hasSave = true;
+    _entries[4].contentType = StoryEntry::ContentType::INK_STORY;
+
+    snprintf(_entries[5].title, sizeof(_entries[5].title), "Photopia");
+    snprintf(_entries[5].author, sizeof(_entries[5].author), "Adam Cadre");
+    _entries[5].sizeBytes = 150000;
+    _entries[5].hasMetadata = true;
+    _entries[5].hasSave = false;
+    _entries[5].contentType = StoryEntry::ContentType::INK_STORY;
+
+    snprintf(_entries[6].title, sizeof(_entries[6].title), "Galatea");
+    snprintf(_entries[6].author, sizeof(_entries[6].author), "Emily Short");
+    _entries[6].sizeBytes = 410000;
+    _entries[6].hasMetadata = true;
+    _entries[6].hasSave = true;
+    _entries[6].contentType = StoryEntry::ContentType::INK_STORY;
+
+    snprintf(_entries[7].title, sizeof(_entries[7].title), "80 Days");
+    snprintf(_entries[7].author, sizeof(_entries[7].author), "inkle");
+    _entries[7].sizeBytes = 5500000;
+    _entries[7].hasMetadata = true;
+    _entries[7].hasSave = false;
+    _entries[7].contentType = StoryEntry::ContentType::INK_STORY;
+  }
+};
+
+void test_library_with_epub(void) {
+  ensure_test_story_media();
+
+  TestDisplay display;
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  AppSettings settings = AppSettings::defaults();
+
+  {
+    BookEngine engine(display, input);
+    engine.applySettings(settings);
+    engine.loadBook("test/the-strange-case-of-dr-jekyll-and-mr-hyde.epub");
+    engine.update(); // Generates thumb.bin
+  }
+
+  TestLibraryWithEpub library(display, input, widget, nullptr /*frontlight*/, settings);
+  library.run();
+
+  saveBMP("test/golden/test_library_with_epub.bmp", display.eink.getFrameBuffer(),
           display.getWidth(), display.getHeight());
   TEST_ASSERT_EQUAL(1, 1);
 }
@@ -676,6 +817,208 @@ void test_story_player_screenshot(void) {
   TEST_ASSERT_EQUAL(1, 1);
 }
 
+void test_epub_page_render(void) {
+  TestDisplay display;
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  AppSettings settings = AppSettings::defaults();
+
+  BookEngine engine(display, input);
+  engine.setBatteryWidget(&widget);
+  engine.applySettings(settings);
+
+  const char *epubPath = "test/the-strange-case-of-dr-jekyll-and-mr-hyde.epub";
+  bool loaded = engine.loadBook(epubPath);
+  TEST_ASSERT_TRUE_MESSAGE(loaded, "Failed to load test EPUB");
+
+  // Call update to render the first page
+  engine.update();
+
+  saveBMP("test/golden/test_epub_page_render.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_epub_page_2_render(void) {
+  TestDisplay display;
+  QueueMockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  AppSettings settings = AppSettings::defaults();
+
+  BookEngine engine(display, input);
+  engine.setBatteryWidget(&widget);
+  engine.applySettings(settings);
+
+  const char *epubPath = "test/the-strange-case-of-dr-jekyll-and-mr-hyde.epub";
+  bool loaded = engine.loadBook(epubPath);
+  TEST_ASSERT_TRUE_MESSAGE(loaded, "Failed to load test EPUB");
+
+  // First page render (cover)
+  engine.update();
+
+  // Advance to page 2 (text page)
+  input.push(ButtonEvent::DOWN);
+  engine.update();
+
+  saveBMP("test/golden/test_epub_page_2_render.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_epub_exit_modal_render(void) {
+  TestDisplay display;
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  AppSettings settings = AppSettings::defaults();
+
+  BookEngine engine(display, input);
+  engine.setBatteryWidget(&widget);
+  engine.applySettings(settings);
+
+  const char *epubPath = "test/the-strange-case-of-dr-jekyll-and-mr-hyde.epub";
+  bool loaded = engine.loadBook(epubPath);
+  TEST_ASSERT_TRUE_MESSAGE(loaded, "Failed to load test EPUB");
+
+  // First page render (cover)
+  engine.update();
+
+  // Show exit modal with progress percentage and battery widget
+  char progressStr[32];
+  snprintf(progressStr, sizeof(progressStr), "%d%%", engine.getProgressPercentage());
+  ModalDialogWidget::show(display, input, &widget, "Exit Reader",
+                          "Do you want to exit to the menu?", progressStr);
+
+  saveBMP("test/golden/test_epub_exit_modal.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_epub_bookmark_resume(void) {
+  TestDisplay display1;
+  QueueMockInput input1;
+  AppSettings settings = AppSettings::defaults();
+
+  const char *epubPath = "test/the-strange-case-of-dr-jekyll-and-mr-hyde.epub";
+
+  // Step 1: Open book and navigate to page 2 (chapter text)
+  {
+    BookEngine engine1(display1, input1);
+    engine1.applySettings(settings);
+    TEST_ASSERT_TRUE(engine1.loadBook(epubPath));
+    engine1.update(); // Page 1 (cover)
+
+    input1.push(ButtonEvent::DOWN);
+    engine1.update(); // Advance to Page 2
+
+    // Wait past debounce
+    delay(350);
+
+    // Save progress on sleep
+    input1.push(ButtonEvent::SLEEP);
+    engine1.update();
+    TEST_ASSERT_TRUE(engine1.shouldSleep());
+  }
+
+  // Step 2: Open book again in a new engine instance, verify it resumes at page 2
+  {
+    TestDisplay display2;
+    MockInput input2;
+    BookEngine engine2(display2, input2);
+    engine2.applySettings(settings);
+    TEST_ASSERT_TRUE(engine2.loadBook(epubPath));
+    engine2.update();
+
+    // Verify progress is preserved past cover (progress > 0)
+    int pct = engine2.getProgressPercentage();
+    TEST_ASSERT_TRUE_MESSAGE(pct > 0, "Expected progress percentage > 0 on resume");
+  }
+
+  // Clean up test save file
+  remove(".eenk_saves/the-strange-case-of-dr-jekyll-and-mr-hyde.sav");
+}
+
+void test_epub_framebuffer_cache(void) {
+  TestDisplay display;
+  MockInput input;
+  AppSettings settings = AppSettings::defaults();
+
+  const char *epubPath = "test/the-strange-case-of-dr-jekyll-and-mr-hyde.epub";
+
+  // Step 1: Render cover page (creates framebuffer cache and thumb.bin)
+  {
+    BookEngine engine(display, input);
+    engine.applySettings(settings);
+    TEST_ASSERT_TRUE(engine.loadBook(epubPath));
+    engine.update(); // Render cover
+  }
+
+  // Step 2: Verify thumbnail exists
+  char thumbPath[256];
+  TEST_ASSERT_TRUE(BookEngine::getCoverThumbPath(epubPath, thumbPath, sizeof(thumbPath)));
+  FILE *fThumb = fopen(thumbPath, "rb");
+  TEST_ASSERT_NOT_NULL_MESSAGE(fThumb, "Cover thumbnail file was not created");
+  if (fThumb) {
+    uint16_t w = 0, h = 0;
+    uint32_t res = 0;
+    TEST_ASSERT_EQUAL(1, fread(&w, 2, 1, fThumb));
+    TEST_ASSERT_EQUAL(1, fread(&h, 2, 1, fThumb));
+    TEST_ASSERT_EQUAL(1, fread(&res, 4, 1, fThumb));
+    TEST_ASSERT_TRUE(w > 0 && w <= 152);
+    TEST_ASSERT_TRUE(h > 0 && h <= 152);
+    fclose(fThumb);
+  }
+
+  // Step 3: Re-render with a second engine - should hit cache
+  {
+    TestDisplay display2;
+    MockInput input2;
+    BookEngine engine2(display2, input2);
+    engine2.applySettings(settings);
+    TEST_ASSERT_TRUE(engine2.loadBook(epubPath));
+    engine2.update(); // Hits cached framebuffer
+    
+    // Check framebuffer matches
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(display.eink.getFrameBuffer(), 
+                                  display2.eink.getFrameBuffer(), 
+                                  800 * 480 / 8);
+  }
+}
+
+void test_epub_touch_disabled_navigation(void) {
+  TestDisplay display;
+  QueueMockInput input;
+  AppSettings settings = AppSettings::defaults();
+  settings.touchScrollEnabled = false; // Disable touch navigation
+
+  BookEngine engine(display, input);
+  engine.applySettings(settings);
+
+  const char *epubPath = "test/the-strange-case-of-dr-jekyll-and-mr-hyde.epub";
+  TEST_ASSERT_TRUE(engine.loadBook(epubPath));
+  engine.update(); // Page 1 (cover)
+
+  // Simulate a touch tap on the right side of the screen
+  input.pushTap(400, 400);
+  engine.update();
+
+  // Progress should still be 0 because touch is disabled
+  TEST_ASSERT_EQUAL(0, engine.getProgressPercentage());
+
+  // Now press physical DOWN button -> should advance
+  delay(350);
+  input.push(ButtonEvent::DOWN);
+  engine.update();
+
+  // Should have advanced to page 2 (progress > 0)
+  TEST_ASSERT_TRUE(engine.getProgressPercentage() > 0);
+}
+
 void test_choice_states_screenshot(void) {
   TestDisplay display;
   display.clear();
@@ -865,6 +1208,25 @@ void test_quick_menu_screenshot(void) {
   ui.show();
 
   saveBMP("test/golden/test_quick_menu.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_quick_menu_disabled_choices_screenshot(void) {
+  TestDisplay display;
+  MockInput input;
+  AppSettings settings = AppSettings::defaults();
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  QuickMenuWidget ui(display, input, widget, nullptr /*frontlight*/, settings, /*choicesEnabled=*/false);
+
+  display.clear();
+  display.renderer.drawText(10, 50, 600, "Background text...", true);
+
+  ui.show();
+
+  saveBMP("test/golden/test_quick_menu_book_mode.bmp", display.eink.getFrameBuffer(),
           display.getWidth(), display.getHeight());
 
   TEST_ASSERT_EQUAL(1, 1);
@@ -1230,6 +1592,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_builtin_literata_rendering);
   RUN_TEST(test_battery_widget_screenshot);
   RUN_TEST(test_library_screenshot);
+  RUN_TEST(test_library_with_epub);
   RUN_TEST(test_settings_view_screenshot);
   RUN_TEST(test_fonts_screenshot);
   RUN_TEST(test_external_fonts_screenshot);
@@ -1240,12 +1603,19 @@ int main(int argc, char **argv) {
   RUN_TEST(test_sleep_cover_screenshot);
   RUN_TEST(test_sleep_cover_image_screenshot);
   RUN_TEST(test_story_player_screenshot);
+  RUN_TEST(test_epub_page_render);
+  RUN_TEST(test_epub_page_2_render);
+  RUN_TEST(test_epub_exit_modal_render);
+  RUN_TEST(test_epub_bookmark_resume);
+  RUN_TEST(test_epub_framebuffer_cache);
+  RUN_TEST(test_epub_touch_disabled_navigation);
   RUN_TEST(test_choice_states_screenshot);
   RUN_TEST(test_choice_states_touch_screenshot);
   RUN_TEST(test_image_widget_screenshot);
   RUN_TEST(test_choice_reveal_interaction);
   RUN_TEST(test_story_metadata_save_path);
   RUN_TEST(test_quick_menu_screenshot);
+  RUN_TEST(test_quick_menu_disabled_choices_screenshot);
   // StreamingEpdFontFamily unit tests
   RUN_TEST(test_streaming_epd_font_family_load_plain);
   RUN_TEST(test_streaming_epd_font_family_load_regular_suffix);

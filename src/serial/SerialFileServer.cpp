@@ -146,6 +146,21 @@ void SerialFileServer::handleDelete(const char* path) {
     bool success = isDir ? removeDirectoryRecursively(path) : SD_FS.remove(path);
     if (success) {
         sendLine("OK DELETE");
+        
+        // Extract stem and delete reconstructable cache
+        const char* lastSlash = strrchr(path, '/');
+        const char* filename = lastSlash ? lastSlash + 1 : path;
+        char stem[128];
+        strncpy(stem, filename, sizeof(stem) - 1);
+        stem[sizeof(stem) - 1] = '\0';
+        char* dot = strrchr(stem, '.');
+        if (dot) *dot = '\0';
+        
+        char cachePath[256];
+        snprintf(cachePath, sizeof(cachePath), "/.eenk_cache/%s", stem);
+        if (SD_FS.exists(cachePath)) {
+            removeDirectoryRecursively(cachePath);
+        }
     } else {
         sendError("IO_ERROR");
     }
