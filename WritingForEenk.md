@@ -106,6 +106,79 @@ When transferring your story to the device using the Device Manager in eenky, th
 
 > Note: eenky inherits the classic Web export mode from Inky, which also supports the very same `# IMAGE:` tag format for rendering images in the browser! What are the odds!?
 
+## Checkpoints and Chapters
+
+eenk supports special tags to let players save snapshots of their progress and rewind during gameplay via the on-device **Story Menu** (accessed by pressing `BACK` or `Escape` in the simulator):
+
+### Checkpoints (`# CHECKPOINT`)
+
+Use `# CHECKPOINT` without a title when you want to offer an ephemeral quick-save or safe point where players can **rewind once** (for instance, right before a deadly combat choice, tricky riddle, or branching decision).
+
+```ink
+=== before_the_trap ===
+# CHECKPOINT
+You stand before three levers. A skull is etched above the center one.
++ [Pull the left lever] -> left_lever
++ [Pull the center lever] -> center_lever
++ [Pull the right lever] -> right_lever
+```
+
+- Each occurrence of `# CHECKPOINT` updates the player's quick-save to that exact position. 
+- There is no visual clue that a checkpoint has been reached, it is left to you whether or not to reveal it (for example with an explicit `[checkpoint]`, or a sutbler in game message).
+- In the Story Menu, this is presented as **`Rewind to last checkpoint`**.
+
+### Chapters (`# CHECKPOINT: <Title>`)
+
+Use `# CHECKPOINT: <Title>` when you want players to be able to **choose how far back to rewind** across the story (e.g., acts, chapters, or major branching milestones).
+
+```ink
+=== act_one ===
+# CHECKPOINT: Act I - The Heist
+The neon signs of Sector 4 flickered against the perpetual rain...
+
+...
+
+=== act_two ===
+# CHECKPOINT: Act II - The Escape
+Sirens echoed in the distance as the hovercraft engine roared to life...
+```
+
+- Each named checkpoint is added chronologically to the Story Menu, under **`Rewind to...`**.
+- Rewinding to a chapter will remove access to subsequent ones: it's a linear chain and you snip it when you rewind.
+- There is no visual clue that a chapter has been reached, it is left to you whether or not to reveal it (for example with an explicit `Act I`, or a sutbler in game message).
+
+```ink
+# let C1 = 0
+# let C2 = 0
+
+==start==
+
+# CHECKPOINT: Before the Choice
+
+Hello there. In front of you is a choice:
++ [Make Choice A] -> ChoiceA
++ [Make Choice B] -> ChoiceB
+
+==ChoiceA==
+You made choice A. Good job.
+# set C1 += 1
+
+# CHECKPOINT: Chapter 2
+
+Now you're in chapter 2. 
++ [Continue to end] -> end
++ [Go back to choice A?] -> ChoiceA
+
+==ChoiceB==
+You made choice B. Bold move.
+# set C2 += 1
+
+==end==
+
+The end.
+# CHECKPOINT: The End
+```
+
 ## Building with eenky
 
 eenky is the desktop companion application that compiles your `.ink` files into a `.bin` file optimized for the eenk hardware. It uses a customized compiler pipeline (`inklecate` -> `inkcpp_cl`).

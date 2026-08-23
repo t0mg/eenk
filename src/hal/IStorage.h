@@ -28,6 +28,22 @@ public:
      */
     virtual void freeBuffer(const unsigned char* buf) = 0;
 
+    /**
+     * Write data to a binary file.
+     * @param path File path
+     * @param data Pointer to buffer
+     * @param size Size in bytes
+     * @return True on success
+     */
+    virtual bool writeFileBinary(const char* path, const unsigned char* data, std::size_t size) = 0;
+
+    /**
+     * Delete a file.
+     * @param path File path
+     * @return True on success
+     */
+    virtual bool deleteFile(const char* path) = 0;
+
     /** Returns true if the file exists and is readable. */
     virtual bool fileExists(const char* path) = 0;
 };

@@ -29,9 +29,11 @@
 #include "ui/BatteryWidget.h"
 
 #define FRAME_W 800
+#include "engine/StorySaveManager.h"
 #include "ui/FooterWidget.h"
 #include "ui/ImageWidget.h"
 #include "ui/Library.h"
+#include "ui/MenuModalWidget.h"
 #include "ui/ModalDialogWidget.h"
 #include "ui/NeuStyle.h"
 #include "ui/QuickMenuWidget.h"
@@ -314,7 +316,7 @@ public:
     }
     return ButtonEvent::NONE;
   }
-  bool getTouchPosition(int& x, int& y) const override {
+  bool getTouchPosition(int &x, int &y) const override {
     if (hasTap) {
       x = tapX;
       y = tapY;
@@ -540,11 +542,13 @@ void test_library_with_epub(void) {
     engine.update(); // Generates thumb.bin
   }
 
-  TestLibraryWithEpub library(display, input, widget, nullptr /*frontlight*/, settings);
+  TestLibraryWithEpub library(display, input, widget, nullptr /*frontlight*/,
+                              settings);
   library.run();
 
-  saveBMP("test/golden/test_library_with_epub.bmp", display.eink.getFrameBuffer(),
-          display.getWidth(), display.getHeight());
+  saveBMP("test/golden/test_library_with_epub.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
   TEST_ASSERT_EQUAL(1, 1);
 }
 
@@ -889,13 +893,13 @@ void test_epub_exit_modal_render(void) {
 
   // Show exit modal with progress percentage and battery widget
   char progressStr[32];
-  snprintf(progressStr, sizeof(progressStr), "%d%%", engine.getProgressPercentage());
+  snprintf(progressStr, sizeof(progressStr), "%d%%",
+           engine.getProgressPercentage());
   ModalDialogWidget::show(display, input, &widget, "Exit Reader",
                           "Do you want to exit to the menu?", progressStr);
 
-  saveBMP("test/golden/test_epub_exit_modal.bmp",
-          display.eink.getFrameBuffer(), display.getWidth(),
-          display.getHeight());
+  saveBMP("test/golden/test_epub_exit_modal.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
   TEST_ASSERT_EQUAL(1, 1);
 }
 
@@ -925,7 +929,8 @@ void test_epub_bookmark_resume(void) {
     TEST_ASSERT_TRUE(engine1.shouldSleep());
   }
 
-  // Step 2: Open book again in a new engine instance, verify it resumes at page 2
+  // Step 2: Open book again in a new engine instance, verify it resumes at page
+  // 2
   {
     TestDisplay display2;
     MockInput input2;
@@ -936,7 +941,8 @@ void test_epub_bookmark_resume(void) {
 
     // Verify progress is preserved past cover (progress > 0)
     int pct = engine2.getProgressPercentage();
-    TEST_ASSERT_TRUE_MESSAGE(pct > 0, "Expected progress percentage > 0 on resume");
+    TEST_ASSERT_TRUE_MESSAGE(pct > 0,
+                             "Expected progress percentage > 0 on resume");
   }
 
   // Clean up test save file
@@ -960,7 +966,8 @@ void test_epub_framebuffer_cache(void) {
 
   // Step 2: Verify thumbnail exists
   char thumbPath[256];
-  TEST_ASSERT_TRUE(BookEngine::getCoverThumbPath(epubPath, thumbPath, sizeof(thumbPath)));
+  TEST_ASSERT_TRUE(
+      BookEngine::getCoverThumbPath(epubPath, thumbPath, sizeof(thumbPath)));
   FILE *fThumb = fopen(thumbPath, "rb");
   TEST_ASSERT_NOT_NULL_MESSAGE(fThumb, "Cover thumbnail file was not created");
   if (fThumb) {
@@ -982,10 +989,10 @@ void test_epub_framebuffer_cache(void) {
     engine2.applySettings(settings);
     TEST_ASSERT_TRUE(engine2.loadBook(epubPath));
     engine2.update(); // Hits cached framebuffer
-    
+
     // Check framebuffer matches
-    TEST_ASSERT_EQUAL_UINT8_ARRAY(display.eink.getFrameBuffer(), 
-                                  display2.eink.getFrameBuffer(), 
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(display.eink.getFrameBuffer(),
+                                  display2.eink.getFrameBuffer(),
                                   800 * 480 / 8);
   }
 }
@@ -1219,15 +1226,17 @@ void test_quick_menu_disabled_choices_screenshot(void) {
   AppSettings settings = AppSettings::defaults();
   BatteryMonitor battery;
   BatteryWidget widget(display.renderer, battery);
-  QuickMenuWidget ui(display, input, widget, nullptr /*frontlight*/, settings, /*choicesEnabled=*/false);
+  QuickMenuWidget ui(display, input, widget, nullptr /*frontlight*/, settings,
+                     /*choicesEnabled=*/false);
 
   display.clear();
   display.renderer.drawText(10, 50, 600, "Background text...", true);
 
   ui.show();
 
-  saveBMP("test/golden/test_quick_menu_book_mode.bmp", display.eink.getFrameBuffer(),
-          display.getWidth(), display.getHeight());
+  saveBMP("test/golden/test_quick_menu_book_mode.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
 
   TEST_ASSERT_EQUAL(1, 1);
 }
@@ -1581,6 +1590,178 @@ void test_builtin_literata_rendering(void) {
   display.renderer.drawText(70, 20, 200, "Literata Bold text", true,
                             EpdFontFamily::BOLD);
 }
+
+void test_save_manager_enk2_serialization(void) {
+  SDLStorage storage;
+  StorySaveManager mgr;
+  const char *testSavePath = "test/test_save.sav";
+  mgr.init(testSavePath, 0x12345678);
+
+  uint8_t snapMain[] = {1, 2, 3, 4, 5};
+  std::deque<WrappedLine> histMain;
+  histMain.push_back({TextBlock("Line 1"), false, false, "", 0, true});
+  mgr.saveMainProgress(snapMain, sizeof(snapMain), histMain);
+
+  uint8_t snapCp1[] = {10, 20};
+  std::deque<WrappedLine> histCp1;
+  histCp1.push_back({TextBlock("Cp 1"), false, false, "", 0, true});
+  mgr.saveCheckpoint("", snapCp1, sizeof(snapCp1), histCp1);
+
+  uint8_t snapCh1[] = {30, 40};
+  std::deque<WrappedLine> histCh1;
+  histCh1.push_back({TextBlock("Ch 1"), false, false, "", 0, true});
+  mgr.saveCheckpoint("The Plan", snapCh1, sizeof(snapCh1), histCh1);
+
+  TEST_ASSERT_TRUE(mgr.writeSaveFile(storage));
+
+  StorySaveManager mgr2;
+  mgr2.init(testSavePath, 0x12345678);
+  TEST_ASSERT_TRUE(mgr2.loadSaveFile(storage));
+  TEST_ASSERT_TRUE(mgr2.hasMainProgress());
+  TEST_ASSERT_EQUAL(5, mgr2.getMainSnapshot().size());
+  TEST_ASSERT_EQUAL(1, mgr2.getMainHistory().size());
+
+  TEST_ASSERT_TRUE(mgr2.hasUnnamedCheckpoint());
+  TEST_ASSERT_TRUE(mgr2.hasNamedCheckpoints());
+  TEST_ASSERT_EQUAL(2, mgr2.getCheckpoints().size());
+
+  storage.deleteFile(testSavePath);
+}
+
+void test_save_manager_universal_key_deduplication(void) {
+  StorySaveManager mgr;
+  mgr.init("test/dummy.sav", 0x11223344);
+
+  uint8_t dummySnap[] = {1, 2, 3};
+  std::deque<WrappedLine> dummyHist;
+
+  // Save unnamed 1
+  mgr.saveCheckpoint("", dummySnap, sizeof(dummySnap), dummyHist);
+  TEST_ASSERT_EQUAL(1, mgr.getCheckpoints().size());
+  TEST_ASSERT_EQUAL(0, mgr.getUnnamedCheckpointIndex());
+
+  // Save named "Chapter 1"
+  mgr.saveCheckpoint("Chapter 1", dummySnap, sizeof(dummySnap), dummyHist);
+  TEST_ASSERT_EQUAL(2, mgr.getCheckpoints().size());
+  TEST_ASSERT_EQUAL(0, mgr.getUnnamedCheckpointIndex());
+
+  // Save unnamed 2 -> should prune older unnamed and append at tail (index 1)
+  mgr.saveCheckpoint("", dummySnap, sizeof(dummySnap), dummyHist);
+  TEST_ASSERT_EQUAL(2, mgr.getCheckpoints().size());
+  TEST_ASSERT_EQUAL_STRING("Chapter 1", mgr.getCheckpoints()[0].title.c_str());
+  TEST_ASSERT_EQUAL_STRING("", mgr.getCheckpoints()[1].title.c_str());
+  TEST_ASSERT_EQUAL(1, mgr.getUnnamedCheckpointIndex());
+
+  // Save named "Chapter 1" again -> should prune index 0 and append at tail
+  // (index 1)
+  mgr.saveCheckpoint("Chapter 1", dummySnap, sizeof(dummySnap), dummyHist);
+  TEST_ASSERT_EQUAL(2, mgr.getCheckpoints().size());
+  TEST_ASSERT_EQUAL_STRING("", mgr.getCheckpoints()[0].title.c_str());
+  TEST_ASSERT_EQUAL_STRING("Chapter 1", mgr.getCheckpoints()[1].title.c_str());
+}
+
+void test_save_manager_restart_clear(void) {
+  SDLStorage storage;
+  StorySaveManager mgr;
+  const char *testSavePath = "test/test_clear.sav";
+  mgr.init(testSavePath, 0x12345678);
+
+  uint8_t snap[] = {1};
+  std::deque<WrappedLine> hist;
+  mgr.saveMainProgress(snap, sizeof(snap), hist);
+  mgr.saveCheckpoint("Ch1", snap, sizeof(snap), hist);
+  mgr.writeSaveFile(storage);
+
+  TEST_ASSERT_TRUE(storage.fileExists(testSavePath));
+  mgr.clearAll(storage);
+
+  TEST_ASSERT_FALSE(mgr.hasMainProgress());
+  TEST_ASSERT_EQUAL(0, mgr.getCheckpoints().size());
+  TEST_ASSERT_FALSE(storage.fileExists(testSavePath));
+}
+
+void test_story_menu_full_screenshot(void) {
+  TestDisplay display;
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+
+  display.clear();
+  display.renderer.drawText(10, 50, 100, "Background text...");
+
+  std::vector<std::string> items = {"Save and exit",
+                                    "Rewind to last checkpoint", "Rewind to...",
+                                    "Restart story"};
+
+  MenuModalWidget::show(display, input, &widget, "Story Menu", items, 2,
+                        "eenk");
+
+  saveBMP("test/golden/test_story_menu_full.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_story_menu_no_checkpoints_screenshot(void) {
+  TestDisplay display;
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+
+  display.clear();
+  display.renderer.drawText(10, 50, 100, "Background text...");
+
+  std::vector<std::string> items = {"Save and exit", "Restart story"};
+
+  MenuModalWidget::show(display, input, &widget, "Story Menu", items, 0,
+                        "eenk");
+
+  saveBMP("test/golden/test_story_menu_no_checkpoints.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_rewind_to_submenu_screenshot(void) {
+  TestDisplay display;
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+
+  display.clear();
+  display.renderer.drawText(10, 50, 100, "Background text...");
+
+  std::vector<std::string> items = {
+      "The Plan", "The Heist", "The Twist",
+      "The Second Twist Where It Turns Out It Was All Part Of The Plan In The "
+      "First Place"};
+
+  MenuModalWidget::show(display, input, &widget, "Rewind to...", items, 3,
+                        "eenk");
+
+  saveBMP("test/golden/test_rewind_to_submenu.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_confirm_restart_modal_screenshot(void) {
+  TestDisplay display;
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+
+  display.clear();
+  display.renderer.drawText(10, 50, 100, "Background text...");
+
+  ModalDialogWidget::show(
+      display, input, &widget, "Confirm Restart",
+      "Are you sure you\nwant to restart ?\nProgress will be lost", "eenk");
+
+  saveBMP("test/golden/test_confirm_restart_modal.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
 #endif
 
 int main(int argc, char **argv) {
@@ -1624,6 +1805,14 @@ int main(int argc, char **argv) {
   RUN_TEST(test_streaming_epd_font_family_missing_regular_fails);
   RUN_TEST(test_streaming_epd_font_family_bold_italic_fallback_order);
   RUN_TEST(test_sd_font_catalogue_family_detection);
+  // Save manager & Menu modal tests
+  RUN_TEST(test_save_manager_enk2_serialization);
+  RUN_TEST(test_save_manager_universal_key_deduplication);
+  RUN_TEST(test_save_manager_restart_clear);
+  RUN_TEST(test_story_menu_full_screenshot);
+  RUN_TEST(test_story_menu_no_checkpoints_screenshot);
+  RUN_TEST(test_rewind_to_submenu_screenshot);
+  RUN_TEST(test_confirm_restart_modal_screenshot);
 #endif
   UNITY_END();
   return 0;

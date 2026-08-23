@@ -45,6 +45,22 @@ void SDLStorage::freeBuffer(const unsigned char* buf)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+bool SDLStorage::writeFileBinary(const char* path, const unsigned char* data, std::size_t size)
+{
+    FILE* f = fopen(path, "wb");
+    if (!f) return false;
+    size_t written = fwrite(data, 1, size, f);
+    fclose(f);
+    return written == size;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+bool SDLStorage::deleteFile(const char* path)
+{
+    return remove(path) == 0;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 bool SDLStorage::fileExists(const char* path)
 {
     FILE* f = fopen(path, "rb");

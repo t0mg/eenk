@@ -7,6 +7,7 @@
 #include "InkStoryManager.h"
 #include "InkDisplayManager.h"
 #include "InkInputHandler.h"
+#include "StorySaveManager.h"
 
 #include <cmath>
 
@@ -27,6 +28,10 @@ public:
     void freeSnapshot();
     bool loadSnapshot(const unsigned char* data, std::size_t length);
     
+    StorySaveManager& getSaveManager() { return _saveManager; }
+    const StorySaveManager& getSaveManager() const { return _saveManager; }
+    IStorage& getStorage() { return _storage; }
+
     void update();
     bool isDone() const { return _state == State::DONE; }
     bool shouldSleep() const { return _shouldSleep; }
@@ -75,6 +80,7 @@ private:
     InkStoryManager _storyManager;
     InkDisplayManager _displayManager;
     InkInputHandler _inputHandler;
+    StorySaveManager _saveManager;
 
     State _state = State::IDLE;
     bool _shouldSleep = false;

@@ -70,6 +70,22 @@ void EspSdStorage::freeBuffer(const unsigned char* buf)
     }
 }
 
+bool EspSdStorage::writeFileBinary(const char* path, const unsigned char* data, std::size_t size)
+{
+    if (!_initialized) return false;
+    File file = SD.open(path, FILE_WRITE);
+    if (!file) return false;
+    size_t written = file.write(data, size);
+    file.close();
+    return written == size;
+}
+
+bool EspSdStorage::deleteFile(const char* path)
+{
+    if (!_initialized) return false;
+    return SD.remove(path);
+}
+
 bool EspSdStorage::fileExists(const char* path)
 {
     if (!_initialized) return false;

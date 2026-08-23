@@ -34,6 +34,17 @@ InkEngine::InkEngine(IDisplay &display, IInput &input, IStorage &storage)
 
 InkEngine::~InkEngine() {}
 
+static uint32_t computeCrc32(const unsigned char *data, size_t length) {
+  uint32_t crc = 0xFFFFFFFF;
+  for (size_t i = 0; i < length; ++i) {
+    crc ^= data[i];
+    for (int j = 0; j < 8; ++j) {
+      crc = (crc >> 1) ^ (0xEDB88320 & -(crc & 1));
+    }
+  }
+  return ~crc;
+}
+
 #ifdef PLATFORM_NATIVE
 bool InkEngine::loadStory(const char *path) {
   StoryMetadata meta;
@@ -46,8 +57,25 @@ bool InkEngine::loadStory(const char *path) {
                                       storyDir.c_str());
   _storyManager.loadMediaSidecar((meta.flags & 1) != 0, path);
 
-  _displayManager.clearHistory();
-  _displayManager.setScrollY(0);
+  char saveBuf[256] = {};
+  StoryMetadata::getSavePath(path, saveBuf, sizeof(saveBuf));
+
+  std::size_t rawSize = 0;
+  const unsigned char *rawData = _storage.readFileBinary(path, &rawSize);
+  uint32_t storyHash = 0;
+  if (rawData && rawSize > 0) {
+    storyHash = computeCrc32(rawData, rawSize);
+    _storage.freeBuffer(rawData);
+  }
+
+  _saveManager.init(saveBuf, storyHash);
+  if (_saveManager.loadSaveFile(_storage, &_storyManager)) {
+    _saveManager.restoreMainProgress(_storyManager, _displayManager);
+  } else {
+    _displayManager.clearHistory();
+    _displayManager.setScrollY(0);
+  }
+
   _state = State::RUNNING_TEXT;
   return true;
 }
@@ -65,8 +93,22 @@ bool InkEngine::loadStory(const unsigned char *data, std::size_t size,
                                       storyDir.c_str());
   _storyManager.loadMediaSidecar((meta.flags & 1) != 0, storyPath);
 
-  _displayManager.clearHistory();
-  _displayManager.setScrollY(0);
+  if (storyPath && storyPath[0]) {
+    char saveBuf[256] = {};
+    StoryMetadata::getSavePath(storyPath, saveBuf, sizeof(saveBuf));
+    uint32_t storyHash = computeCrc32(data, size);
+    _saveManager.init(saveBuf, storyHash);
+    if (_saveManager.loadSaveFile(_storage, &_storyManager)) {
+      _saveManager.restoreMainProgress(_storyManager, _displayManager);
+    } else {
+      _displayManager.clearHistory();
+      _displayManager.setScrollY(0);
+    }
+  } else {
+    _displayManager.clearHistory();
+    _displayManager.setScrollY(0);
+  }
+
   _state = State::RUNNING_TEXT;
   return true;
 }
@@ -134,29 +176,65 @@ void InkEngine::tickRunningText() {
         s.pop_back();
       }
 
+      bool hasImage = false;
+      std::string imagePath = "";
+      bool hasCheckpointTag = false;
+      std::string checkpointTitle = "";
+
       if (runner->has_tags()) {
         for (size_t i = 0; i < runner->num_tags(); i++) {
           const char *tag = runner->get_tag(i);
-          if (tag && strncasecmp(tag, "IMAGE:", 6) == 0) {
+          if (!tag)
+            continue;
+          while (*tag == ' ' || *tag == '\t')
+            tag++;
+
+          if (strncasecmp(tag, "IMAGE:", 6) == 0) {
             const char *pathStr = tag + 6;
             while (*pathStr == ' ')
               pathStr++;
-
-            WrappedLine wl;
-            wl.isImage = true;
-            wl.imagePath = pathStr;
-            wl.imageHeight = _storyManager.getImageHeight(pathStr);
-            wl.endOfParagraph = true;
-
-            _displayManager.addWrappedLine(wl);
-            newLinesCount++;
+            hasImage = true;
+            imagePath = pathStr;
+          } else if (strcasecmp(tag, "CHECKPOINT") == 0) {
+            hasCheckpointTag = true;
+            checkpointTitle = "";
+          } else if (strncasecmp(tag, "CHECKPOINT:", 11) == 0 ||
+                     strncasecmp(tag, "CHECKPOINT ", 11) == 0) {
+            hasCheckpointTag = true;
+            const char *titleStr = tag + 11;
+            while (*titleStr == ' ' || *titleStr == '\t')
+              titleStr++;
+            std::string t(titleStr);
+            while (!t.empty() &&
+                   (t.back() == ' ' || t.back() == '\t' || t.back() == '\r' ||
+                    t.back() == '\n')) {
+              t.pop_back();
+            }
+            checkpointTitle = t;
           }
         }
       }
 
-      if (s.empty() && runner->has_tags()) {
-      } else {
+      if (hasImage) {
+        WrappedLine wl;
+        wl.isImage = true;
+        wl.imagePath = imagePath;
+        wl.imageHeight = _storyManager.getImageHeight(imagePath.c_str());
+        wl.endOfParagraph = true;
+        _displayManager.addWrappedLine(wl);
+        newLinesCount++;
+      } else if (!s.empty() || !runner->has_tags()) {
         pushLine(s);
+      }
+
+      if (hasCheckpointTag) {
+        size_t snapLen = 0;
+        const unsigned char *snap = _storyManager.createSnapshot(&snapLen);
+        if (snap && snapLen > 0) {
+          _saveManager.saveCheckpoint(checkpointTitle, snap, snapLen,
+                                      _displayManager.getHistory());
+          _saveManager.writeSaveFile(_storage);
+        }
       }
     }
   }

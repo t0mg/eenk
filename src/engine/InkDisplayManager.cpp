@@ -288,10 +288,9 @@ void InkDisplayManager::collectChoices(ink::runtime::runner &runner) {
 }
 
 void InkDisplayManager::setupStoryEndedChoices() {
-  _numChoices = 2;
+  _numChoices = 1;
   _selectedChoice = 0;
-  strncpy(_choiceText[0], "Exit to menu", sizeof(_choiceText[0]) - 1);
-  strncpy(_choiceText[1], "Replay story", sizeof(_choiceText[1]) - 1);
+  strncpy(_choiceText[0], "The End", sizeof(_choiceText[0]) - 1);
 
   GfxRenderer *renderer = _display.getRenderer();
   if (renderer) {
@@ -303,9 +302,6 @@ void InkDisplayManager::setupStoryEndedChoices() {
       int wrapWidth = narrativeWidth - indicatorWidth;
       _wrappedChoices[0] = renderer->wrapRichText(
           FONT_CHOICE, {TextRun(_choiceText[0], EpdFontFamily::Style::REGULAR)},
-          wrapWidth, 2);
-      _wrappedChoices[1] = renderer->wrapRichText(
-          FONT_CHOICE, {TextRun(_choiceText[1], EpdFontFamily::Style::REGULAR)},
           wrapWidth, 2);
     }
   }

@@ -25,6 +25,7 @@ SystemUI::~SystemUI() {}
 #include "SleepCoverWidget.h"
 #include "LoadingWidget.h"
 #include "ModalDialogWidget.h"
+#include "MenuModalWidget.h"
 
 void SystemUI::showMessage(const char *title, const char *message) {
   LoadingWidget::showMessage(_display, title, message);
@@ -39,11 +40,33 @@ void SystemUI::showSleepCover(const char *msg, const char *title) {
 }
 
 bool SystemUI::showConfirmDialog(IInput &input, const char *title,
-                                 const char *message, const char *headerTitle) {
+                                 const char *message, const char *headerTitle,
+                                 int minWidth, int minHeight,
+                                 bool drawHalftone) {
 #ifdef PLATFORM_ESP32
-  return ModalDialogWidget::show(_display, input, batteryWidget, title, message, headerTitle);
+  return ModalDialogWidget::show(_display, input, batteryWidget, title, message,
+                                 headerTitle, minWidth, minHeight,
+                                 drawHalftone);
 #else
-  return ModalDialogWidget::show(_display, input, nullptr, title, message, headerTitle);
+  return ModalDialogWidget::show(_display, input, nullptr, title, message,
+                                 headerTitle, minWidth, minHeight,
+                                 drawHalftone);
+#endif
+}
+
+int SystemUI::showMenuModal(IInput &input, const char *title,
+                            const std::vector<std::string> &items,
+                            int initialSelection, const char *headerTitle,
+                            int minWidth, int minHeight, bool drawHalftone,
+                            int *outW, int *outH) {
+#ifdef PLATFORM_ESP32
+  return MenuModalWidget::show(_display, input, batteryWidget, title, items,
+                               initialSelection, headerTitle, minWidth,
+                               minHeight, drawHalftone, outW, outH);
+#else
+  return MenuModalWidget::show(_display, input, nullptr, title, items,
+                               initialSelection, headerTitle, minWidth,
+                               minHeight, drawHalftone, outW, outH);
 #endif
 }
 

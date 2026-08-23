@@ -13,7 +13,8 @@
 
 bool ModalDialogWidget::show(IDisplay &display, IInput &input,
                              BatteryWidget *batteryWidget, const char *title,
-                             const char *message, const char *headerTitle) {
+                             const char *message, const char *headerTitle,
+                             int minWidth, int minHeight, bool drawHalftone) {
   auto renderer = display.getRenderer();
   if (!renderer)
     return false;
@@ -21,7 +22,7 @@ bool ModalDialogWidget::show(IDisplay &display, IInput &input,
   const int dispW = display.getWidth();
   const int dispH = display.getHeight();
 
-  static constexpr int DLG_W = NeuStyle::DIALOG_W;
+  int DLG_W = std::max(static_cast<int>(NeuStyle::DIALOG_W), minWidth);
   int fontHeading = NeuStyle::FONT_HEADING;
   int fontBody = NeuStyle::FONT_BODY;
 
@@ -69,7 +70,8 @@ bool ModalDialogWidget::show(IDisplay &display, IInput &input,
   int msgTotalH = numMsgLines * msgLineH;
   // Content starts after the title bar overlap
   int contentH = (hasTitle ? titleBarH + titleGap - paddingTop : 0) + msgTotalH;
-  int DLG_H = paddingTop + contentH + paddingBottom;
+  int calculatedH = paddingTop + contentH + paddingBottom;
+  int DLG_H = std::max(calculatedH, minHeight);
 
   int dlgX = (dispW - DLG_W) / 2;
   int dlgY =
@@ -80,8 +82,10 @@ bool ModalDialogWidget::show(IDisplay &display, IInput &input,
     dlgY += titleBarH / 2;
   }
 
-  // Draw halftone background overlay
-  renderer->fillHalftoneRect(0, 0, dispW, dispH, false);
+  // Draw halftone background overlay if requested
+  if (drawHalftone) {
+    renderer->fillHalftoneRect(0, 0, dispW, dispH, false);
+  }
 
   // Shadow box: 6px border, 20px offset shadow
   renderer->drawShadowBox(dlgX, dlgY, DLG_W, DLG_H, NeuStyle::BORDER_W,
@@ -96,7 +100,7 @@ bool ModalDialogWidget::show(IDisplay &display, IInput &input,
   int currY = dlgY + paddingTop;
   if (hasTitle) {
     int titleBarY = dlgY;
-    // Black rectangle spanning the dialog width, centered
+    // Black rectangle spanning the dialog width
     renderer->fillRect(dlgX, titleBarY, DLG_W, titleBarH, true);
     // White text centered in the black bar
     // Convert title to uppercase

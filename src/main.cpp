@@ -409,97 +409,8 @@ void setup() {
         }
 #endif
 
-        if (storyLoaded && SD_FS.exists(saveFilePath)) {
-          File saveFile = SD_FS.open(saveFilePath, FILE_READ);
-          if (saveFile) {
-            uint32_t magic = 0;
-            if (saveFile.read((uint8_t *)&magic, 4) == 4 &&
-                magic == 0x314B4E45) { // "ENK1"
-              uint32_t savedHash = 0;
-              if (saveFile.read((uint8_t *)&savedHash, 4) == 4 &&
-                  savedHash == currentStoryHash) {
-                uint32_t snapSize = 0;
-                if (saveFile.read((uint8_t *)&snapSize, 4) == 4) {
-                  // Cap size to reasonable limit (e.g. 1MB) to prevent bad
-                  // allocs on corrupt files
-                  if (snapSize < 1024 * 1024) {
-                    unsigned char *buf =
-                        new (std::nothrow) unsigned char[snapSize];
-                    if (buf) {
-                      saveFile.read(buf, snapSize);
-                      if (engine->loadSnapshot(buf, snapSize)) {
-                        Serial.println("Save loaded successfully!");
-
-                        // Read history
-                        uint16_t historySize = 0;
-                        if (saveFile.read((uint8_t *)&historySize, 2) == 2) {
-                          std::deque<WrappedLine> history;
-                          for (uint16_t i = 0; i < historySize; i++) {
-                            uint16_t lineLen;
-                            if (saveFile.read((uint8_t *)&lineLen, 2) != 2)
-                              break;
-                            char *lineBuf =
-                                new (std::nothrow) char[lineLen + 1];
-                            if (lineBuf) {
-                              saveFile.read((uint8_t *)lineBuf, lineLen);
-                              lineBuf[lineLen] = '\0';
-                              uint8_t flags = 0;
-                              saveFile.read(&flags, 1);
-                              bool isOld = (flags & 1) != 0;
-                              bool endOfParagraph = (flags & 2) != 0;
-                              std::string str(lineBuf);
-                              bool isImage = false;
-                              std::string imagePath = "";
-                              if (str.length() > 7 &&
-                                  str.substr(0, 6) == "\x1B[IMG:") {
-                                isImage = true;
-                                imagePath = str.substr(6, str.length() - 7);
-                                str = "";
-                              }
-                              WrappedLine wl;
-                              wl.block = TextBlock(str);
-                              wl.isOld = isOld;
-                              wl.isImage = isImage;
-                              wl.imagePath = imagePath;
-                              wl.imageHeight = isImage ? engine->getImageHeight(
-                                                             imagePath.c_str())
-                                                       : 0;
-                              wl.endOfParagraph = endOfParagraph;
-                              history.push_back(wl);
-                              delete[] lineBuf;
-                            } else {
-                              break;
-                            }
-                          }
-                          engine->setHistory(history);
-                        }
-                      } else {
-                        Serial.println("Failed to load save file.");
-                        errorMessage = "Failed to load save file.";
-                        storyLoaded = false;
-                      }
-                      delete[] buf;
-                    } else {
-                      Serial.println("Out of memory reading save.");
-                      errorMessage = "Out of memory reading save.";
-                      storyLoaded = false;
-                    }
-                  } else {
-                    Serial.println("Save file snapshot too large.");
-                    errorMessage = "Save file corrupt (size).";
-                    storyLoaded = false;
-                  }
-                }
-              } else {
-                Serial.println("Save file is for an older version of the "
-                               "story. Starting fresh.");
-              }
-            } else {
-              Serial.println("Incompatible save file. Starting fresh.");
-              // It's an old save file. Just ignore it and start fresh.
-            }
-            saveFile.close();
-          }
+        if (storyLoaded) {
+          Serial.println("Story and save loaded successfully!");
         }
       }
     } else {
@@ -546,7 +457,7 @@ void setup() {
 }
 
 void saveProgress() {
-  if (!engine)
+  if (!engine || !storage)
     return;
 #ifdef PLATFORM_ESP32
   systemUI->showLoading("Saving Progress...", 1.0f);
@@ -554,70 +465,13 @@ void saveProgress() {
 
   size_t snapLen = 0;
   const unsigned char *snapData = engine->createSnapshot(&snapLen);
-  if (snapData) {
-    File f = SD_FS.open(saveFilePath, FILE_WRITE);
-    if (f) {
-      uint32_t magic = 0x314B4E45; // "ENK1"
-      f.write((const uint8_t *)&magic, 4);
-
-      f.write((const uint8_t *)&currentStoryHash, 4);
-
-      uint32_t snapSize32 = snapLen;
-      f.write((const uint8_t *)&snapSize32, 4);
-      f.write(snapData, snapLen);
-
-      // Write history
-      const auto &history = engine->getHistory();
-      uint16_t historySize = history.size();
-      f.write((const uint8_t *)&historySize, 2);
-      for (const auto &line : history) {
-        std::string text = line.block.getText();
-        if (line.isImage) {
-          text = "\x1B[IMG:" + line.imagePath + "]";
-        }
-        uint16_t len = text.length();
-        f.write((const uint8_t *)&len, 2);
-        f.write((const uint8_t *)text.c_str(), len);
-        uint8_t flags = (line.isOld ? 1 : 0) | (line.endOfParagraph ? 2 : 0);
-        f.write(&flags, 1);
-      }
-
-      f.close();
+  if (snapData && snapLen > 0) {
+    engine->getSaveManager().saveMainProgress(snapData, snapLen,
+                                             engine->getHistory());
+    if (engine->getSaveManager().writeSaveFile(*storage)) {
       Serial.println("Game saved successfully!");
     } else {
-      systemUI->showMessage("eenk SYSTEM ERROR",
-                            "Failed to write save file to SD.\n\nPress CONFIRM "
-                            "or BACK to reboot to the menu.");
-      while (true) {
-        ButtonEvent ev = input->pollInput();
-        if (ev == ButtonEvent::SLEEP) {
-          break;
-        } else if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::BACK ||
-                   ev == ButtonEvent::QUIT) {
-          Serial.println("Rebooting to MENU requested by user...");
-          BootManager::setBootMode(BootMode::MENU);
-          delay(500);
-          BootManager::reboot();
-        }
-        delay(10);
-      }
-    }
-  } else {
-    systemUI->showMessage("eenk SYSTEM ERROR",
-                          "Failed to create runtime snapshot.\n\nPress CONFIRM "
-                          "or BACK to reboot to the menu.");
-    while (true) {
-      ButtonEvent ev = input->pollInput();
-      if (ev == ButtonEvent::SLEEP) {
-        break;
-      } else if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::BACK ||
-                 ev == ButtonEvent::QUIT) {
-        Serial.println("Rebooting to MENU requested by user...");
-        BootManager::setBootMode(BootMode::MENU);
-        delay(500);
-        BootManager::reboot();
-      }
-      delay(10);
+      Serial.println("Failed to write save file to SD.");
     }
   }
 #endif

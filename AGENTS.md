@@ -137,6 +137,7 @@ src/
 │   └── SdCacheStorage.cpp/.h # CacheStorage cache directory adapter
 ├── engine/
 │   ├── InkEngine.cpp/.h      # Core Ink story execution engine
+│   └── StorySaveManager.cpp/.h # ENK2 save game serialization & checkpoint manager
 ├── hal/
 │   ├── IDisplay.h            # Display hardware abstraction interface
 │   ├── IInput.h              # Input hardware abstraction interface
@@ -153,6 +154,7 @@ src/
 ├── ui/
 │   ├── SystemUI.cpp/.h       # Top-level UI coordinator
 │   ├── Library.cpp/.h        # Story library browser
+│   ├── MenuModalWidget.cpp/.h # Selectable menu modal widget (story menu & submenus)
 │   ├── SettingsView.cpp/.h   # Settings menu
 │   ├── BatteryWidget.cpp/.h  # Battery indicator
 │   ├── HeaderWidget.cpp/.h   # Header bar

@@ -24,8 +24,9 @@ constexpr int PILL_PADDING_X =
 constexpr int HEADER_H = 40;  // Top bar height (px)
 constexpr int FOOTER_H = 64;  // Bottom bar height (px)
 constexpr int ROW_H = 60;     // Settings/library row height (px)
-constexpr int DIALOG_W = 300; // Default dialog width (px)
-constexpr int MARGIN_X = 12;  // Standard horizontal margin (px)
+constexpr int DIALOG_W = 300;      // Default dialog width (px)
+constexpr int MENU_DIALOG_W = 390; // Default menu modal width (px)
+constexpr int MARGIN_X = 12;       // Standard horizontal margin (px)
 
 // ── Font IDs ─────────────────────────────────────────────────────────────────
 // Heading/action font (Syne Bold 10pt, all caps)
