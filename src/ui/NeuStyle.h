@@ -26,6 +26,7 @@ constexpr int FOOTER_H = 64;  // Bottom bar height (px)
 constexpr int ROW_H = 60;     // Settings/library row height (px)
 constexpr int DIALOG_W = 300;      // Default dialog width (px)
 constexpr int MENU_DIALOG_W = 390; // Default menu modal width (px)
+constexpr int CHOICE_MIN_H = 64;   // Minimum choice & menu item height (px)
 constexpr int MARGIN_X = 12;       // Standard horizontal margin (px)
 
 // ── Font IDs ─────────────────────────────────────────────────────────────────

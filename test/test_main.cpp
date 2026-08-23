@@ -1494,6 +1494,27 @@ void test_choice_reveal_interaction(void) {
   TEST_ASSERT_EQUAL(InkEngine::State::STORY_ENDED, engine.getState());
 }
 
+void test_choice_activation_skips_blink_when_touch_disabled(void) {
+  TestDisplay display;
+  MockInput input;
+  SDLStorage storage;
+  InkEngine engine(display, input, storage);
+
+  AppSettings settings = AppSettings::defaults();
+  settings.touchChoicesEnabled = false;
+
+  InkDisplayManager dm(display);
+  dm.applySettings(settings);
+  dm.setupStoryEndedChoices();
+
+  InkStoryManager story(storage);
+  dm.flashChoiceActivation(story, settings, 2);
+
+  // Selected choice is updated, but blinking choice remains unset (-1)
+  TEST_ASSERT_EQUAL(2, dm.getSelectedChoice());
+  TEST_ASSERT_EQUAL(-1, dm.getBlinkingChoice());
+}
+
 void test_story_metadata_save_path(void) {
   char saveBufFolder[256];
   char saveBufRootFile[256];
@@ -1794,6 +1815,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_choice_states_touch_screenshot);
   RUN_TEST(test_image_widget_screenshot);
   RUN_TEST(test_choice_reveal_interaction);
+  RUN_TEST(test_choice_activation_skips_blink_when_touch_disabled);
   RUN_TEST(test_story_metadata_save_path);
   RUN_TEST(test_quick_menu_screenshot);
   RUN_TEST(test_quick_menu_disabled_choices_screenshot);

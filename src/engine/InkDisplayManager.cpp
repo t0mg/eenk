@@ -639,6 +639,9 @@ void InkDisplayManager::redraw(InkStoryManager &storyManager,
 
 void InkDisplayManager::flashChoiceActivation(InkStoryManager& storyManager, AppSettings& settings, int choiceIdx) {
   _selectedChoice = choiceIdx;
+  if (!settings.touchChoicesEnabled) {
+    return;
+  }
   int dummyRefresh = 0;
 
   // Single crisp blink acknowledgment (Regular <-> Inverted)

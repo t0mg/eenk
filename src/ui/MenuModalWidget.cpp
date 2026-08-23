@@ -72,7 +72,7 @@ int MenuModalWidget::show(IDisplay &display, IInput &input,
       pageWrappedLines.push_back(wrapped);
 
       int numLines = static_cast<int>(wrapped.size());
-      int itemH = std::max(56, numLines * bodyLineH + 20);
+      int itemH = std::max(NeuStyle::CHOICE_MIN_H, numLines * bodyLineH + 20);
       pageItemHeights.push_back(itemH);
       itemsTotalH += itemH;
     }
