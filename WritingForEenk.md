@@ -147,38 +147,6 @@ Sirens echoed in the distance as the hovercraft engine roared to life...
 - Rewinding to a chapter will remove access to subsequent ones: it's a linear chain and you snip it when you rewind.
 - There is no visual clue that a chapter has been reached, it is left to you whether or not to reveal it (for example with an explicit `Act I`, or a sutbler in game message).
 
-```ink
-# let C1 = 0
-# let C2 = 0
-
-==start==
-
-# CHECKPOINT: Before the Choice
-
-Hello there. In front of you is a choice:
-+ [Make Choice A] -> ChoiceA
-+ [Make Choice B] -> ChoiceB
-
-==ChoiceA==
-You made choice A. Good job.
-# set C1 += 1
-
-# CHECKPOINT: Chapter 2
-
-Now you're in chapter 2. 
-+ [Continue to end] -> end
-+ [Go back to choice A?] -> ChoiceA
-
-==ChoiceB==
-You made choice B. Bold move.
-# set C2 += 1
-
-==end==
-
-The end.
-# CHECKPOINT: The End
-```
-
 ## Building with eenky
 
 eenky is the desktop companion application that compiles your `.ink` files into a `.bin` file optimized for the eenk hardware. It uses a customized compiler pipeline (`inklecate` -> `inkcpp_cl`).
@@ -192,7 +160,7 @@ You can play it in eenky's simulator by clicking the device button in the toolba
 
 ## Transferring to the eenk device
 
-To play your compiled story on the hardware device you can either take the SD card out and put it in your computer, or transfer directly from eenky to the device if it has USB Serial capability.
+To play your compiled story on the hardware device you can either take the SD card out and put it in your computer, or transfer directly from eenky to the device over USB.
 
 ### Using the Device Manager in eenky
 
@@ -200,7 +168,7 @@ To play your compiled story on the hardware device you can either take the SD ca
 2. Connect it to your computer via USB.
 3. Open eenky's **Device Manager** from the home screen, Device menu or keyboard shortcut (Ctrl+D or Cmd+D). 
 4. Click **Connect** and select the correct COM port (e.g. `USB jtag/serial debug unit`).
-5. Click **Upload Story** and select your story `.bin` file. Associated files like fonts and `.media` will be added automatically.
+5. Click **Upload Story** and select your story `.bin` file. Add associated files like `.epdfont` and `.media` if necessary and proceed with the upload.
 6. Click **Disconnect** and the device will reboot to reveal your new story in the library!
 
 ### Manual write to the SD card
