@@ -39,33 +39,36 @@
         <span class="status-text" id="status-text">Not connected</span>
       </div>
 
+      <!-- ── SD Card usage ───────────────────────────────────── -->
+      <div class="sd-bar-row" id="sd-bar-row" style="visibility:hidden;" aria-label="SD Card storage">
+        <span class="sd-label">SD Card</span>
+        <div class="sd-bar-wrap">
+          <div class="sd-bar-fill" id="sd-bar" style="width:0%"></div>
+        </div>
+        <span class="sd-size-text" id="sd-size-text">—</span>
+      </div>
+
       <div class="dm-header-actions">
         <button class="btn btn-secondary" id="connect-btn" aria-label="Connect to eenk device">
           <span class="material-symbols-outlined">usb</span> Connect
-        </button>
-        <button class="btn btn-secondary" id="disconnect-btn" style="display:none;" aria-label="Disconnect">
-          <span class="material-symbols-outlined">usb_off</span> Disconnect
         </button>
         <button class="btn btn-secondary" id="refresh-btn" style="display:none;" aria-label="Refresh file list"
           title="Refresh">
           <span class="material-symbols-outlined">refresh</span>
         </button>
+        <button class="btn btn-secondary" id="disconnect-btn" style="display:none;" aria-label="Disconnect">
+          <span class="material-symbols-outlined">usb_off</span> Disconnect
+        </button>
       </div>
     </header>
-
-    <!-- ── SD Card usage ───────────────────────────────────── -->
-    <div class="sd-bar-row" id="sd-bar-row" style="display:none;" aria-label="SD Card storage">
-      <span class="sd-label">SD Card</span>
-      <div class="sd-bar-wrap">
-        <div class="sd-bar-fill" id="sd-bar" style="width:0%"></div>
-      </div>
-      <span class="sd-size-text" id="sd-size-text">—</span>
-    </div>
 
     <!-- ── Tabs ────────────────────────────────────────────── -->
     <div class="dm-tabs" id="tab-strip" role="tablist">
       <button class="dm-tab active" role="tab" aria-selected="true" data-tab="stories" id="tab-stories">
-        <span class="material-symbols-outlined">menu_book</span> Stories
+        <span class="material-symbols-outlined">auto_stories</span> Stories
+      </button>
+      <button class="dm-tab" role="tab" aria-selected="false" data-tab="books" id="tab-books">
+        <span class="material-symbols-outlined">book_2</span> Books
       </button>
       <button class="dm-tab" role="tab" aria-selected="false" data-tab="saves" id="tab-saves">
         <span class="material-symbols-outlined">save</span> Saves
@@ -86,13 +89,7 @@
       <!-- Stories tab -->
       <div class="tab-panel active" id="panel-stories" role="tabpanel" aria-labelledby="tab-stories"
         style="display:none;">
-        <div class="file-list-header">
-          <span class="file-list-title">Stories</span>
-          <label class="btn btn-secondary" for="upload-input" id="upload-label" aria-label="Upload story .bin file">
-            <span class="material-symbols-outlined">upload</span> Upload Story…
-          </label>
-          <input type="file" id="upload-input" accept=".bin,.epdfont,.media" style="display:none;" multiple />
-        </div>
+        <input type="file" id="upload-input" accept=".bin,.epdfont,.media" style="display:none;" multiple />
 
         <!-- Sidecar prompt (browser context: shown after picking a .bin) -->
         <div class="sidecar-prompt" id="sidecar-prompt" style="display:none;">
@@ -110,18 +107,29 @@
         <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Drop .bin file here to upload">
           <span class="upload-icon"><span class="material-symbols-outlined"
               style="font-size:2rem;">folder_open</span></span>
-          <span class="upload-hint">Drop your <strong>.bin</strong> story file or folder here, or click Upload Story
-            above</span>
+          <span class="upload-hint">Drop your <strong>.bin</strong> story file or folder or click here</span>
         </div>
 
         <div class="file-list" id="stories-list"></div>
       </div>
 
+      <!-- Books tab -->
+      <div class="tab-panel" id="panel-books" role="tabpanel" aria-labelledby="tab-books" style="display:none;">
+        <input type="file" id="upload-book-input" accept=".epub" style="display:none;" multiple />
+
+        <!-- Upload drop zone -->
+        <div class="upload-zone" id="upload-book-zone" role="button" tabindex="0"
+          aria-label="Drop .epub file here to upload">
+          <span class="upload-icon"><span class="material-symbols-outlined"
+              style="font-size:2rem;">folder_open</span></span>
+          <span class="upload-hint">Drop your <strong>.epub</strong> book file or folder or click here</span>
+        </div>
+
+        <div class="file-list" id="books-list"></div>
+      </div>
+
       <!-- Saves tab -->
       <div class="tab-panel" id="panel-saves" role="tabpanel" aria-labelledby="tab-saves" style="display:none;">
-        <div class="file-list-header">
-          <span class="file-list-title">Saves</span>
-        </div>
         <div class="file-list" id="saves-list"></div>
       </div>
 

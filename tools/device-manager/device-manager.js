@@ -38,6 +38,7 @@ const state = {
   protocolVersion: null,
   sdInfo: { total: 0, used: 0, free: 0 },
   stories: [],
+  books: [],
   saves: [],
   transferState: null,
   error: null,
@@ -65,11 +66,15 @@ const sdBar = $('sd-bar');
 const sdSizeText = $('sd-size-text');
 const emptyState = $('empty-state');
 const panelStories = $('panel-stories');
+const panelBooks = $('panel-books');
 const panelSaves = $('panel-saves');
 const storiesList = $('stories-list');
+const booksList = $('books-list');
 const savesList = $('saves-list');
 const uploadInput = $('upload-input');
 const uploadZone = $('upload-zone');
+const uploadBookInput = $('upload-book-input');
+const uploadBookZone = $('upload-book-zone');
 const sidecarPrompt = $('sidecar-prompt');
 const sidecarFileList = $('sidecar-file-list');
 const sidecarUploadBtn = $('sidecar-upload-btn');
@@ -92,14 +97,14 @@ let _pendingSidecars = [];    // Array<File> from browser picker
 
 /* ── Render ─────────────────────────────────────────────────────── */
 function render() {
-  const { isConnected, isConnecting, sdInfo, stories, saves, transferState, error, currentTab } = state;
+  const { isConnected, isConnecting, sdInfo, stories, books, saves, transferState, error, currentTab } = state;
 
   // Header status
   statusDot.className = 'status-dot' + (isConnecting ? ' connecting' : isConnected ? ' connected' : '');
   statusText.textContent = isConnecting
     ? 'Connecting…'
     : isConnected
-      ? `Connected — Protocol v${state.protocolVersion ?? '?'}`
+      ? `v${state.protocolVersion ?? '?'}`
       : 'Not connected';
 
   connectBtn.style.display = isConnected || isConnecting ? 'none' : '';
@@ -108,7 +113,7 @@ function render() {
   connectBtn.disabled = isConnecting;
 
   // SD bar
-  sdBarRow.style.display = isConnected ? '' : 'none';
+  sdBarRow.style.visibility = isConnected ? '' : 'hidden';
   if (isConnected && sdInfo.total > 0) {
     const pct = Math.round((sdInfo.used / sdInfo.total) * 100);
     sdBar.style.width = `${pct}%`;
@@ -119,6 +124,7 @@ function render() {
   const showFiles = isConnected && !isConnecting;
   emptyState.style.display = showFiles ? 'none' : '';
   panelStories.style.display = showFiles && currentTab === 'stories' ? 'block' : 'none';
+  if (panelBooks) panelBooks.style.display = showFiles && currentTab === 'books' ? 'block' : 'none';
   panelSaves.style.display = showFiles && currentTab === 'saves' ? 'block' : 'none';
 
   // Tab strip active state
@@ -130,6 +136,7 @@ function render() {
 
   // File lists
   renderFileList(storiesList, stories, 'story');
+  if (booksList) renderFileList(booksList, books, 'book');
   renderFileList(savesList, saves, 'save');
 
   // Transfer footer
@@ -160,9 +167,11 @@ function render() {
 }
 
 function renderFileList(container, items, kind) {
+  if (!container) return;
   container.innerHTML = '';
   if (!items.length) {
-    container.innerHTML = `<div class="empty-list">No ${kind}s found on device.</div>`;
+    const plural = kind === 'story' ? 'stories' : `${kind}s`;
+    container.innerHTML = `<div class="empty-list">No ${plural} found on device.</div>`;
     return;
   }
   items.forEach(item => {
@@ -174,7 +183,7 @@ function renderFileList(container, items, kind) {
       <span class="file-name" title="${item.path}">${item.name}</span>
       <span class="file-size">${item.size ? formatSize(item.size) : ''}</span>
       <div class="file-actions">
-        ${item.type === 'D' ? '' : `<button class="icon-btn download-btn" data-path="${item.path}" data-name="${item.name}" aria-label="Download ${item.name}">
+        ${(item.type === 'D' || kind === 'book') ? '' : `<button class="icon-btn download-btn" data-path="${item.path}" data-name="${item.name}" aria-label="Download ${item.name}">
           <span class="material-symbols-outlined" style="font-size:1em;">download</span> Download
         </button>`}
         <button class="icon-btn delete-btn delete" data-path="${item.path}" data-name="${item.name}" aria-label="Delete ${item.name}">
@@ -225,7 +234,7 @@ async function disconnect() {
   }
   setState({
     isConnected: false, protocolVersion: null,
-    stories: [], saves: [], sdInfo: { total: 0, used: 0, free: 0 },
+    stories: [], books: [], saves: [], sdInfo: { total: 0, used: 0, free: 0 },
     transferState: null, error: null,
   });
 }
@@ -244,6 +253,14 @@ async function refreshFiles() {
       if (!e.message?.includes('NOT_FOUND')) throw e;
     }
 
+    let books = [];
+    try {
+      const files = await protocol.listFiles('/books');
+      books = files.map(f => ({ ...f, path: `/books/${f.name}` }));
+    } catch (e) {
+      if (!e.message?.includes('NOT_FOUND')) throw e;
+    }
+
     let saves = [];
     try {
       const files = await protocol.listFiles('/.eenk_saves');
@@ -252,7 +269,7 @@ async function refreshFiles() {
       if (!e.message?.includes('NOT_FOUND')) throw e;
     }
 
-    setState({ stories, saves });
+    setState({ stories, books, saves });
   } catch (e) {
     showError('Error refreshing files: ' + e.message);
   }
@@ -262,6 +279,19 @@ async function deleteItem(path, name) {
   if (!state.isConnected || !protocol) return;
   try {
     await protocol.deleteFile(path);
+
+    // If deleting an epub book or a file in /books, also clean up the related .eenk_cache subfolder
+    if (path.startsWith('/books/') || name.toLowerCase().endsWith('.epub')) {
+      const stem = name.replace(/\.[^/.]+$/, '');
+      if (stem) {
+        try {
+          await protocol.deleteFile(`/.eenk_cache/${stem}`);
+        } catch (_) {
+          // Cache subfolder may not exist if book was never opened
+        }
+      }
+    }
+
     await refreshFiles();
   } catch (e) {
     showError(`Delete failed: ${e.message}`);
@@ -377,7 +407,7 @@ async function handleBinSelected(binFile, providedFiles = []) {
     // Browser: no filesystem access — check if sidecars were provided in the same drop/selection
     const SIDECAR_EXTS = ['.epdfont', '.media'];
     const baseName = binFile.name.replace(/\.bin$/i, '');
-    
+
     // Auto-detect from providedFiles
     const autoFound = providedFiles.filter(f => {
       const ext = f.name.substring(f.name.lastIndexOf('.')).toLowerCase();
@@ -394,7 +424,7 @@ async function handleBinSelected(binFile, providedFiles = []) {
     if (autoFound.length > 0) {
       titleEl.textContent = 'Associated files detected';
       descEl.textContent = 'The following files were provided alongside the story. Upload them?';
-      
+
       autoFound.forEach(f => {
         const row = document.createElement('div');
         row.className = 'sidecar-file-row';
@@ -423,7 +453,7 @@ async function handleBinSelected(binFile, providedFiles = []) {
         // Only keep unique files by name
         const existingNames = new Set(_pendingSidecars.map(f => f.name));
         const uniqueNew = newFiles.filter(f => !existingNames.has(f.name));
-        
+
         _pendingSidecars = [..._pendingSidecars, ...uniqueNew];
         // Re-render list
         sidecarFileList.innerHTML = '';
@@ -474,26 +504,35 @@ document.querySelectorAll('.dm-tab').forEach(btn => {
   });
 });
 
-// Upload input
-uploadInput.addEventListener('change', async () => {
-  const files = Array.from(uploadInput.files || []);
-  uploadInput.value = '';
-  const bin = files.find(f => f.name.endsWith('.bin'));
-  if (bin) await handleBinSelected(bin, files);
-  else if (files.length > 0) showError("Please include a .bin story file.");
-});
+async function executeBookUpload(epubFile) {
+  if (!state.isConnected || !protocol) return;
+  try {
+    try { await protocol.mkdir('/books'); } catch (_) { }
 
-// Upload zone click → trigger hidden input
-uploadZone.addEventListener('click', () => uploadInput.click());
-uploadZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') uploadInput.click(); });
+    const buf = await epubFile.arrayBuffer();
+    const data = new Uint8Array(buf);
 
-// Drag-and-drop on upload zone
-uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
-uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
-uploadZone.addEventListener('drop', async e => {
-  e.preventDefault();
-  uploadZone.classList.remove('drag-over');
+    setState({ transferState: { type: 'upload', filename: epubFile.name, bytesTransferred: 0, bytesTotal: data.length } });
+    await protocol.uploadFile(`/books/${epubFile.name}`, data, (transferred, total) => {
+      setState({ transferState: { type: 'upload', filename: epubFile.name, bytesTransferred: transferred, bytesTotal: total } });
+    });
 
+    await refreshFiles();
+  } catch (e) {
+    showError(`Upload failed for ${epubFile.name}: ` + e.message);
+  } finally {
+    clearTransfer();
+  }
+}
+
+async function handleEpubSelected(epubFiles) {
+  if (!epubFiles || !epubFiles.length) return;
+  for (const epub of epubFiles) {
+    await executeBookUpload(epub);
+  }
+}
+
+async function extractDroppedFiles(e) {
   const files = [];
 
   if (e.dataTransfer?.items) {
@@ -512,12 +551,12 @@ uploadZone.addEventListener('drop', async e => {
                 allEntries.push(...readEntries);
               } while (readEntries.length > 0);
 
-              for (const e of allEntries) {
-                if (e.isFile) {
-                  const file = await new Promise(resolve => e.file(resolve, () => resolve(null)));
+              for (const en of allEntries) {
+                if (en.isFile) {
+                  const file = await new Promise(resolve => en.file(resolve, () => resolve(null)));
                   if (file) files.push(file);
-                } else if (e.isDirectory) {
-                  await readDir(e);
+                } else if (en.isDirectory) {
+                  await readDir(en);
                 }
               }
             };
@@ -536,10 +575,70 @@ uploadZone.addEventListener('drop', async e => {
     files.push(...Array.from(e.dataTransfer?.files || []));
   }
 
+  return files;
+}
+
+// Upload input (Stories)
+uploadInput.addEventListener('change', async () => {
+  const files = Array.from(uploadInput.files || []);
+  uploadInput.value = '';
   const bin = files.find(f => f.name.endsWith('.bin'));
   if (bin) await handleBinSelected(bin, files);
   else if (files.length > 0) showError("Please include a .bin story file.");
 });
+
+// Upload zone click → trigger hidden input (Stories)
+uploadZone.addEventListener('click', () => uploadInput.click());
+uploadZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') uploadInput.click(); });
+
+// Drag-and-drop on upload zone (Stories)
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', async e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+
+  const files = await extractDroppedFiles(e);
+  const bin = files.find(f => f.name.endsWith('.bin'));
+  if (bin) await handleBinSelected(bin, files);
+  else if (files.length > 0) showError("Please include a .bin story file.");
+});
+
+// Upload input (Books)
+if (uploadBookInput) {
+  uploadBookInput.addEventListener('change', async () => {
+    const files = Array.from(uploadBookInput.files || []);
+    uploadBookInput.value = '';
+    const epubs = files.filter(f => f.name.toLowerCase().endsWith('.epub'));
+    if (epubs.length > 0) {
+      await handleEpubSelected(epubs);
+    } else if (files.length > 0) {
+      showError("Please select a .epub book file.");
+    }
+  });
+}
+
+// Upload zone click → trigger hidden input (Books)
+if (uploadBookZone) {
+  uploadBookZone.addEventListener('click', () => uploadBookInput?.click());
+  uploadBookZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') uploadBookInput?.click(); });
+
+  // Drag-and-drop on upload zone (Books)
+  uploadBookZone.addEventListener('dragover', e => { e.preventDefault(); uploadBookZone.classList.add('drag-over'); });
+  uploadBookZone.addEventListener('dragleave', () => uploadBookZone.classList.remove('drag-over'));
+  uploadBookZone.addEventListener('drop', async e => {
+    e.preventDefault();
+    uploadBookZone.classList.remove('drag-over');
+
+    const files = await extractDroppedFiles(e);
+    const epubs = files.filter(f => f.name.toLowerCase().endsWith('.epub'));
+    if (epubs.length > 0) {
+      await handleEpubSelected(epubs);
+    } else if (files.length > 0) {
+      showError("Please include a .epub book file.");
+    }
+  });
+}
 
 // Sidecar prompt buttons
 sidecarUploadBtn.addEventListener('click', async () => {
