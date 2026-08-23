@@ -25,6 +25,12 @@
 #else
 #include <cstdlib>
 #include <cstdio>
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
 #endif
 #include <cstring>
 #include <vector>
