@@ -33,11 +33,9 @@ The easiest way to install or update eenk firmware is using your web browser:
 
 ### Method 2: Offline SD Card Update
 
-TODO: refine this.
+TODO: document this alternative method for X4.
 
-<!-- You can update firmware offline without a PC connection:
-
-1. Download the latest `firmware.bin` release for your device.
+<!-- 1. Download the [latest `firmware.bin` release](https://github.com/t0mg/eenk/releases/latest) for your device (`x3x4-` or `x4pro-` depending on your model).
 2. Copy `firmware.bin` to the **root directory** of your MicroSD card.
 3. Insert the SD card and turn on the device. The bootloader will detect the update file, flash the new firmware, and rename the file to `firmware.bin.bak`. -->
 
@@ -61,13 +59,13 @@ The Xteink X4 Pro has 3 physical buttons on the sides: **LEFT** on one side, and
 
 Buttons are used as follows in eenk:
 
-| Control | In Story Player | In Library / Menus | In Settings View |
-|---|---|---|---|
-| **UP / LEFT** | Scroll text up / Previous choice | Move selection up | Move selection up |
-| **DOWN / RIGHT** | Scroll text down / Next choice | Move selection down | Move selection down |
-| **BACK / QUIT / MENU** | Open exit dialog (save & pause) | Open Settings panel | Exit Settings (saves automatically) |
-| **CONFIRM / SELECT / POWER (Short press)** | Confirm selected choice | Launch selected story | Cycle value / Run action |
-| **POWER (Long Press)** | Save progress and sleep | Save and sleep | Save settings and sleep |
+| Control | In Story Player | In EPUB Reader | In Library / Menus | In Settings View |
+|---|---|---|---|---|
+| **UP / LEFT** | Scroll text up / Previous choice | Previous page | Move selection up | Move selection up |
+| **DOWN / RIGHT** | Scroll text down / Next choice | Next page | Move selection down | Move selection down |
+| **BACK / QUIT / MENU** | Open exit dialog (save & pause) | Open exit dialog (save & pause) | Open Settings panel | Exit Settings (saves automatically) |
+| **CONFIRM / SELECT / POWER (Short press)** | Confirm selected choice | Next page | Launch selected story | Cycle value / Run action |
+| **POWER (Long Press)** | Save progress and sleep | Bookmark page and sleep | Sleep | Save settings and sleep |
 
 Generally speaking when there are modal windows or a footer with labels, the corresponding chin button should be used.
 
@@ -213,6 +211,14 @@ This UI screen is still a work in progress and likely to be adjusted in the near
 | **Reboot to Updater** | OTA / App1 | Reboot into the recovery/updater partition (X4). |
 | **Format SD** | Erase SD Card | Formats the MicroSD card to FAT32 filesystem. |
 | **Firmware** | Version String | Displays the currently installed eenk firmware version. | -->
+
+## EPUB reading
+
+eenk also includes a basic EPUB reader so you can take the occasional break between your adventures and read some traditional books.
+
+EPUB files can be uploaded on the SD card under `/books` or via the device manager. Books will appear in your Library, mixed in with your Ink-based stories.
+
+A bookmark is stored in `/.eenk_saves/` for each book you open. the `.eenk_cache` folder contains processed content such as images for faster loading between readings. This cache is cleaned up when you delete the book from the device manager.
 
 ## Font Management
 

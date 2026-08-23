@@ -9,7 +9,7 @@ The **eenk** core firmware runtime and hardware ecosystem are made possible by t
 
 ## Other building blocks
 
-- **[Free-Ink SDK](https://github.com/Free-Ink/freeink-sdk)** - Created by the Free-Ink team. Hardware abstraction SDK providing low-level display drivers (UC8253, UC8279, SSD1677, UC8179), power control, battery monitoring, and device detection for Xteink hardware.
+- **[Free-Ink SDK](https://github.com/Free-Ink/freeink-sdk)** - Created by the Free-Ink team. Hardware abstraction SDK providing low-level display drivers (UC8253, UC8279, SSD1677, UC8179), power control, battery monitoring, and device detection for Xteink hardware. Additionally the [FreeInkBook](https://freeink.org/docs/lib-book) reading engine is used for the EPUB reader functionality. 
 - **[esptool-js](https://github.com/espressif/esptool-js)** - Espressif Systems. Web Serial JavaScript library enabling browser-based firmware flashing.
 - **[Arduino-ESP32 / ESP-IDF](https://github.com/espressif/arduino-esp32)** - Espressif Systems. Core ESP32 hardware platform, peripheral drivers, and framework.
 - **[PlatformIO](https://platformio.org/)** - PlatformIO team. Build automation system for embedded hardware and host compilation.
