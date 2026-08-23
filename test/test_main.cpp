@@ -647,24 +647,12 @@ void test_fonts_screenshot(void) {
   TEST_ASSERT_EQUAL(1, 1);
 }
 
-static bool writeDummyEpdfont(const char *path, bool is2bit = false);
-
 void test_external_fonts_screenshot(void) {
   TestDisplay display;
   display.clear();
 
-#ifdef _WIN32
-  _mkdir("sd_fonts");
-#else
-  mkdir("sd_fonts", 0755);
-#endif
-  const char *rpath = "sd_fonts/orbitron-regular.epdfont";
-  const char *bpath = "sd_fonts/orbitron-bold.epdfont";
-  writeDummyEpdfont(rpath);
-  writeDummyEpdfont(bpath);
-
   StreamingEpdFontFamily fam;
-  const char *dirs[] = {"sd_fonts", nullptr};
+  const char *dirs[] = {"test/fonts", "sd_fonts", nullptr};
   TEST_ASSERT_TRUE(fam.load("orbitron", dirs));
 
   int y = 50;
@@ -698,9 +686,6 @@ void test_external_fonts_screenshot(void) {
     display.renderer.drawText(100, 20, y, "Hello World from SD card!", true,
                               EpdFontFamily::BOLD);
   }
-
-  remove(rpath);
-  remove(bpath);
 
   saveBMP("test/golden/test_external_fonts.bmp", display.eink.getFrameBuffer(),
           display.getWidth(), display.getHeight());
@@ -1260,7 +1245,7 @@ void test_quick_menu_disabled_choices_screenshot(void) {
 
 // Writes a minimal valid .epdfont file (zero glyphs/intervals/bitmap) for
 // testing. Layout matches EpdFontLoader::FileHeader + FileMetrics exactly.
-static bool writeDummyEpdfont(const char *path, bool is2bit) {
+static bool writeDummyEpdfont(const char *path, bool is2bit = false) {
   FILE *f = fopen(path, "wb");
   if (!f)
     return false;
