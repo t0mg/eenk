@@ -135,11 +135,11 @@ marked.use({
       return `<h${level} id="${id}" class="heading-anchor-group">` +
         `<span class="heading-text">${text}</span>` +
         `<a href="#${id}" class="heading-anchor" aria-label="Link to section: ${plainTitle}" title="Direct link to section">` +
-          `<svg class="heading-anchor-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">` +
-            `<path d="M7.775 3.275a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 1 1 2.83 2.83l-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25zm-.02 9.45a.75.75 0 0 0-1.06-1.06l-1.25 1.25a2 2 0 0 1-2.83-2.83l2.5-2.5a2 2 0 0 1 2.83 0 .75.75 0 0 0 1.06-1.06 3.5 3.5 0 0 0-4.95 0l-2.5 2.5a3.5 3.5 0 0 0 4.95 4.95l1.25-1.25z"/>` +
-          `</svg>` +
+        `<svg class="heading-anchor-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">` +
+        `<path d="M7.775 3.275a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 1 1 2.83 2.83l-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25zm-.02 9.45a.75.75 0 0 0-1.06-1.06l-1.25 1.25a2 2 0 0 1-2.83-2.83l2.5-2.5a2 2 0 0 1 2.83 0 .75.75 0 0 0 1.06-1.06 3.5 3.5 0 0 0-4.95 0l-2.5 2.5a3.5 3.5 0 0 0 4.95 4.95l1.25-1.25z"/>` +
+        `</svg>` +
         `</a>` +
-      `</h${level}>\n`;
+        `</h${level}>\n`;
     }
   }
 });
@@ -196,7 +196,7 @@ function mdToHtml(filePath) {
 function resolveNavHrefs(navHtml, assetRootPrefix) {
   // Replace plain out paths with correct relative paths
   return nav.reduce((html, item) => {
-    return html.replaceAll(`href="${item.out}"`, `href="${assetRootPrefix}${item.out}"`);
+    return html.replaceAll(`href="${item.out}"`, `href="${assetRootPrefix}${item.out.replace("index.html", "")}"`);
   }, navHtml);
 }
 
