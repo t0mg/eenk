@@ -47,13 +47,10 @@ static constexpr int kFontHeading = NeuStyle::FONT_HEADING;
 
 static constexpr int ROW_H = NeuStyle::ROW_H;
 static constexpr int LEFT_MARGIN = NeuStyle::MARGIN_X;
-static constexpr int DISP_W = 480;
-static constexpr int DISP_H = 800;
 
 // Card inset from screen edges for bordered rows
 static constexpr int CARD_INSET_X = 24;
 static constexpr int CARD_INSET_Y = 8;
-static constexpr int CARD_W = DISP_W - 2 * CARD_INSET_X;
 
 // Helper: uppercase a string in-place
 static void toUpper(char *s) {
@@ -327,7 +324,7 @@ void SettingsView::renderFooter() {
   footer.btnConfirm = {true, "Change", "Confirm"};
   footer.btnPrev = {true, "Up", "Prev"};
   footer.btnNext = {true, "Down", "Next"};
-  footer.render(r, DISP_W, DISP_H);
+  footer.render(r, _display.getWidth(), _display.getHeight());
 }
 
 // ─── drawSettingsRow()
@@ -341,7 +338,7 @@ void SettingsView::drawSettingsRow(int y, const char *label, const char *value,
 
   int cardX = CARD_INSET_X;
   int cardY = y + CARD_INSET_Y / 2;
-  int cardW = CARD_W;
+  int cardW = _display.getWidth() - 2 * CARD_INSET_X;
   int cardH = ROW_H - CARD_INSET_Y;
 
   ListItemWidget::draw(

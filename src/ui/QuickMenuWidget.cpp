@@ -63,7 +63,13 @@ QuickMenuAction QuickMenuWidget::show() {
           render();
         }
       } else if (touchY >= 250 && touchY < 330) { // Toggles row
-        if (touchX >= 20 && touchX <= 155) {
+        int gap = 20;
+        int toggleW = (displayW - 48 - 2 * gap) / 3;
+        int toggleX0 = 24;
+        int toggleX1 = toggleX0 + toggleW + gap;
+        int toggleX2 = toggleX1 + toggleW + gap;
+
+        if (touchX >= toggleX0 && touchX <= toggleX0 + toggleW) {
           _settings.frontLightEnabled = !_settings.frontLightEnabled;
           if (_frontlight) {
             if (_settings.frontLightEnabled) {
@@ -74,10 +80,10 @@ QuickMenuAction QuickMenuWidget::show() {
             }
           }
           _dirty = true;
-        } else if (touchX >= 165 && touchX <= 305) {
+        } else if (touchX >= toggleX1 && touchX <= toggleX1 + toggleW) {
           _settings.touchScrollEnabled = !_settings.touchScrollEnabled;
           _dirty = true;
-        } else if (touchX >= 310 && touchX <= 450) {
+        } else if (touchX >= toggleX2 && touchX <= toggleX2 + toggleW) {
           if (_choicesEnabled) {
             _settings.touchChoicesEnabled = !_settings.touchChoicesEnabled;
             _dirty = true;
@@ -97,48 +103,6 @@ QuickMenuAction QuickMenuWidget::show() {
     }
 
     switch (ev) {
-    // case ButtonEvent::UP:
-    //   if (_selectedRow > 0) {
-    //     _selectedRow--;
-    //     render();
-    //   }
-    //   break;
-    // case ButtonEvent::DOWN:
-    //   if (_selectedRow < 4) {
-    //     _selectedRow++;
-    //     render();
-    //   }
-    //   break;
-    // case ButtonEvent::LEFT:
-    //   if (_selectedRow == 0 && _frontlight) {
-    //     int b = std::max(0, (int)_frontlight->getBrightness() - 10);
-    //     _frontlight->setBrightness(b);
-    //     render();
-    //   } else if (_selectedRow == 1 && _frontlight) {
-    //     int w = std::max(0, (int)_frontlight->getColorTemperature() - 10);
-    //     _frontlight->setColorTemperature(w);
-    //     render();
-    //   }
-    //   break;
-    // case ButtonEvent::RIGHT:
-    //   if (_selectedRow == 0 && _frontlight) {
-    //     int b = std::min(100, (int)_frontlight->getBrightness() + 10);
-    //     _frontlight->setBrightness(b);
-    //     render();
-    //   } else if (_selectedRow == 1 && _frontlight) {
-    //     int w = std::min(100, (int)_frontlight->getColorTemperature() + 10);
-    //     _frontlight->setColorTemperature(w);
-    //     render();
-    //   }
-    //   break;
-    // case ButtonEvent::CONFIRM:
-    //   if (_selectedRow == 2)
-    //     return QuickMenuAction::SLEEP_DEVICE;
-    //   if (_selectedRow == 3)
-    //     return QuickMenuAction::OPEN_SETTINGS;
-    //   if (_selectedRow == 4)
-    //     return QuickMenuAction::CLOSE;
-    //   break;
     case ButtonEvent::BACK:
     case ButtonEvent::QUIT:
     case ButtonEvent::SWIPE_UP:
@@ -203,33 +167,38 @@ void QuickMenuWidget::render() {
 
   // Toggles Row
   int toggleY = cardY + 260;
+  int gap = 20;
+  int toggleW = (cardW - 48 - 2 * gap) / 3;
+  int toggleX0 = cardX + 24;
+  int toggleX1 = toggleX0 + toggleW + gap;
+  int toggleX2 = toggleX1 + toggleW + gap;
 
   // LED Toggle
-  r->drawShadowBox(cardX + 24, toggleY, 126, 60, NeuStyle::BORDER_W, 4);
+  r->drawShadowBox(toggleX0, toggleY, toggleW, 60, NeuStyle::BORDER_W, 4);
   if (!_settings.frontLightEnabled) {
-    r->fillRect(cardX + 26, toggleY + 2, 122, 56, true);
+    r->fillRect(toggleX0 + 2, toggleY + 2, toggleW - 4, 56, true);
   }
-  centerText(fontHeading, cardX + 24, toggleY, 126, 60, "LIGHT",
+  centerText(fontHeading, toggleX0, toggleY, toggleW, 60, "LIGHT",
              _settings.frontLightEnabled);
 
   // Touch Scroll Toggle
-  r->drawShadowBox(cardX + 170, toggleY, 126, 60, NeuStyle::BORDER_W, 4);
+  r->drawShadowBox(toggleX1, toggleY, toggleW, 60, NeuStyle::BORDER_W, 4);
   if (!_settings.touchScrollEnabled) {
-    r->fillRect(cardX + 172, toggleY + 2, 122, 56, true);
+    r->fillRect(toggleX1 + 2, toggleY + 2, toggleW - 4, 56, true);
   }
-  centerText(fontHeading, cardX + 170, toggleY, 126, 60, "SWIPE",
+  centerText(fontHeading, toggleX1, toggleY, toggleW, 60, "SWIPE",
              _settings.touchScrollEnabled);
 
   // Touch Choices Toggle
-  r->drawShadowBox(cardX + 316, toggleY, 126, 60, NeuStyle::BORDER_W, 4);
+  r->drawShadowBox(toggleX2, toggleY, toggleW, 60, NeuStyle::BORDER_W, 4);
   if (!_choicesEnabled) {
-    centerText(fontHeading, cardX + 316, toggleY, 126, 60, "CHOICES", true);
-    r->fillHalftoneRect(cardX + 318, toggleY + 2, 122, 56, true);
+    centerText(fontHeading, toggleX2, toggleY, toggleW, 60, "CHOICES", true);
+    r->fillHalftoneRect(toggleX2 + 2, toggleY + 2, toggleW - 4, 56, true);
   } else {
     if (!_settings.touchChoicesEnabled) {
-      r->fillRect(cardX + 318, toggleY + 2, 122, 56, true);
+      r->fillRect(toggleX2 + 2, toggleY + 2, toggleW - 4, 56, true);
     }
-    centerText(fontHeading, cardX + 316, toggleY, 126, 60, "CHOICES",
+    centerText(fontHeading, toggleX2, toggleY, toggleW, 60, "CHOICES",
                _settings.touchChoicesEnabled);
   }
 

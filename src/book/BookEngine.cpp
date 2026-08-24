@@ -537,13 +537,22 @@ void BookEngine::generateCoverThumbnail() {
 #endif
 
     const int thumbBox = 152;
-    int srcW = 480;
-    int srcH = 800;
+    int srcW = _display.getWidth();
+    int srcH = _display.getHeight();
     
     // Calculate proportional scaling
     float scale = (float)thumbBox / srcH; 
     int drawW = (int)(srcW * scale);
     int drawH = thumbBox;
+
+    int panelWidth = srcH;
+    int panelHeight = srcW;
+    GfxRenderer::Orientation o = _display.getRenderer() ? _display.getRenderer()->getOrientation() : GfxRenderer::PortraitInverted;
+    if (o == GfxRenderer::LandscapeClockwise || o == GfxRenderer::LandscapeCounterClockwise) {
+        panelWidth = srcW;
+        panelHeight = srcH;
+    }
+    int panelWidthBytes = (panelWidth + 7) / 8;
     
     size_t outRowBytes = (drawW + 7) / 8;
     size_t outSize = outRowBytes * drawH;
@@ -572,21 +581,20 @@ void BookEngine::generateCoverThumbnail() {
             for (int sy = srcYStart; sy < srcYEnd; sy++) {
                 for (int sx = srcXStart; sx < srcXEnd; sx++) {
                     int panelX, panelY;
-                    GfxRenderer::Orientation o = _display.getRenderer() ? _display.getRenderer()->getOrientation() : GfxRenderer::Portrait;
                     switch(o) {
-                        case GfxRenderer::Portrait: panelX = sy; panelY = 479 - sx; break;
-                        case GfxRenderer::PortraitInverted: panelX = 799 - sy; panelY = sx; break;
-                        case GfxRenderer::LandscapeClockwise: panelX = 799 - sx; panelY = 479 - sy; break;
+                        case GfxRenderer::Portrait: panelX = sy; panelY = panelHeight - 1 - sx; break;
+                        case GfxRenderer::PortraitInverted: panelX = (panelWidth - 1) - sy; panelY = sx; break;
+                        case GfxRenderer::LandscapeClockwise: panelX = (panelWidth - 1) - sx; panelY = (panelHeight - 1) - sy; break;
                         case GfxRenderer::LandscapeCounterClockwise: panelX = sx; panelY = sy; break;
-                        default: panelX = sy; panelY = 479 - sx; break;
+                        default: panelX = (panelWidth - 1) - sy; panelY = sx; break;
                     }
                     if (panelX < 0) panelX = 0;
-                    if (panelX > 799) panelX = 799;
+                    if (panelX > panelWidth - 1) panelX = panelWidth - 1;
                     if (panelY < 0) panelY = 0;
-                    if (panelY > 479) panelY = 479;
+                    if (panelY > panelHeight - 1) panelY = panelHeight - 1;
                     
                     int bitIdx = 7 - (panelX & 7);
-                    int byteIdx = panelY * 100 + (panelX / 8);
+                    int byteIdx = panelY * panelWidthBytes + (panelX / 8);
                     total++;
                     if (!(fb[byteIdx] & (1 << bitIdx))) {
                         black++;
@@ -663,6 +671,9 @@ void BookEngine::renderCurrentPage() {
     // 2. Check SD framebuffer cache
     if (_currentPageData.imageCount > 0 && loadCachedFramebuffer()) {
         saveToRingCache();
+        if (_currentSpine == 0 && _currentPage == 0) {
+            generateCoverThumbnail();
+        }
         return;
     }
     
@@ -676,8 +687,8 @@ void BookEngine::renderCurrentPage() {
     
     freeink::book::FrameTarget target;
     target.framebuffer = _display.getRenderer()->getFrameBuffer();
-    target.width = 800; // physical panel-native
-    target.height = 480; 
+    target.width = _display.getHeight(); // physical panel-native (e.g. 800 or 792)
+    target.height = _display.getWidth(); // physical panel-native (e.g. 480 or 528)
     target.widthBytes = (target.width + 7) / 8;
     target.format = freeink::book::FrameFormat::Mono1Dithered;
     

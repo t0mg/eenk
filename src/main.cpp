@@ -25,17 +25,33 @@
 #ifndef PIO_UNIT_TESTING
 int main(int argc, char *argv[]) {
   const char *storyPath = "stories/the_intercept.bin";
-  if (argc > 1)
-    storyPath = argv[1];
+  int winW = SDLDisplay::WIN_W;
+  int winH = SDLDisplay::WIN_H;
+
+  for (int i = 1; i < argc; ++i) {
+    if (strcmp(argv[i], "--x3") == 0) {
+      winW = SDLDisplay::X3_WIN_W;
+      winH = SDLDisplay::X3_WIN_H;
+    } else if (strcmp(argv[i], "--device") == 0 && i + 1 < argc) {
+      if (strcasecmp(argv[i + 1], "x3") == 0) {
+        winW = SDLDisplay::X3_WIN_W;
+        winH = SDLDisplay::X3_WIN_H;
+      }
+      i++;
+    } else if (argv[i][0] != '-') {
+      storyPath = argv[i];
+    }
+  }
 
   setvbuf(stdout, NULL, _IONBF, 0);
   setvbuf(stderr, NULL, _IONBF, 0);
 
   printf("=== eenk Interactive Fiction Runtime ===\n");
-  printf("Story: %s\n\n", storyPath);
+  printf("Story: %s\n", storyPath);
+  printf("Display: %d×%d\n\n", winW, winH);
 
   // Instantiate HAL
-  SDLDisplay display;
+  SDLDisplay display(winW, winH);
   SDLInput input(&display); // shares quit-flag
   SDLStorage storage;
 

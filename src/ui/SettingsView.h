@@ -52,7 +52,6 @@ private:
     bool _dirty     = false;
     SdFontCatalogue _fontCatalogue;
     int _currentFontIndex = 0;
-    static constexpr int DISP_H = 800;
 
     void renderPage();
     void renderFooter();

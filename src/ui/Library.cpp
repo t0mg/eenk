@@ -512,7 +512,7 @@ void Library::renderEntry(int index, int yPos, bool selected) {
 
   int cardX = 24;
   int cardY = yPos + 4;
-  int cardW = DISPLAY_W - 48;
+  int cardW = _display.getWidth() - 48;
   int cardH = ITEM_H - 8;
 
   ListItemWidget::draw(
@@ -672,7 +672,7 @@ void Library::renderEmpty() {
   int lineH = r->getLineHeight(FONT_NORMAL);
   int totalH = lineH * 3 + 8;
   // Centre within the content area (between status bar and hint bar).
-  int contentH = DISPLAY_H - HeaderWidget::HEIGHT - FooterWidget::HEIGHT;
+  int contentH = _display.getHeight() - HeaderWidget::HEIGHT - FooterWidget::HEIGHT;
   int startY = HeaderWidget::HEIGHT + (contentH - totalH) / 2;
 
   r->drawCenteredText(FONT_BOLD, startY, kLine1, true);
@@ -695,7 +695,7 @@ void Library::renderFooter() {
   footer.btnPrev = {true, "PREV", "Prev", false};
   footer.btnNext = {true, "NEXT", "Next", false};
 
-  footer.render(r, DISPLAY_W, DISPLAY_H);
+  footer.render(r, _display.getWidth(), _display.getHeight());
 }
 
 // ─── render()
@@ -734,13 +734,13 @@ void Library::render() {
     // Scroll arrows.
     if (_scrollOffset > 0) {
       // Up arrow at top-right of list area.
-      r->drawText(FONT_BOLD, DISPLAY_W / 2, HeaderWidget::HEIGHT + 2, "^",
+      r->drawText(FONT_BOLD, _display.getWidth() / 2, HeaderWidget::HEIGHT + 2, "^",
                   true);
     }
     if (_scrollOffset + VISIBLE_ITEMS < _numEntries) {
       // Down arrow at bottom-right of list area.
       int arrowY = HeaderWidget::HEIGHT + VISIBLE_ITEMS * ITEM_H - 14;
-      r->drawText(FONT_BOLD, DISPLAY_W / 2, arrowY, "v", true);
+      r->drawText(FONT_BOLD, _display.getWidth() / 2, arrowY, "v", true);
     }
 #endif
   }

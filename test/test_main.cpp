@@ -102,6 +102,17 @@ void test_sd_font_catalogue(void) {
 #ifdef PLATFORM_NATIVE
 void saveBMP(const char *filename, const uint8_t *frameBuffer, int width,
              int height) {
+  std::string fn(filename);
+  size_t lastSlash = fn.find_last_of("/\\");
+  if (lastSlash != std::string::npos) {
+    std::string dir = fn.substr(0, lastSlash);
+#ifdef _WIN32
+    _mkdir(dir.c_str());
+#else
+    mkdir(dir.c_str(), 0755);
+#endif
+  }
+
   FILE *f = fopen(filename, "wb");
   if (!f)
     return;
@@ -172,17 +183,18 @@ void saveBMP(const char *filename, const uint8_t *frameBuffer, int width,
   fwrite(infoHeader, 1, 40, f);
   fwrite(colorTable, 1, 8, f);
 
-  // We allocate a buffer for the logical image size. Width=480, height=800.
-  // Row size for 480 width is exactly 60 bytes.
   uint8_t *rotatedBuffer = new uint8_t[imageSize];
   for (int i = 0; i < imageSize; i++)
     rotatedBuffer[i] = 0;
 
+  int panelWidth = height; // In PortraitInverted: physical panel width = height
+  int panelWidthBytes = (panelWidth + 7) / 8;
+
   for (int y = 0; y < height; y++) {
     for (int x = 0; x < width; x++) {
-      int hw_x = 799 - y;
+      int hw_x = (panelWidth - 1) - y;
       int hw_y = x;
-      uint32_t idx = (hw_y * 800 + hw_x) / 8;
+      uint32_t idx = hw_y * panelWidthBytes + (hw_x / 8);
       uint8_t bit = 7 - (hw_x % 8);
       bool isWhite = (frameBuffer[idx] & (1 << bit)) != 0;
       if (isWhite) {
@@ -201,6 +213,8 @@ void saveBMP(const char *filename, const uint8_t *frameBuffer, int width,
 
 class TestDisplay : public IDisplay {
 public:
+  int _width;
+  int _height;
   EInkDisplay eink;
   GfxRenderer renderer;
   EpdFont sysFontNormal;
@@ -232,8 +246,9 @@ public:
   EpdFont literataSmallItalic;
   EpdFontFamily literataSmallFamily;
 
-  TestDisplay()
-      : renderer(eink), sysFontNormal(&ui_12), sysFamilyNormal(&sysFontNormal),
+  explicit TestDisplay(int w = 480, int h = 800)
+      : _width(w), _height(h), eink(h, w), renderer(eink),
+        sysFontNormal(&ui_12), sysFamilyNormal(&sysFontNormal),
         sysFontBold(&ui_bold_12), sysFamilyBold(&sysFontBold),
         sysFontSmall(&ui_10), sysFamilySmall(&sysFontSmall),
         sysFontHeading(&syne_bold_10), sysFamilyHeading(&sysFontHeading),
@@ -280,8 +295,8 @@ public:
   void clear() override { eink.clearScreen(0xFF); }
   void present() override {}
   void fullRefresh() override {}
-  int getWidth() const override { return 480; }
-  int getHeight() const override { return 800; }
+  int getWidth() const override { return _width; }
+  int getHeight() const override { return _height; }
   GfxRenderer *getRenderer() override { return &renderer; }
 };
 
@@ -1783,6 +1798,716 @@ void test_confirm_restart_modal_screenshot(void) {
           display.getHeight());
   TEST_ASSERT_EQUAL(1, 1);
 }
+
+void test_battery_widget_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+
+  display.clear();
+  display.renderer.fillRect(0, 0, display.getWidth(), 40, true);
+  widget.draw(display.getWidth() - widget.getWidth() - 8,
+              (40 - widget.getHeight()) / 2, true);
+  widget.draw(display.getWidth() - widget.getWidth() - 8,
+              (40 - widget.getHeight()) / 2 + 40, false);
+  saveBMP("test/golden/x3/test_battery_widget.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_library_x3_screenshot(void) {
+  ensure_test_story_media();
+
+  TestDisplay display(528, 792);
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  AppSettings settings = AppSettings::defaults();
+
+  TestLibrary library(display, input, widget, nullptr /*frontlight*/, settings);
+  library.run();
+
+  saveBMP("test/golden/x3/test_library.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_library_with_epub_x3(void) {
+  ensure_test_story_media();
+
+  TestDisplay display(528, 792);
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  AppSettings settings = AppSettings::defaults();
+
+  {
+    BookEngine engine(display, input);
+    engine.applySettings(settings);
+    engine.loadBook("test/the-strange-case-of-dr-jekyll-and-mr-hyde.epub");
+    engine.update(); // Generates thumb.bin
+  }
+
+  TestLibraryWithEpub library(display, input, widget, nullptr /*frontlight*/,
+                              settings);
+  library.run();
+
+  saveBMP("test/golden/x3/test_library_with_epub.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_settings_view_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  AppSettings settings = AppSettings::defaults();
+
+  SettingsView view(display, input, widget, nullptr /*frontlight*/, settings);
+  view.run();
+
+  saveBMP("test/golden/x3/test_settings_view.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_fonts_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  display.clear();
+
+  int y = 40;
+
+  display.renderer.drawText(10, 20, y, "UI Normal 12: The quick brown fox");
+  y += display.renderer.getLineHeight(10) + 8;
+
+  display.renderer.drawText(11, 20, y, "UI Bold 12: jumps over the lazy dog");
+  y += display.renderer.getLineHeight(11) + 8;
+
+  display.renderer.drawText(
+      20, 20, y, "UI Small 10: Sphynx of black quartz, judge my vow");
+  y += display.renderer.getLineHeight(20) + 16;
+
+  // Sans Medium
+  display.renderer.drawText(50, 20, y,
+                            "Sans M Regular: The quick brown fox jumps", true,
+                            EpdFontFamily::REGULAR);
+  y += display.renderer.getLineHeight(50) + 6;
+
+  display.renderer.drawText(50, 20, y,
+                            "Sans M Italic: The quick brown fox jumps", true,
+                            EpdFontFamily::ITALIC);
+  y += display.renderer.getLineHeight(50) + 6;
+
+  display.renderer.drawText(50, 20, y, "Sans M Bold: The quick brown fox jumps",
+                            true, EpdFontFamily::BOLD);
+  y += display.renderer.getLineHeight(50) + 16;
+
+  // Literata Serif Medium
+  display.renderer.drawText(70, 20, y,
+                            "Literata M Regular: The quick brown fox jumps",
+                            true, EpdFontFamily::REGULAR);
+  y += display.renderer.getLineHeight(70) + 6;
+
+  display.renderer.drawText(70, 20, y,
+                            "Literata M Italic: The quick brown fox jumps",
+                            true, EpdFontFamily::ITALIC);
+  y += display.renderer.getLineHeight(70) + 6;
+
+  display.renderer.drawText(70, 20, y,
+                            "Literata M Bold: The quick brown fox jumps", true,
+                            EpdFontFamily::BOLD);
+  y += display.renderer.getLineHeight(70) + 16;
+
+  int maxW = display.getWidth() - 40;
+
+  // Rich HTML & MD with Literata
+  auto runs1 = InkRichTextParser::parse(
+      "Literata HTML: <i>Italic</i>, <b>Bold</b>, <b><i>Both</i></b>!");
+  auto blocks1 = display.renderer.wrapRichText(70, runs1, maxW, 10);
+  for (const auto &b : blocks1) {
+    display.renderer.drawRichText(70, 20, y, b);
+    y += display.renderer.getLineHeight(70);
+  }
+  y += 6;
+
+  auto runs2 =
+      InkRichTextParser::parse("Literata MD: *Italic*, **Bold**, **_Both_**!");
+  auto blocks2 = display.renderer.wrapRichText(70, runs2, maxW, 10);
+  for (const auto &b : blocks2) {
+    display.renderer.drawRichText(70, 20, y, b);
+    y += display.renderer.getLineHeight(70);
+  }
+  y += 10;
+
+  // Choice rich text (UI 12)
+  auto runs3 =
+      InkRichTextParser::parse("Choice UI: *Italic*, **Bold**, **_Both_**!");
+  auto blocks3 = display.renderer.wrapRichText(10, runs3, maxW, 10);
+  for (const auto &b : blocks3) {
+    display.renderer.drawRichText(10, 20, y, b);
+    y += display.renderer.getLineHeight(10);
+  }
+
+  saveBMP("test/golden/x3/test_fonts.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_external_fonts_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  display.clear();
+
+  StreamingEpdFontFamily fam;
+  const char *dirs[] = {"test/fonts", "sd_fonts", nullptr};
+  TEST_ASSERT_TRUE(fam.load("orbitron", dirs));
+
+  int y = 50;
+
+  EpdFont r(fam.getData(EpdFontFamily::REGULAR));
+  EpdFont b(fam.getData(EpdFontFamily::BOLD));
+  EpdFont i(fam.getData(EpdFontFamily::ITALIC));
+  EpdFont bi(fam.getData(EpdFontFamily::BOLD_ITALIC));
+  EpdFontFamily sysFam(&r, &b, &i, &bi);
+
+  display.renderer.insertFont(100, sysFam);
+  display.renderer.removeStreamingFont(100);
+  if (fam.hasStyle(EpdFontFamily::REGULAR))
+    display.renderer.setStreamingFont(100, EpdFontFamily::REGULAR,
+                                      fam.slot(EpdFontFamily::REGULAR));
+  if (fam.hasStyle(EpdFontFamily::BOLD))
+    display.renderer.setStreamingFont(100, EpdFontFamily::BOLD,
+                                      fam.slot(EpdFontFamily::BOLD));
+  if (fam.hasStyle(EpdFontFamily::ITALIC))
+    display.renderer.setStreamingFont(100, EpdFontFamily::ITALIC,
+                                      fam.slot(EpdFontFamily::ITALIC));
+  if (fam.hasStyle(EpdFontFamily::BOLD_ITALIC))
+    display.renderer.setStreamingFont(100, EpdFontFamily::BOLD_ITALIC,
+                                      fam.slot(EpdFontFamily::BOLD_ITALIC));
+
+  display.renderer.drawText(100, 20, y, "External Font (Orbitron):", true,
+                            EpdFontFamily::REGULAR);
+  y += display.renderer.getLineHeight(100) + 10;
+
+  if (fam.hasStyle(EpdFontFamily::BOLD)) {
+    display.renderer.drawText(100, 20, y, "Hello World from SD card!", true,
+                               EpdFontFamily::BOLD);
+  }
+
+  saveBMP("test/golden/x3/test_external_fonts.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_modal_dialog_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  MockInput input;
+  SystemUI ui(display);
+
+  display.clear();
+  display.renderer.drawText(10, 50, 100, "Background text...");
+
+  ui.showConfirmDialog(input, "Confirm Action",
+                       "Are you sure you want to exit the current story?");
+
+  saveBMP("test/golden/x3/test_modal_dialog.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_modal_dialog_long_text_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  MockInput input;
+  SystemUI ui(display);
+
+  display.clear();
+  display.renderer.drawText(10, 50, 100, "Background text...");
+
+  ui.showConfirmDialog(
+      input, nullptr,
+      "Formatting the SD card will erase all saved story data, custom fonts, "
+      "and user preferences. This action cannot be undone.");
+
+  saveBMP("test/golden/x3/test_modal_dialog_long.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_loading_widget_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  SystemUI ui(display);
+
+  ui.showLoading("Loading Story...", 0.65f);
+
+  saveBMP("test/golden/x3/test_loading_widget.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_error_widget_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  SystemUI ui(display);
+
+  ui.showMessage(
+      "Failed to load story",
+      "The story file is corrupted or could not be found.\nPlease try "
+      "re-flashing the device or formatting the SD card.");
+
+  saveBMP("test/golden/x3/test_error_widget.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_sleep_cover_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  SystemUI ui(display);
+
+  ui.showSleepCover("Zzzzz...", "Sleep mode");
+
+  saveBMP("test/golden/x3/test_sleep_cover.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_sleep_cover_image_x3_screenshot(void) {
+  ensure_test_story_media();
+
+  TestDisplay display(528, 792);
+  SystemUI ui(display);
+
+  BootManager::setStoryPath("test/story/story.bin");
+
+  ui.showSleepCover("Zzzzz...", "Sleep mode");
+
+  saveBMP("test/golden/x3/test_sleep_cover_image.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_story_player_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  display.clear();
+
+  int y = 50;
+  display.renderer.drawText(50, 20, y, "You wake up in a dark room.", true,
+                            EpdFontFamily::REGULAR);
+  y += display.renderer.getLineHeight(50) + 10;
+  display.renderer.drawText(50, 20, y, "The air is cold.", true,
+                            EpdFontFamily::REGULAR);
+  y += display.renderer.getLineHeight(50) + 20;
+
+  display.renderer.drawText(50, 20, y, "What do you do?", true,
+                            EpdFontFamily::BOLD);
+  y += display.renderer.getLineHeight(50) + 30;
+
+  int choiceFont = 10;
+  int iconSize = 10;
+  display.renderer.drawText(choiceFont, 40, y, "1. Look around", true);
+  y += display.renderer.getLineHeight(choiceFont) + 10;
+  display.renderer.fillRect(
+      20, y - 2, display.getWidth() - 40, display.renderer.getLineHeight(choiceFont) + 4, true);
+  display.renderer.drawTriangleIcon(
+      24, y + (display.renderer.getLineHeight(choiceFont) - iconSize) / 2,
+      iconSize, false);
+  display.renderer.drawText(choiceFont, 40, y, "2. Go back to sleep", false);
+  y += display.renderer.getLineHeight(choiceFont) + 10;
+  display.renderer.drawText(choiceFont, 40, y, "3. Yell for help", true);
+
+  FooterWidget footer;
+  footer.btnBack = {true, "Menu", "Power"};
+  footer.btnConfirm = {true, "Select", "Confirm"};
+  footer.btnPrev = {true, "Up", "Prev"};
+  footer.btnNext = {true, "Down", "Next"};
+  footer.render(&display.renderer, display.getWidth(), display.getHeight());
+
+  saveBMP("test/golden/x3/test_story_player.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_epub_page_x3_render(void) {
+  TestDisplay display(528, 792);
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  AppSettings settings = AppSettings::defaults();
+
+  BookEngine engine(display, input);
+  engine.setBatteryWidget(&widget);
+  engine.applySettings(settings);
+
+  const char *epubPath = "test/the-strange-case-of-dr-jekyll-and-mr-hyde.epub";
+  bool loaded = engine.loadBook(epubPath);
+  TEST_ASSERT_TRUE_MESSAGE(loaded, "Failed to load test EPUB");
+
+  // Call update to render the first page
+  engine.update();
+
+  saveBMP("test/golden/x3/test_epub_page_render.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_epub_page_2_x3_render(void) {
+  TestDisplay display(528, 792);
+  QueueMockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  AppSettings settings = AppSettings::defaults();
+
+  BookEngine engine(display, input);
+  engine.setBatteryWidget(&widget);
+  engine.applySettings(settings);
+
+  const char *epubPath = "test/the-strange-case-of-dr-jekyll-and-mr-hyde.epub";
+  bool loaded = engine.loadBook(epubPath);
+  TEST_ASSERT_TRUE_MESSAGE(loaded, "Failed to load test EPUB");
+
+  // First page render (cover)
+  engine.update();
+
+  // Advance to page 2 (text page)
+  input.push(ButtonEvent::DOWN);
+  engine.update();
+
+  saveBMP("test/golden/x3/test_epub_page_2_render.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_epub_exit_modal_x3_render(void) {
+  TestDisplay display(528, 792);
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  AppSettings settings = AppSettings::defaults();
+
+  BookEngine engine(display, input);
+  engine.setBatteryWidget(&widget);
+  engine.applySettings(settings);
+
+  const char *epubPath = "test/the-strange-case-of-dr-jekyll-and-mr-hyde.epub";
+  bool loaded = engine.loadBook(epubPath);
+  TEST_ASSERT_TRUE_MESSAGE(loaded, "Failed to load test EPUB");
+
+  // First page render (cover)
+  engine.update();
+
+  // Show exit modal with progress percentage and battery widget
+  char progressStr[32];
+  snprintf(progressStr, sizeof(progressStr), "%d%%",
+           engine.getProgressPercentage());
+  ModalDialogWidget::show(display, input, &widget, "Exit Reader",
+                          "Do you want to exit to the menu?", progressStr);
+
+  saveBMP("test/golden/x3/test_epub_exit_modal.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_choice_states_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  display.clear();
+
+  int marginX = 24;
+  int width = display.getWidth();
+  int narrativeWidth = width - (2 * marginX);
+  int indicatorWidth = 24;
+
+  int y = 45;
+  int narrativeFont = 50; // Sans Medium
+
+  auto narrativeRuns = InkRichTextParser::parse(
+      "You stand at the threshold of the forgotten vault. A cold whisper "
+      "echoes from the darkness below, asking what path you will choose.");
+  auto narrativeBlocks = display.renderer.wrapRichText(
+      narrativeFont, narrativeRuns, narrativeWidth, 10);
+  for (const auto &b : narrativeBlocks) {
+    display.renderer.drawRichText(narrativeFont, marginX, y, b);
+    y += display.renderer.getLineHeight(narrativeFont);
+  }
+  y += 15;
+
+  display.renderer.fillRect(marginX, y, narrativeWidth, 2, true);
+  y += 20;
+
+  int choiceFont = 10; // UI 12
+  int choiceLineHeight = display.renderer.getLineHeight(choiceFont);
+  int choicePadding = choiceLineHeight / 3;
+  int choiceContentWidth = narrativeWidth - indicatorWidth;
+
+  auto drawChoiceItem = [&](const char *text, bool focused) {
+    auto runs = InkRichTextParser::parse(text);
+    auto blocks =
+        display.renderer.wrapRichText(choiceFont, runs, choiceContentWidth, 10);
+    int numLines = std::max((size_t)1, blocks.size());
+    int textHeight = numLines * choiceLineHeight;
+    int blockHeight = textHeight + 8;
+    int verticalOffset = 4;
+
+    if (focused) {
+      display.renderer.fillRect(marginX - 4, y, narrativeWidth + 8, blockHeight,
+                                true);
+    }
+
+    bool textBlack = !focused;
+    int iconSize = 10;
+    int iconX = marginX + 4;
+    int textY = y + verticalOffset;
+    for (size_t i = 0; i < blocks.size(); ++i) {
+      if (i == 0 && focused) {
+        display.renderer.drawTriangleIcon(
+            iconX, textY + (choiceLineHeight - iconSize) / 2, iconSize,
+            textBlack);
+      }
+      display.renderer.drawRichText(choiceFont, marginX + indicatorWidth, textY,
+                                    blocks[i], textBlack);
+      textY += choiceLineHeight;
+    }
+    y += blockHeight + choicePadding;
+  };
+
+  drawChoiceItem("Examine the runes on the archway", false);
+  drawChoiceItem("Step forward with your **drawn blade**", false);
+  drawChoiceItem("Turn back and <i>seal the heavy gate</i>", true);
+  drawChoiceItem("Search the stone walls for hidden mechanisms", false);
+
+  FooterWidget footer;
+  footer.btnBack = {true, "Menu", "Back"};
+  footer.btnConfirm = {true, "Select", "Confirm"};
+  footer.btnPrev = {true, "Up", "Prev"};
+  footer.btnNext = {true, "Down", "Next"};
+  footer.render(&display.renderer, display.getWidth(), display.getHeight());
+
+  saveBMP("test/golden/x3/test_choices.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_choice_states_touch_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  display.clear();
+
+  int marginX = 24;
+  int width = display.getWidth();
+  int narrativeWidth = width - (2 * marginX);
+  int indicatorWidth = 24;
+
+  int y = 45;
+  int narrativeFont = 50; // Sans Medium
+
+  auto narrativeRuns = InkRichTextParser::parse(
+      "You stand at the threshold of the forgotten vault. A cold whisper "
+      "echoes from the darkness below, asking what path you will choose.");
+  auto narrativeBlocks = display.renderer.wrapRichText(
+      narrativeFont, narrativeRuns, narrativeWidth, 10);
+  for (const auto &b : narrativeBlocks) {
+    display.renderer.drawRichText(narrativeFont, marginX, y, b);
+    y += display.renderer.getLineHeight(narrativeFont);
+  }
+  y += 15;
+
+  display.renderer.fillRect(marginX, y, narrativeWidth, 2, true);
+  y += 20;
+
+  int choiceFont = 10; // UI 12
+  int choiceLineHeight = display.renderer.getLineHeight(choiceFont);
+  int choicePadding = choiceLineHeight / 3;
+  int choiceContentWidth = narrativeWidth - indicatorWidth;
+
+  auto drawChoiceItem = [&](const char *text, bool focused) {
+    auto runs = InkRichTextParser::parse(text);
+    auto blocks =
+        display.renderer.wrapRichText(choiceFont, runs, choiceContentWidth, 10);
+    int numLines = std::max((size_t)1, blocks.size());
+    int textHeight = numLines * choiceLineHeight;
+    int blockHeight = std::max(64, textHeight);
+    int verticalOffset = (blockHeight - textHeight) / 2;
+
+    if (focused) {
+      display.renderer.fillRect(marginX - 4, y, narrativeWidth + 8, blockHeight,
+                                true);
+    }
+
+    bool textBlack = !focused;
+    int iconSize = 10;
+    int iconX = marginX + 4;
+    int textY = y + verticalOffset;
+    for (size_t i = 0; i < blocks.size(); ++i) {
+      if (i == 0 && focused) {
+        display.renderer.drawTriangleIcon(
+            iconX, textY + (choiceLineHeight - iconSize) / 2, iconSize,
+            textBlack);
+      }
+      display.renderer.drawRichText(choiceFont, marginX + indicatorWidth, textY,
+                                    blocks[i], textBlack);
+      textY += choiceLineHeight;
+    }
+    y += blockHeight + choicePadding;
+  };
+
+  drawChoiceItem("Examine the runes on the archway", true);
+  drawChoiceItem("Step forward with your **drawn blade**", false);
+  drawChoiceItem("Turn back and <i>seal the heavy gate</i>", false);
+
+  FooterWidget footer;
+  footer.btnBack = {true, "Menu", "Back"};
+  footer.btnConfirm = {true, "Select", "Confirm"};
+  footer.btnPrev = {true, "Up", "Prev"};
+  footer.btnNext = {true, "Down", "Next"};
+  footer.render(&display.renderer, display.getWidth(), display.getHeight());
+
+  saveBMP("test/golden/x3/test_choices_touch.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_quick_menu_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  MockInput input;
+  AppSettings settings = AppSettings::defaults();
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  QuickMenuWidget ui(display, input, widget, nullptr /*frontlight*/, settings);
+
+  display.clear();
+  display.renderer.drawText(10, 50, 600, "Background text...", true);
+
+  ui.show();
+
+  saveBMP("test/golden/x3/test_quick_menu.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_quick_menu_disabled_choices_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  MockInput input;
+  AppSettings settings = AppSettings::defaults();
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  QuickMenuWidget ui(display, input, widget, nullptr /*frontlight*/, settings,
+                     /*choicesEnabled=*/false);
+
+  display.clear();
+  display.renderer.drawText(10, 50, 600, "Background text...", true);
+
+  ui.show();
+
+  saveBMP("test/golden/x3/test_quick_menu_book_mode.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_image_widget_x3_screenshot(void) {
+  ensure_test_story_media();
+
+  TestDisplay display(528, 792);
+  MockInput input;
+  SDLStorage storage;
+  InkEngine engine(display, input, storage);
+
+  BootManager::setStoryPath("test/story/story.bin");
+  engine.loadStory("test/story/story.bin");
+  engine.update();
+
+  saveBMP("test/golden/x3/test_image_widget.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_story_menu_full_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+
+  display.clear();
+  display.renderer.drawText(10, 50, 100, "Background text...");
+
+  std::vector<std::string> items = {"Save and exit",
+                                    "Rewind to last checkpoint", "Rewind to...",
+                                    "Restart story"};
+
+  MenuModalWidget::show(display, input, &widget, "Story Menu", items, 2,
+                        "eenk");
+
+  saveBMP("test/golden/x3/test_story_menu_full.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_story_menu_no_checkpoints_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+
+  display.clear();
+  display.renderer.drawText(10, 50, 100, "Background text...");
+
+  std::vector<std::string> items = {"Save and exit", "Restart story"};
+
+  MenuModalWidget::show(display, input, &widget, "Story Menu", items, 0,
+                        "eenk");
+
+  saveBMP("test/golden/x3/test_story_menu_no_checkpoints.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_rewind_to_submenu_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+
+  display.clear();
+  display.renderer.drawText(10, 50, 100, "Background text...");
+
+  std::vector<std::string> items = {
+      "The Plan", "The Heist", "The Twist",
+      "The Second Twist Where It Turns Out It Was All Part Of The Plan In The "
+      "First Place"};
+
+  MenuModalWidget::show(display, input, &widget, "Rewind to...", items, 3,
+                        "eenk");
+
+  saveBMP("test/golden/x3/test_rewind_to_submenu.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_confirm_restart_modal_x3_screenshot(void) {
+  TestDisplay display(528, 792);
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+
+  display.clear();
+  display.renderer.drawText(10, 50, 100, "Background text...");
+
+  ModalDialogWidget::show(
+      display, input, &widget, "Confirm Restart",
+      "Are you sure you\nwant to restart ?\nProgress will be lost", "eenk");
+
+  saveBMP("test/golden/x3/test_confirm_restart_modal.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
 #endif
 
 int main(int argc, char **argv) {
@@ -1835,6 +2560,33 @@ int main(int argc, char **argv) {
   RUN_TEST(test_story_menu_no_checkpoints_screenshot);
   RUN_TEST(test_rewind_to_submenu_screenshot);
   RUN_TEST(test_confirm_restart_modal_screenshot);
+
+  // X3 (792x528) Golden Screenshot Tests
+  RUN_TEST(test_battery_widget_x3_screenshot);
+  RUN_TEST(test_library_x3_screenshot);
+  RUN_TEST(test_library_with_epub_x3);
+  RUN_TEST(test_settings_view_x3_screenshot);
+  RUN_TEST(test_fonts_x3_screenshot);
+  RUN_TEST(test_external_fonts_x3_screenshot);
+  RUN_TEST(test_modal_dialog_x3_screenshot);
+  RUN_TEST(test_modal_dialog_long_text_x3_screenshot);
+  RUN_TEST(test_loading_widget_x3_screenshot);
+  RUN_TEST(test_error_widget_x3_screenshot);
+  RUN_TEST(test_sleep_cover_x3_screenshot);
+  RUN_TEST(test_sleep_cover_image_x3_screenshot);
+  RUN_TEST(test_story_player_x3_screenshot);
+  RUN_TEST(test_epub_page_x3_render);
+  RUN_TEST(test_epub_page_2_x3_render);
+  RUN_TEST(test_epub_exit_modal_x3_render);
+  RUN_TEST(test_choice_states_x3_screenshot);
+  RUN_TEST(test_choice_states_touch_x3_screenshot);
+  RUN_TEST(test_quick_menu_x3_screenshot);
+  RUN_TEST(test_quick_menu_disabled_choices_x3_screenshot);
+  RUN_TEST(test_image_widget_x3_screenshot);
+  RUN_TEST(test_story_menu_full_x3_screenshot);
+  RUN_TEST(test_story_menu_no_checkpoints_x3_screenshot);
+  RUN_TEST(test_rewind_to_submenu_x3_screenshot);
+  RUN_TEST(test_confirm_restart_modal_x3_screenshot);
 #endif
   UNITY_END();
   return 0;

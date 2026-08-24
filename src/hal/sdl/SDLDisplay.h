@@ -15,19 +15,21 @@
 class SDLDisplay : public IDisplay
 {
 public:
-    // Window dimensions
+    // Window dimensions (default X4: 480x800)
     static constexpr int WIN_W = 480;
     static constexpr int WIN_H = 800;
+    static constexpr int X3_WIN_W = 528;
+    static constexpr int X3_WIN_H = 792;
 
-    SDLDisplay();
+    explicit SDLDisplay(int winW = WIN_W, int winH = WIN_H);
     ~SDLDisplay() override;
 
     void clear() override;
     void present() override;
     void fullRefresh() override;
 
-    int getWidth()  const override { return WIN_W; }
-    int getHeight() const override { return WIN_H; }
+    int getWidth()  const override { return _winW; }
+    int getHeight() const override { return _winH; }
 
     GfxRenderer* getRenderer() override { return &_gfxRenderer; }
 
@@ -37,6 +39,8 @@ public:
     void signalQuit()       { _quit = true; }
 
 private:
+    int           _winW     = WIN_W;
+    int           _winH     = WIN_H;
     SDL_Window*   _window   = nullptr;
     SDL_Renderer* _renderer = nullptr;
     SDL_Texture*  _texture  = nullptr;

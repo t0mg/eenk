@@ -11,8 +11,8 @@ static constexpr SDL_Color COLOR_BG  = {0xF5, 0xF1, 0xE8, 0xFF}; // parchment wh
 static constexpr SDL_Color COLOR_FG  = {0x1A, 0x1A, 0x1A, 0xFF}; // near-black ink
 
 // ─────────────────────────────────────────────────────────────────────────────
-SDLDisplay::SDLDisplay()
-    : _mockEink(), _gfxRenderer(_mockEink)
+SDLDisplay::SDLDisplay(int winW, int winH)
+    : _winW(winW), _winH(winH), _mockEink(winH, winW), _gfxRenderer(_mockEink)
 {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         fprintf(stderr, "[SDLDisplay] SDL_Init failed: %s\n", SDL_GetError());
@@ -22,7 +22,7 @@ SDLDisplay::SDLDisplay()
     _window = SDL_CreateWindow(
         "eenk — Interactive Fiction Runtime (E-Ink Simulator)",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        WIN_W, WIN_H,
+        _winW, _winH,
         SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
     );
     if (!_window) {
@@ -38,7 +38,7 @@ SDLDisplay::SDLDisplay()
     }
 
     // ARGB8888 texture to blast our 1bpp buffer into
-    _texture = SDL_CreateTexture(_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, WIN_W, WIN_H);
+    _texture = SDL_CreateTexture(_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, _winW, _winH);
     if (!_texture) {
         fprintf(stderr, "[SDLDisplay] SDL_CreateTexture failed: %s\n", SDL_GetError());
         return;
@@ -47,7 +47,7 @@ SDLDisplay::SDLDisplay()
     // Nearest-neighbour scaling keeps pixels crisp
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
     // Set logical size so the window can be resized without affecting layout
-    SDL_RenderSetLogicalSize(_renderer, WIN_W, WIN_H);
+    SDL_RenderSetLogicalSize(_renderer, _winW, _winH);
 
     _gfxRenderer.begin();
     // Default orientation
@@ -55,7 +55,7 @@ SDLDisplay::SDLDisplay()
 
     clear();
     present();
-    printf("[SDLDisplay] Window ready — %d×%d (1-bpp simulation)\n", WIN_W, WIN_H);
+    printf("[SDLDisplay] Window ready — %d×%d (1-bpp simulation)\n", _winW, _winH);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -86,18 +86,14 @@ void SDLDisplay::present()
         uint32_t fgPixel = SDL_MapRGBA(SDL_AllocFormat(SDL_PIXELFORMAT_ARGB8888), COLOR_FG.r, COLOR_FG.g, COLOR_FG.b, COLOR_FG.a);
         
         uint8_t* fb = _mockEink.getFrameBuffer();
+        int panelW = _mockEink.getDisplayWidth();
+        int panelWBytes = _mockEink.getDisplayWidthBytes();
         
-        for (int y = 0; y < WIN_H; ++y) {
-            for (int x = 0; x < WIN_W; ++x) {
-                // Read from hardware mock layout (GfxRenderer mapped Portrait coordinates to 800x480 hardware format)
-                // Wait! GfxRenderer::drawPixel maps (x, y) depending on the orientation!
-                // If it's Portrait, GfxRenderer maps (0,0) to HW (799,0).
-                // But the _mockEink frame buffer is STILL 800x480 physically.
-                // We must un-map it when drawing to the SDL texture, OR map SDL rendering to the hardware frame!
-                // Actually, let's read the pixel exactly the way we wrote it in EspEinkDisplay.cpp
-                int hw_x = 799 - y;
+        for (int y = 0; y < _winH; ++y) {
+            for (int x = 0; x < _winW; ++x) {
+                int hw_x = (panelW - 1) - y;
                 int hw_y = x;
-                uint32_t idx = (hw_y * 800 + hw_x) / 8;
+                uint32_t idx = hw_y * panelWBytes + (hw_x / 8);
                 uint8_t bit = 7 - (hw_x % 8);
                 bool isWhite = (fb[idx] & (1 << bit)) != 0;
                 

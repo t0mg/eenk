@@ -66,6 +66,8 @@ void FooterWidget::render(GfxRenderer* r, int displayWidth, int displayHeight) c
     }
 
     // Standard 4 immovable slots layout
+    int btnWidth = displayWidth / 4;
+    int maxLabelW = btnWidth - 10;
     for (int i = 0; i < 4; ++i) {
         if (actions[i]->hasAction) {
             std::string label = actions[i]->customLabel;
@@ -75,18 +77,18 @@ void FooterWidget::render(GfxRenderer* r, int displayWidth, int displayHeight) c
             // Convert to uppercase
             for (auto& c : label) c = toupper(c);
 
-            // Truncate if > MAX_LABEL_WIDTH
-            std::string truncLabel = r->truncatedText(fontIndex, label.c_str(), MAX_LABEL_WIDTH);
+            // Truncate if > maxLabelW
+            std::string truncLabel = r->truncatedText(fontIndex, label.c_str(), maxLabelW);
 
             if (actions[i]->isPill) {
                 int pillY = contentTop + (contentH - NeuStyle::PILL_H) / 2;
                 int pillW = r->getTextWidth(fontIndex, truncLabel.c_str()) + 2 * NeuStyle::PILL_PADDING_X + 2 * NeuStyle::PILL_RADIUS;
-                int pillX = i * BTN_WIDTH + (BTN_WIDTH - pillW) / 2;
+                int pillX = i * btnWidth + (btnWidth - pillW) / 2;
                 r->drawPill(fontIndex, pillX, pillY, truncLabel.c_str(),
                             NeuStyle::PILL_PADDING_X, NeuStyle::PILL_H, NeuStyle::PILL_RADIUS, false);
             } else {
                 int textW = r->getTextWidth(fontIndex, truncLabel.c_str());
-                int x = i * BTN_WIDTH + (BTN_WIDTH - textW) / 2;
+                int x = i * btnWidth + (btnWidth - textW) / 2;
                 int y = contentTop + (contentH - textH) / 2;
                 r->drawText(fontIndex, x, y, truncLabel.c_str(), false);
             }
