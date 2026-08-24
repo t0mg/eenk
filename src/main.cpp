@@ -134,6 +134,7 @@ int main(int argc, char *argv[]) {
 #include "ui/StoryMetadata.h"
 #include "ui/SystemUI.h"
 #include <BatteryMonitor.h>
+#include <BoardConfig.h>
 #include <EpdFont.h>
 #include <builtinFonts/ui_12.h>
 #include <esp_sleep.h>
@@ -225,6 +226,17 @@ void setup() {
                             "Please do not unplug or power off.");
     };
 
+#ifdef PLATFORM_ESP32
+    const int powerPin = BoardConfig::ACTIVE.input.power;
+    const int powerActiveLevel = BoardConfig::ACTIVE.input.powerActiveHigh ? HIGH : LOW;
+    if (powerPin >= 0) {
+      while (digitalRead(powerPin) == powerActiveLevel) {
+        delay(10);
+      }
+    }
+#endif
+    if (input) input->resetActivityTimer();
+
     while (true) {
         Library *library =
             new Library(*display, *input, *batteryWidget, frontlight, settings);
@@ -297,6 +309,17 @@ void setup() {
         delay(10);
       }
     }
+
+#ifdef PLATFORM_ESP32
+    const int powerPin = BoardConfig::ACTIVE.input.power;
+    const int powerActiveLevel = BoardConfig::ACTIVE.input.powerActiveHigh ? HIGH : LOW;
+    if (powerPin >= 0) {
+      while (digitalRead(powerPin) == powerActiveLevel) {
+        delay(10);
+      }
+    }
+#endif
+    if (input) input->resetActivityTimer();
 
     return; // setup() done, loop() will run bookEngine
 #else
@@ -469,7 +492,18 @@ void setup() {
   }
 
   Serial.printf("Free heap after load: %u bytes\n", (unsigned int)ESP.getFreeHeap());
+#ifdef PLATFORM_ESP32
+  const int powerPin = BoardConfig::ACTIVE.input.power;
+  const int powerActiveLevel = BoardConfig::ACTIVE.input.powerActiveHigh ? HIGH : LOW;
+  if (powerPin >= 0) {
+    while (digitalRead(powerPin) == powerActiveLevel) {
+      delay(10);
+    }
+  }
+#endif
+  if (input) input->resetActivityTimer();
   delay(2000); // Give user time to see RAM stats
+  if (input) input->resetActivityTimer();
 }
 
 void saveProgress() {

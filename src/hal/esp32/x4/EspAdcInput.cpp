@@ -1,6 +1,7 @@
 #ifdef PLATFORM_ESP32
 
 #include "EspAdcInput.h"
+#include <BoardConfig.h>
 #include <driver/rtc_io.h>
 #include <esp_sleep.h>
 
@@ -13,31 +14,42 @@ void EspAdcInput::resetActivityTimer() {
 }
 
 ButtonEvent EspAdcInput::pollInput() {
-  _input.update();
-
   ButtonEvent ev = ButtonEvent::NONE;
 
-  if (_input.isPressed(InputManager::BTN_POWER) &&
-      _input.getHeldTime() > 1000) {
-    // Wait for the user to release the button so we don't immediately wake up!
-    while (digitalRead(InputManager::POWER_BUTTON_PIN) == LOW) {
+  const int powerPin = BoardConfig::ACTIVE.input.power;
+  const int powerActiveLevel = BoardConfig::ACTIVE.input.powerActiveHigh ? HIGH : LOW;
+
+  if (powerPin >= 0 && digitalRead(powerPin) == powerActiveLevel) {
+    unsigned long start = millis();
+    while (digitalRead(powerPin) == powerActiveLevel) {
+      if (millis() - start > 1000) {
+        while (digitalRead(powerPin) == powerActiveLevel) {
+          delay(10);
+        }
+        ev = ButtonEvent::SLEEP;
+        break;
+      }
       delay(10);
     }
-    ev = ButtonEvent::SLEEP;
-  } else if (_input.wasPressed(InputManager::BTN_UP))
-    ev = ButtonEvent::UP;
-  else if (_input.wasPressed(InputManager::BTN_DOWN))
-    ev = ButtonEvent::DOWN;
-  else if (_input.wasPressed(InputManager::BTN_LEFT))
-    ev = ButtonEvent::LEFT;
-  else if (_input.wasPressed(InputManager::BTN_RIGHT))
-    ev = ButtonEvent::RIGHT;
-  else if (_input.wasPressed(InputManager::BTN_CONFIRM))
-    ev = ButtonEvent::CONFIRM;
-  else if (_input.wasPressed(InputManager::BTN_BACK))
-    ev = ButtonEvent::QUIT;
-  else if (_input.wasReleased(InputManager::BTN_POWER))
-    ev = ButtonEvent::CONFIRM;
+    if (ev != ButtonEvent::SLEEP) {
+      ev = ButtonEvent::CONFIRM;
+    }
+  } else {
+    _input.update();
+
+    if (_input.wasPressed(InputManager::BTN_UP))
+      ev = ButtonEvent::UP;
+    else if (_input.wasPressed(InputManager::BTN_DOWN))
+      ev = ButtonEvent::DOWN;
+    else if (_input.wasPressed(InputManager::BTN_LEFT))
+      ev = ButtonEvent::LEFT;
+    else if (_input.wasPressed(InputManager::BTN_RIGHT))
+      ev = ButtonEvent::RIGHT;
+    else if (_input.wasPressed(InputManager::BTN_CONFIRM))
+      ev = ButtonEvent::CONFIRM;
+    else if (_input.wasPressed(InputManager::BTN_BACK))
+      ev = ButtonEvent::QUIT;
+  }
 
   if (ev != ButtonEvent::NONE) {
     _lastActivityMs = millis();
@@ -50,3 +62,4 @@ ButtonEvent EspAdcInput::pollInput() {
 }
 
 #endif
+

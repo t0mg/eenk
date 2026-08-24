@@ -406,11 +406,18 @@ void BookEngine::buildFbCachePath(char* out, size_t outLen) const {
 #endif
 }
 
+size_t BookEngine::getFramebufferSize() const {
+    size_t panelWidth = _display.getHeight();
+    size_t panelHeight = _display.getWidth();
+    size_t panelWidthBytes = (panelWidth + 7) / 8;
+    return panelWidthBytes * panelHeight;
+}
+
 void BookEngine::initRingCache() {
 #if defined(PLATFORM_ESP32) && defined(BOARD_HAS_PSRAM)
     if (!_ringCacheEnabled) {
         for (int i = 0; i < RING_CACHE_SLOTS; i++) {
-            _ringCache[i].framebuffer = (uint8_t*)heap_caps_malloc(FB_SIZE, MALLOC_CAP_SPIRAM);
+            _ringCache[i].framebuffer = (uint8_t*)heap_caps_malloc(MAX_FB_SIZE, MALLOC_CAP_SPIRAM);
             _ringCache[i].valid = false;
             if (!_ringCache[i].framebuffer) {
                 // Failed to allocate - disable ring cache
@@ -434,7 +441,7 @@ bool BookEngine::loadFromRingCache() {
             _ringCache[i].charStart == _currentPageData.charStart) {
             uint8_t* fb = _display.getRenderer()->getFrameBuffer();
             if (fb) {
-                memcpy(fb, _ringCache[i].framebuffer, FB_SIZE);
+                memcpy(fb, _ringCache[i].framebuffer, getFramebufferSize());
                 return true;
             }
         }
@@ -446,7 +453,7 @@ void BookEngine::saveToRingCache() {
     if (!_ringCacheEnabled) return;
     uint8_t* fb = _display.getRenderer()->getFrameBuffer();
     if (fb) {
-        memcpy(_ringCache[_ringCacheNext].framebuffer, fb, FB_SIZE);
+        memcpy(_ringCache[_ringCacheNext].framebuffer, fb, getFramebufferSize());
         _ringCache[_ringCacheNext].spineIndex = _currentSpine;
         _ringCache[_ringCacheNext].charStart = _currentPageData.charStart;
         _ringCache[_ringCacheNext].valid = true;
@@ -459,19 +466,20 @@ bool BookEngine::loadCachedFramebuffer() {
     buildFbCachePath(path, sizeof(path));
     uint8_t* fb = _display.getRenderer()->getFrameBuffer();
     if (!fb) return false;
+    size_t fbSize = getFramebufferSize();
 
 #ifdef PLATFORM_ESP32
     File f = SD_FS.open(path, FILE_READ);
     if (!f) return false;
-    size_t readLen = f.read(fb, FB_SIZE);
+    size_t readLen = f.read(fb, fbSize);
     f.close();
-    return readLen == FB_SIZE;
+    return readLen == fbSize;
 #else
     FILE* f = fopen(path, "rb");
     if (!f) return false;
-    size_t readLen = fread(fb, 1, FB_SIZE, f);
+    size_t readLen = fread(fb, 1, fbSize, f);
     fclose(f);
-    return readLen == FB_SIZE;
+    return readLen == fbSize;
 #endif
 }
 
@@ -480,6 +488,7 @@ void BookEngine::saveCachedFramebuffer() {
     buildFbCachePath(path, sizeof(path));
     uint8_t* fb = _display.getRenderer()->getFrameBuffer();
     if (!fb) return;
+    size_t fbSize = getFramebufferSize();
 
     char stem[64] = {0};
     buildStem(stem, sizeof(stem));
@@ -492,7 +501,7 @@ void BookEngine::saveCachedFramebuffer() {
     }
     File f = SD_FS.open(path, FILE_WRITE);
     if (f) {
-        f.write(fb, FB_SIZE);
+        f.write(fb, fbSize);
         f.close();
     }
 #else
@@ -505,7 +514,7 @@ void BookEngine::saveCachedFramebuffer() {
 #endif
     FILE* f = fopen(path, "wb");
     if (f) {
-        fwrite(fb, 1, FB_SIZE, f);
+        fwrite(fb, 1, fbSize, f);
         fclose(f);
     }
 #endif
@@ -745,6 +754,8 @@ void BookEngine::handleInput() {
     bool hasTouchTap = _input.getTouchPosition(touchX, touchY) && touchX >= 0 && touchY >= 0;
 
     if (ev == ButtonEvent::NONE && !hasTouchTap) return;
+
+    _input.resetActivityTimer();
 
     if (ev == ButtonEvent::TOP_EDGE_SWIPE) {
         BatteryMonitor *dummyBm = nullptr;

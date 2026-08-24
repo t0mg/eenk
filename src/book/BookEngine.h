@@ -106,7 +106,8 @@ private:
         bool valid;
         uint8_t* framebuffer;  // 48000 bytes (800*480/8)
     };
-    static constexpr size_t FB_SIZE = 800 * 528 / 8;  // 52800 bytes (fits X4: 48000 and X3: 52272)
+    static constexpr size_t MAX_FB_SIZE = 800 * 528 / 8;  // 52800 bytes (fits X4: 48000 and X3: 52272)
+    size_t getFramebufferSize() const;
     static constexpr int RING_CACHE_SLOTS = 4;
     FbCacheSlot _ringCache[RING_CACHE_SLOTS] = {};
     int _ringCacheNext = 0;
