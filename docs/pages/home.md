@@ -18,6 +18,8 @@
 
 Write interactive stories with the [**eenky** IDE](eenky/) (or any other text editor), compile them for eenk using eenky's build pipeline, and play on the go or on your desktop on the built-in simulator.
 
+<iframe style="width:100%;aspect-ratio:16/9" src="https://www.youtube.com/embed/JddSaGFBtNU?si=aRQLL_d_aKiVgCTu&modestbranding=1" title="eenk project trailer" frameborder="0" allow="picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
 <div class="features-grid">
   <div class="feature-card">
     <h3><span class="feature-icon material-symbols-outlined">favorite</span>
