@@ -57,7 +57,7 @@ Write interactive stories with the [**eenky** IDE](eenky/) (or any other text ed
 
 <div class="device-gallery">
   <div class="device-card">
-    <div class="device-label">Xteink X3 (untested!)</div>
+    <div class="device-label">Xteink X3</div>
     <div class="device-img">
       <model-viewer src="assets/glb/X3-En-Black.glb" alt="Xteink X3 3D Model" interaction-prompt="none" auto-rotate camera-controls shadow-intensity="1" touch-action="pan-y"></model-viewer>
     </div>
@@ -78,9 +78,9 @@ Write interactive stories with the [**eenky** IDE](eenky/) (or any other text ed
 
 | Device | MCU | Resolution | Notes |
 |--------|-----|------------|-------|
-| **X3** | ESP32-C3 | 792 × 528 | Original model |
-| **X4** | ESP32-C3 | 800 × 480 | Current main target |
-| **X4 Pro** | ESP32-S3 | 800 × 480 | Extra RAM and backlight |
+| **X3** | ESP32-C3 | 792 × 528 | Original model, 4 chin buttons |
+| **X4** | ESP32-C3 | 800 × 480 | Narrower display and a real USB C port |
+| **X4 Pro** | ESP32-S3 | 800 × 480 | Way more RAM, touchscreen, backlight |
 
 ## Quick Start
 
