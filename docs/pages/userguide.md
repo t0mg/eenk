@@ -16,7 +16,7 @@ Welcome to the **eenk** User Guide! This guide covers everything you need to kno
 |---|---|---|
 | **Xteink X4** | ESP32-C3 | Reference platform |
 | **Xteink X4 Pro** | ESP32-S3 | Touch and backlight are supported; extra PSRAM is used for faster story loading |
-| **Xteink X3** | ESP32-C3 | **Untested** (theoretical support only, please report back if you try it out!) |
+| **Xteink X3** | ESP32-C3 | Same chip as X4 with different screen resolution, now also supported |
 
 
 ## Flashing eenk
