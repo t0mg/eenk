@@ -336,22 +336,23 @@ async function executeUpload(binFile, binData, sidecars) {
         if (endIdx > 0) title = new TextDecoder().decode(titleBytes.slice(0, endIdx));
       }
     }
-    const folderName = title.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 32);
+    const folderName = (title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'story').substring(0, 32);
 
     try { await protocol.mkdir(`/stories/${folderName}`); } catch (_) { }
 
-    // Upload main .bin
+    // Upload story .bin
     setState({ transferState: { type: 'upload', filename: binFile.name, bytesTransferred: 0, bytesTotal: binData.length } });
-    await protocol.uploadFile(`/stories/${folderName}/main.bin`, binData, (transferred, total) => {
+    await protocol.uploadFile(`/stories/${folderName}/story.bin`, binData, (transferred, total) => {
       setState({ transferState: { type: 'upload', filename: binFile.name, bytesTransferred: transferred, bytesTotal: total } });
     });
 
-    // Upload sidecars
+    // Upload sidecars — normalize any .media sidecar to story.media
     for (const sidecar of sidecars) {
       const buf = await sidecar.arrayBuffer();
       const data = new Uint8Array(buf);
+      const destName = sidecar.name.endsWith('.media') ? 'story.media' : sidecar.name;
       setState({ transferState: { type: 'upload', filename: sidecar.name, bytesTransferred: 0, bytesTotal: data.length } });
-      await protocol.uploadFile(`/stories/${folderName}/${sidecar.name}`, data, (transferred, total) => {
+      await protocol.uploadFile(`/stories/${folderName}/${destName}`, data, (transferred, total) => {
         setState({ transferState: { type: 'upload', filename: sidecar.name, bytesTransferred: transferred, bytesTotal: total } });
       });
     }
