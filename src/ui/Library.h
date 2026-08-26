@@ -66,10 +66,13 @@ protected:
 
   static constexpr int MAX_STORIES = 32;
   static constexpr int ITEM_H = 172; // px per story list entry
-  // floor((800 - STATUS_BAR_H - FooterWidget::HEIGHT) / ITEM_H)
+  // floor((800 - HeaderWidget::HEIGHT - FooterWidget::HEIGHT) / ITEM_H)
   static constexpr int VISIBLE_ITEMS = 4;
   static constexpr int DISPLAY_W = 480;
   static constexpr int DISPLAY_H = 800;
+  static constexpr int CARD_MARGIN_LEFT = 16;
+  static constexpr int RIGHT_GUTTER_W = 44;
+  static constexpr int LIST_TOP_Y = HeaderWidget::HEIGHT + 2;
   static constexpr int ITEM_MARGIN_X =
       12; // left/right text margin within an entry
 

@@ -75,6 +75,9 @@ public:
     // Y-coordinate mapping for touch interactions
     int getChoiceIndexAtY(int y) const;
     void setupStoryEndedChoices();
+#ifdef PIO_UNIT_TESTING
+    void setupTestChoices(const std::vector<std::string>& choices);
+#endif
 
 private:
     IDisplay& _display;

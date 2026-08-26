@@ -315,16 +315,14 @@ class QueueMockInput : public IInput {
 public:
   std::vector<ButtonEvent> queue;
   size_t index = 0;
-  mutable int tapX = -1;
-  mutable int tapY = -1;
-  mutable bool hasTap = false;
+  struct Tap {
+    int x, y;
+  };
+  mutable std::vector<Tap> tapQueue;
+  mutable size_t tapIdx = 0;
 
   void push(ButtonEvent ev) { queue.push_back(ev); }
-  void pushTap(int x, int y) {
-    tapX = x;
-    tapY = y;
-    hasTap = true;
-  }
+  void pushTap(int x, int y) { tapQueue.push_back({x, y}); }
   ButtonEvent pollInput() override {
     if (index < queue.size()) {
       return queue[index++];
@@ -332,10 +330,10 @@ public:
     return ButtonEvent::NONE;
   }
   bool getTouchPosition(int &x, int &y) const override {
-    if (hasTap) {
-      x = tapX;
-      y = tapY;
-      hasTap = false;
+    if (tapIdx < tapQueue.size()) {
+      x = tapQueue[tapIdx].x;
+      y = tapQueue[tapIdx].y;
+      tapIdx++;
       return true;
     }
     x = -1;
@@ -1729,8 +1727,7 @@ void test_story_menu_full_screenshot(void) {
                                     "Rewind to last checkpoint", "Rewind to...",
                                     "Restart story"};
 
-  MenuModalWidget::show(display, input, &widget, "Story Menu", items, 2,
-                        "eenk");
+  MenuModalWidget::show(display, input, &widget, "Story Menu", items, 2);
 
   saveBMP("test/golden/test_story_menu_full.bmp", display.eink.getFrameBuffer(),
           display.getWidth(), display.getHeight());
@@ -1748,8 +1745,7 @@ void test_story_menu_no_checkpoints_screenshot(void) {
 
   std::vector<std::string> items = {"Save and exit", "Restart story"};
 
-  MenuModalWidget::show(display, input, &widget, "Story Menu", items, 0,
-                        "eenk");
+  MenuModalWidget::show(display, input, &widget, "Story Menu", items, 0);
 
   saveBMP("test/golden/test_story_menu_no_checkpoints.bmp",
           display.eink.getFrameBuffer(), display.getWidth(),
@@ -1771,8 +1767,7 @@ void test_rewind_to_submenu_screenshot(void) {
       "The Second Twist Where It Turns Out It Was All Part Of The Plan In The "
       "First Place"};
 
-  MenuModalWidget::show(display, input, &widget, "Rewind to...", items, 3,
-                        "eenk");
+  MenuModalWidget::show(display, input, &widget, "Rewind to...", items, 3);
 
   saveBMP("test/golden/test_rewind_to_submenu.bmp",
           display.eink.getFrameBuffer(), display.getWidth(),
@@ -1791,12 +1786,166 @@ void test_confirm_restart_modal_screenshot(void) {
 
   ModalDialogWidget::show(
       display, input, &widget, "Confirm Restart",
-      "Are you sure you\nwant to restart ?\nProgress will be lost", "eenk");
+      "Are you sure you\nwant to restart ?\nProgress will be lost");
 
   saveBMP("test/golden/test_confirm_restart_modal.bmp",
           display.eink.getFrameBuffer(), display.getWidth(),
           display.getHeight());
   TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_menu_modal_pagination_and_sizing(void) {
+  TestDisplay display;
+  QueueMockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+
+  std::vector<std::string> items = {"Option 1", "Option 2", "Option 3",
+                                    "Option 4", "Option 5", "Option 6"};
+
+  // Show page 0 first to record height
+  int outW1 = 0, outH1 = 0;
+  MockInput quitInput;
+  MenuModalWidget::show(display, quitInput, &widget, "Test Menu", items, 0,
+                        nullptr, 0, 0, false, &outW1, &outH1);
+
+  // Now test touch down arrow -> next page -> tap option 5
+  input.pushTap(240, 550); // tap down arrow (Y in [515..579])
+  input.pushTap(240, 350); // tap Option 5 on page 2 (Y in [323..387])
+
+  int outW2 = 0, outH2 = 0;
+  int selected =
+      MenuModalWidget::show(display, input, &widget, "Test Menu", items, 0,
+                            nullptr, 0, 0, false, &outW2, &outH2);
+
+  TEST_ASSERT_EQUAL(4, selected); // Option 5 is index 4
+  TEST_ASSERT_TRUE_MESSAGE(outH2 >= outH1,
+                           "Modal height must not shrink on page 2");
+}
+
+void test_menu_modal_touch_page_up(void) {
+  TestDisplay display;
+  QueueMockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+
+  std::vector<std::string> items = {"Option 1", "Option 2", "Option 3",
+                                    "Option 4", "Option 5", "Option 6"};
+
+  // Start on page 1 (index 5)
+  input.pushTap(240, 350); // tap up arrow (Y in [323..387]) -> goes to page 0
+  input.pushTap(240, 290); // tap Option 1 on page 0 (Y in [259..323])
+
+  int selected = MenuModalWidget::show(display, input, &widget, "Test Menu",
+                                       items, 5, nullptr, 0, 0, false);
+  TEST_ASSERT_EQUAL(0, selected); // Option 1 is index 0
+}
+
+void test_menu_modal_paginated_screenshot(void) {
+  TestDisplay display;
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+
+  display.clear();
+  display.renderer.drawText(10, 50, 100, "Background text...");
+
+  std::vector<std::string> items = {
+      "Chapter 1: The Beginning",  "Chapter 2: The Journey",
+      "Chapter 3: The Conflict",   "Chapter 4: The Climax",
+      "Chapter 5: The Resolution", "Chapter 6: Epilogue"};
+
+  MenuModalWidget::show(display, input, &widget, "Chapters", items, 0);
+
+  saveBMP("test/golden/test_menu_modal_paginated.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_ink_display_manager_choice_overflow(void) {
+  TestDisplay display;
+  StoryMetadata meta;
+  AppSettings settings = AppSettings::defaults();
+  settings.touchChoicesEnabled = true;
+  settings.touchScrollEnabled = true;
+
+  InkDisplayManager dm(display);
+  dm.applySettings(settings);
+  dm.resolveAndApplyFont(meta, "story", "");
+
+  // Add 15 narrative lines so choices overflow below the 800px screen
+  for (int i = 0; i < 15; ++i) {
+    WrappedLine line;
+    line.block.addRun(
+        "Narrative line of sufficient length to fill some vertical space.",
+        EpdFontFamily::REGULAR);
+    dm.addWrappedLine(line);
+  }
+
+  std::vector<std::string> choices = {
+      "Choice 1: Explore the ancient ruins on the hill",
+      "Choice 2: Speak with the mysterious traveller",
+      "Choice 3: Rest near the campfire until morning",
+      "Choice 4: Venture into the dark and winding cave",
+      "Choice 5: Consult your old leather journal",
+      "Choice 6: Turn back toward the village gates"};
+
+  dm.setupTestChoices(choices);
+  dm.revealChoices();
+
+  // Verify that total content height exceeds the screen and requires scrolling
+  TEST_ASSERT_TRUE_MESSAGE(dm.getMaxScrollY() > 0,
+                           "Document should require scrolling");
+
+  // Before scrolling (at top)
+  dm.setScrollY(0);
+  TEST_ASSERT_FALSE_MESSAGE(
+      dm.isChoicesVisible(),
+      "Choices at the end should not be fully visible when scrollY is 0");
+
+  // Verify first choice (index 0) is on screen and selectable before scrolling
+  int hitTopChoice = -1;
+  for (int y = 0; y < display.getHeight(); y++) {
+    if (dm.getChoiceIndexAtY(y) == 0) {
+      hitTopChoice = 0;
+      break;
+    }
+  }
+  TEST_ASSERT_EQUAL_MESSAGE(
+      0, hitTopChoice,
+      "First choice should be reachable on screen before scrolling");
+
+  // Verify last choice (index 5) is NOT on screen before scrolling
+  bool lastChoiceOnScreenBefore = false;
+  for (int y = 0; y < display.getHeight(); y++) {
+    if (dm.getChoiceIndexAtY(y) == 5) {
+      lastChoiceOnScreenBefore = true;
+      break;
+    }
+  }
+  TEST_ASSERT_FALSE_MESSAGE(
+      lastChoiceOnScreenBefore,
+      "Last choice must not be on screen before scrolling down");
+
+  // Scroll down to the bottom (as triggered by down arrow / scroll action)
+  dm.setScrollToBottom();
+  TEST_ASSERT_TRUE_MESSAGE(
+      dm.isChoicesVisible(),
+      "Choices should be visible after scrolling to bottom");
+  TEST_ASSERT_EQUAL(dm.getMaxScrollY(), dm.getScrollY());
+
+  // Bottom choice (Choice 6, index 5) should now be on screen and selectable
+  int hitBottomChoice = -1;
+  for (int y = 0; y < display.getHeight(); y++) {
+    if (dm.getChoiceIndexAtY(y) == 5) {
+      hitBottomChoice = 5;
+      break;
+    }
+  }
+  TEST_ASSERT_EQUAL_MESSAGE(
+      5, hitBottomChoice,
+      "Last choice should be selectable after scrolling down");
 }
 
 void test_battery_widget_x3_screenshot(void) {
@@ -1810,8 +1959,9 @@ void test_battery_widget_x3_screenshot(void) {
               (40 - widget.getHeight()) / 2, true);
   widget.draw(display.getWidth() - widget.getWidth() - 8,
               (40 - widget.getHeight()) / 2 + 40, false);
-  saveBMP("test/golden/x3/test_battery_widget.bmp", display.eink.getFrameBuffer(),
-          display.getWidth(), display.getHeight());
+  saveBMP("test/golden/x3/test_battery_widget.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
   TEST_ASSERT_EQUAL(1, 1);
 }
 
@@ -1868,8 +2018,9 @@ void test_settings_view_x3_screenshot(void) {
   SettingsView view(display, input, widget, nullptr /*frontlight*/, settings);
   view.run();
 
-  saveBMP("test/golden/x3/test_settings_view.bmp", display.eink.getFrameBuffer(),
-          display.getWidth(), display.getHeight());
+  saveBMP("test/golden/x3/test_settings_view.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
   TEST_ASSERT_EQUAL(1, 1);
 }
 
@@ -1992,11 +2143,12 @@ void test_external_fonts_x3_screenshot(void) {
 
   if (fam.hasStyle(EpdFontFamily::BOLD)) {
     display.renderer.drawText(100, 20, y, "Hello World from SD card!", true,
-                               EpdFontFamily::BOLD);
+                              EpdFontFamily::BOLD);
   }
 
-  saveBMP("test/golden/x3/test_external_fonts.bmp", display.eink.getFrameBuffer(),
-          display.getWidth(), display.getHeight());
+  saveBMP("test/golden/x3/test_external_fonts.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
   TEST_ASSERT_EQUAL(1, 1);
 }
 
@@ -2041,8 +2193,9 @@ void test_loading_widget_x3_screenshot(void) {
 
   ui.showLoading("Loading Story...", 0.65f);
 
-  saveBMP("test/golden/x3/test_loading_widget.bmp", display.eink.getFrameBuffer(),
-          display.getWidth(), display.getHeight());
+  saveBMP("test/golden/x3/test_loading_widget.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
   TEST_ASSERT_EQUAL(1, 1);
 }
 
@@ -2108,8 +2261,9 @@ void test_story_player_x3_screenshot(void) {
   int iconSize = 10;
   display.renderer.drawText(choiceFont, 40, y, "1. Look around", true);
   y += display.renderer.getLineHeight(choiceFont) + 10;
-  display.renderer.fillRect(
-      20, y - 2, display.getWidth() - 40, display.renderer.getLineHeight(choiceFont) + 4, true);
+  display.renderer.fillRect(20, y - 2, display.getWidth() - 40,
+                            display.renderer.getLineHeight(choiceFont) + 4,
+                            true);
   display.renderer.drawTriangleIcon(
       24, y + (display.renderer.getLineHeight(choiceFont) - iconSize) / 2,
       iconSize, false);
@@ -2206,8 +2360,9 @@ void test_epub_exit_modal_x3_render(void) {
   ModalDialogWidget::show(display, input, &widget, "Exit Reader",
                           "Do you want to exit to the menu?", progressStr);
 
-  saveBMP("test/golden/x3/test_epub_exit_modal.bmp", display.eink.getFrameBuffer(),
-          display.getWidth(), display.getHeight());
+  saveBMP("test/golden/x3/test_epub_exit_modal.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
   TEST_ASSERT_EQUAL(1, 1);
 }
 
@@ -2363,8 +2518,9 @@ void test_choice_states_touch_x3_screenshot(void) {
   footer.btnNext = {true, "Down", "Next"};
   footer.render(&display.renderer, display.getWidth(), display.getHeight());
 
-  saveBMP("test/golden/x3/test_choices_touch.bmp", display.eink.getFrameBuffer(),
-          display.getWidth(), display.getHeight());
+  saveBMP("test/golden/x3/test_choices_touch.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
   TEST_ASSERT_EQUAL(1, 1);
 }
 
@@ -2439,11 +2595,11 @@ void test_story_menu_full_x3_screenshot(void) {
                                     "Rewind to last checkpoint", "Rewind to...",
                                     "Restart story"};
 
-  MenuModalWidget::show(display, input, &widget, "Story Menu", items, 2,
-                        "eenk");
+  MenuModalWidget::show(display, input, &widget, "Story Menu", items, 2);
 
-  saveBMP("test/golden/x3/test_story_menu_full.bmp", display.eink.getFrameBuffer(),
-          display.getWidth(), display.getHeight());
+  saveBMP("test/golden/x3/test_story_menu_full.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
   TEST_ASSERT_EQUAL(1, 1);
 }
 
@@ -2458,8 +2614,7 @@ void test_story_menu_no_checkpoints_x3_screenshot(void) {
 
   std::vector<std::string> items = {"Save and exit", "Restart story"};
 
-  MenuModalWidget::show(display, input, &widget, "Story Menu", items, 0,
-                        "eenk");
+  MenuModalWidget::show(display, input, &widget, "Story Menu", items, 0);
 
   saveBMP("test/golden/x3/test_story_menu_no_checkpoints.bmp",
           display.eink.getFrameBuffer(), display.getWidth(),
@@ -2481,8 +2636,7 @@ void test_rewind_to_submenu_x3_screenshot(void) {
       "The Second Twist Where It Turns Out It Was All Part Of The Plan In The "
       "First Place"};
 
-  MenuModalWidget::show(display, input, &widget, "Rewind to...", items, 3,
-                        "eenk");
+  MenuModalWidget::show(display, input, &widget, "Rewind to...", items, 3);
 
   saveBMP("test/golden/x3/test_rewind_to_submenu.bmp",
           display.eink.getFrameBuffer(), display.getWidth(),
@@ -2501,7 +2655,7 @@ void test_confirm_restart_modal_x3_screenshot(void) {
 
   ModalDialogWidget::show(
       display, input, &widget, "Confirm Restart",
-      "Are you sure you\nwant to restart ?\nProgress will be lost", "eenk");
+      "Are you sure you\nwant to restart ?\nProgress will be lost");
 
   saveBMP("test/golden/x3/test_confirm_restart_modal.bmp",
           display.eink.getFrameBuffer(), display.getWidth(),
@@ -2560,6 +2714,10 @@ int main(int argc, char **argv) {
   RUN_TEST(test_story_menu_no_checkpoints_screenshot);
   RUN_TEST(test_rewind_to_submenu_screenshot);
   RUN_TEST(test_confirm_restart_modal_screenshot);
+  RUN_TEST(test_menu_modal_pagination_and_sizing);
+  RUN_TEST(test_menu_modal_touch_page_up);
+  RUN_TEST(test_menu_modal_paginated_screenshot);
+  RUN_TEST(test_ink_display_manager_choice_overflow);
 
   // X3 (792x528) Golden Screenshot Tests
   RUN_TEST(test_battery_widget_x3_screenshot);

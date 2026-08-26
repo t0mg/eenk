@@ -254,7 +254,8 @@ void Library::formatSize(uint32_t bytes, char *out, size_t outLen) {
     if (mb10 % 10 == 0) {
       snprintf(out, outLen, "%u MB", (unsigned int)(mb10 / 10));
     } else {
-      snprintf(out, outLen, "%u.%u MB", (unsigned int)(mb10 / 10), (unsigned int)(mb10 % 10));
+      snprintf(out, outLen, "%u.%u MB", (unsigned int)(mb10 / 10),
+               (unsigned int)(mb10 % 10));
     }
   } else {
     snprintf(out, outLen, "%u KB", (unsigned int)((bytes + 512u) / 1024u));
@@ -510,9 +511,9 @@ void Library::renderEntry(int index, int yPos, bool selected) {
     defined(PIO_UNIT_TESTING)
   const StoryEntry &e = _entries[index];
 
-  int cardX = 24;
+  int cardX = CARD_MARGIN_LEFT;
   int cardY = yPos + 4;
-  int cardW = _display.getWidth() - 48;
+  int cardW = _display.getWidth() - CARD_MARGIN_LEFT - RIGHT_GUTTER_W;
   int cardH = ITEM_H - 8;
 
   ListItemWidget::draw(
@@ -672,7 +673,8 @@ void Library::renderEmpty() {
   int lineH = r->getLineHeight(FONT_NORMAL);
   int totalH = lineH * 3 + 8;
   // Centre within the content area (between status bar and hint bar).
-  int contentH = _display.getHeight() - HeaderWidget::HEIGHT - FooterWidget::HEIGHT;
+  int contentH =
+      _display.getHeight() - HeaderWidget::HEIGHT - FooterWidget::HEIGHT;
   int startY = HeaderWidget::HEIGHT + (contentH - totalH) / 2;
 
   r->drawCenteredText(FONT_BOLD, startY, kLine1, true);
@@ -714,7 +716,7 @@ void Library::render() {
 
   _display.clear();
   HeaderWidget header(_display, _battery);
-  header.render("eenk", NeuStyle::FONT_HEADING);
+  header.render(nullptr, NeuStyle::FONT_HEADING);
 
   if (_numEntries == 0) {
     renderEmpty();
@@ -726,23 +728,24 @@ void Library::render() {
 
     for (int i = _scrollOffset; i < lastVisible; i++) {
       int row = i - _scrollOffset;
-      int yPos = HeaderWidget::HEIGHT + 8 + row * ITEM_H;
+      int yPos = LIST_TOP_Y + row * ITEM_H;
       renderEntry(i, yPos, i == _selectedIndex);
     }
 
-#ifdef PLATFORM_ESP32
-    // Scroll arrows.
+    int dispW = _display.getWidth();
+    int dispH = _display.getHeight();
+    int iconSize = 16;
+    int arrowX = dispW - RIGHT_GUTTER_W + (RIGHT_GUTTER_W - iconSize) / 2;
+
+    // Scroll arrows in the right gutter (top-right and bottom-right corners).
     if (_scrollOffset > 0) {
-      // Up arrow at top-right of list area.
-      r->drawText(FONT_BOLD, _display.getWidth() / 2, HeaderWidget::HEIGHT + 2, "^",
-                  true);
+      int arrowY = HeaderWidget::HEIGHT + 18;
+      r->drawUpTriangleIcon(arrowX, arrowY, iconSize, true);
     }
     if (_scrollOffset + VISIBLE_ITEMS < _numEntries) {
-      // Down arrow at bottom-right of list area.
-      int arrowY = HeaderWidget::HEIGHT + VISIBLE_ITEMS * ITEM_H - 14;
-      r->drawText(FONT_BOLD, _display.getWidth() / 2, arrowY, "v", true);
+      int arrowY = (dispH - FooterWidget::HEIGHT) - 18 - (iconSize + 1) / 2;
+      r->drawDownTriangleIcon(arrowX, arrowY, iconSize, true);
     }
-#endif
   }
 
   // First render: do a full (ghosting-clearing) refresh; subsequent renders
@@ -779,8 +782,9 @@ void Library::launchStory(int index) {
 
   // Provide a visual cue that we registered the click before the ESP restarts
   bool isEpub = e.contentType == StoryEntry::ContentType::EPUB_BOOK;
-  const char *titleStr = isEpub ? (e.isCurrentlyLoaded ? "Resuming book..." : "Opening book...")
-                                : (e.isCurrentlyLoaded ? "Resuming story..." : "Loading story...");
+  const char *titleStr =
+      isEpub ? (e.isCurrentlyLoaded ? "Resuming book..." : "Opening book...")
+             : (e.isCurrentlyLoaded ? "Resuming story..." : "Loading story...");
   LoadingWidget::show(_display, titleStr, 1.0f);
 
   // Release SPI peripherals so the next boot can re-initialise them cleanly.
@@ -846,9 +850,30 @@ bool Library::run() {
       } else if (touchEv == ButtonEvent::RIGHT) {
         ev = ButtonEvent::RIGHT;
       } else {
-        int listTop = HeaderWidget::HEIGHT + 8;
-        int listBottom = dispH - FooterWidget::HEIGHT;
-        if (touchY >= listTop && touchY < listBottom && _numEntries > 0) {
+        int listTop = LIST_TOP_Y;
+        int listItemsHeight = VISIBLE_ITEMS * ITEM_H;
+        int listBottom = listTop + listItemsHeight;
+        int contentH = (dispH - FooterWidget::HEIGHT) - HeaderWidget::HEIGHT;
+
+        if (touchX >= dispW - RIGHT_GUTTER_W) {
+          // Touch in right gutter
+          if (_scrollOffset > 0 &&
+              touchY < HeaderWidget::HEIGHT + contentH / 2) {
+            // Tap top-right -> scroll up
+            _selectedIndex = std::max(0, _selectedIndex - VISIBLE_ITEMS);
+            clampScroll();
+            render();
+          } else if (_scrollOffset + VISIBLE_ITEMS < _numEntries &&
+                     touchY >= HeaderWidget::HEIGHT + contentH / 2 &&
+                     touchY < dispH - FooterWidget::HEIGHT) {
+            // Tap bottom-right -> scroll down
+            _selectedIndex =
+                std::min(_numEntries - 1, _selectedIndex + VISIBLE_ITEMS);
+            clampScroll();
+            render();
+          }
+        } else if (touchY >= listTop && touchY < listBottom &&
+                   _numEntries > 0) {
           int row = (touchY - listTop) / ITEM_H;
           int clickedIdx = _scrollOffset + row;
           if (clickedIdx >= 0 && clickedIdx < _numEntries &&

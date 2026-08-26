@@ -306,6 +306,36 @@ void InkDisplayManager::setupStoryEndedChoices() {
     }
   }
 }
+
+#ifdef PIO_UNIT_TESTING
+void InkDisplayManager::setupTestChoices(const std::vector<std::string> &choices) {
+  _numChoices = 0;
+  _selectedChoice = 0;
+  GfxRenderer *renderer = _display.getRenderer();
+  int width = _display.getWidth();
+  int marginX = _settings.marginPx;
+  int narrativeWidth = width - (2 * marginX);
+  int indicatorWidth = 24;
+
+  for (size_t i = 0; i < choices.size() && i < MAX_CHOICES; ++i) {
+    strncpy(_choiceText[i], choices[i].c_str(), sizeof(_choiceText[i]) - 1);
+    _choiceText[i][sizeof(_choiceText[i]) - 1] = '\0';
+    _wrappedChoices[i].clear();
+    if (renderer && narrativeWidth > indicatorWidth) {
+      int wrapWidth = narrativeWidth - indicatorWidth;
+      std::vector<TextRun> runs = InkRichTextParser::parse(_choiceText[i]);
+      _wrappedChoices[i] = renderer->wrapRichText(FONT_CHOICE, runs, wrapWidth, 100);
+      if (_wrappedChoices[i].empty()) {
+        TextBlock empty;
+        empty.addRun("", EpdFontFamily::REGULAR);
+        _wrappedChoices[i].push_back(empty);
+      }
+    }
+    ++_numChoices;
+  }
+  updateMaxScrollY();
+}
+#endif
 InkDisplayManager::ChoiceLayout InkDisplayManager::getChoiceLayout(GfxRenderer *renderer) const {
   ChoiceLayout layout;
   layout.marginY = _settings.marginPx;
@@ -626,6 +656,13 @@ void InkDisplayManager::redraw(InkStoryManager &storyManager,
         }
       }
     }
+  }
+
+  if (_choicesRevealed && _scrollY < _maxScrollY) {
+    int triSize = 12;
+    int triX = marginX + (narrativeWidth - triSize) / 2;
+    int triY = height - 14;
+    renderer->drawDownTriangleIcon(triX, triY, triSize, true);
   }
 
   if (settings.refreshInterval > 0 &&

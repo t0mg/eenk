@@ -43,6 +43,7 @@ int MenuModalWidget::show(IDisplay &display, IInput &input,
 
   int totalItems = static_cast<int>(items.size());
   int selectedIndex = std::max(0, std::min(initialSelection, totalItems - 1));
+  int currentMinHeight = minHeight;
 
   static constexpr int maxItemsPerPage = 4;
 
@@ -50,6 +51,10 @@ int MenuModalWidget::show(IDisplay &display, IInput &input,
     int currentPage = selectedIndex / maxItemsPerPage;
     int startIndex = currentPage * maxItemsPerPage;
     int endIndex = std::min(totalItems, startIndex + maxItemsPerPage);
+
+    bool hasPrevPage = (startIndex > 0);
+    bool hasNextPage = (endIndex < totalItems);
+    static constexpr int arrowRowH = NeuStyle::CHOICE_MIN_H;
 
     int innerX = (dispW - DLG_W) / 2 + NeuStyle::BORDER_W;
     int innerW = DLG_W - 2 * NeuStyle::BORDER_W;
@@ -77,9 +82,13 @@ int MenuModalWidget::show(IDisplay &display, IInput &input,
       itemsTotalH += itemH;
     }
 
-    int calculatedH =
-        (hasTitle ? titleBarH : 0) + itemsTotalH + 2 * NeuStyle::BORDER_W;
-    int DLG_H = std::max(calculatedH, minHeight);
+    int arrowsTotalH = (hasPrevPage ? arrowRowH : 0) + (hasNextPage ? arrowRowH : 0);
+
+    int calculatedH = (hasTitle ? titleBarH : 0) + itemsTotalH + arrowsTotalH +
+                      2 * NeuStyle::BORDER_W;
+    int DLG_H = std::max(calculatedH, currentMinHeight);
+    currentMinHeight = DLG_H;
+
     int dlgX = (dispW - DLG_W) / 2;
     int dlgY =
         (dispH - FooterWidget::HEIGHT - NeuStyle::SHADOW_OFFSET - DLG_H) / 2;
@@ -128,6 +137,17 @@ int MenuModalWidget::show(IDisplay &display, IInput &input,
                          true);
     }
 
+    // Up Arrow row if previous page exists
+    RenderedMenuItem upArrowRect = {0, 0, 0, 0, -1};
+    if (hasPrevPage) {
+      upArrowRect = {innerX, currY, innerW, arrowRowH, -1};
+      int iconSize = 16;
+      int iconX = innerX + (innerW - iconSize) / 2;
+      int iconY = currY + (arrowRowH - (iconSize + 1) / 2) / 2;
+      renderer->drawUpTriangleIcon(iconX, iconY, iconSize, true);
+      currY += arrowRowH;
+    }
+
     // Draw menu items
     std::vector<RenderedMenuItem> renderedItems;
     for (size_t p = 0; p < pageWrappedLines.size(); ++p) {
@@ -154,9 +174,6 @@ int MenuModalWidget::show(IDisplay &display, IInput &input,
                              false);
         }
       } else {
-        // White interior background
-        // renderer->fillRect(innerX, currY, innerW, itemH, false);
-
         // Black text
         for (size_t l = 0; l < lines.size(); ++l) {
           int textY = currY + textOffsetY + static_cast<int>(l) * bodyLineH;
@@ -167,6 +184,17 @@ int MenuModalWidget::show(IDisplay &display, IInput &input,
 
       renderedItems.push_back({innerX, currY, innerW, itemH, itemIdx});
       currY += itemH;
+    }
+
+    // Down Arrow row if next page exists
+    RenderedMenuItem downArrowRect = {0, 0, 0, 0, -1};
+    if (hasNextPage) {
+      downArrowRect = {innerX, currY, innerW, arrowRowH, -1};
+      int iconSize = 16;
+      int iconX = innerX + (innerW - iconSize) / 2;
+      int iconY = currY + (arrowRowH - (iconSize + 1) / 2) / 2;
+      renderer->drawDownTriangleIcon(iconX, iconY, iconSize, true);
+      currY += arrowRowH;
     }
 
     // Render footer
@@ -195,8 +223,8 @@ int MenuModalWidget::show(IDisplay &display, IInput &input,
         if (footerEv == ButtonEvent::BACK) {
           return -1;
         } else if (footerEv == ButtonEvent::CONFIRM ||
-                   footerEv == ButtonEvent::RIGHT &&
-                       footer.getSlotAt(touchX, touchY, dispW, dispH) == 1) {
+                   (footerEv == ButtonEvent::RIGHT &&
+                    footer.getSlotAt(touchX, touchY, dispW, dispH) == 1)) {
           return selectedIndex;
         } else if (footerEv == ButtonEvent::LEFT) { // Slot 2: PREV
           selectedIndex =
@@ -210,6 +238,26 @@ int MenuModalWidget::show(IDisplay &display, IInput &input,
           break;
         }
 
+        // Check Up Arrow touch
+        if (hasPrevPage && touchX >= upArrowRect.x &&
+            touchX <= upArrowRect.x + upArrowRect.w &&
+            touchY >= upArrowRect.y &&
+            touchY <= upArrowRect.y + upArrowRect.h) {
+          selectedIndex = std::max(0, startIndex - maxItemsPerPage);
+          stateChanged = true;
+          break;
+        }
+
+        // Check Down Arrow touch
+        if (hasNextPage && touchX >= downArrowRect.x &&
+            touchX <= downArrowRect.x + downArrowRect.w &&
+            touchY >= downArrowRect.y &&
+            touchY <= downArrowRect.y + downArrowRect.h) {
+          selectedIndex = std::min(totalItems - 1, endIndex);
+          stateChanged = true;
+          break;
+        }
+
         // Check item touch
         for (const auto &ri : renderedItems) {
           if (touchX >= ri.x && touchX <= ri.x + ri.w && touchY >= ri.y &&
@@ -217,6 +265,12 @@ int MenuModalWidget::show(IDisplay &display, IInput &input,
             return ri.itemIndex; // Tapping item selects and confirms
           }
         }
+      }
+
+      if (ev == ButtonEvent::SWIPE_UP) {
+        ev = ButtonEvent::DOWN;
+      } else if (ev == ButtonEvent::SWIPE_DOWN) {
+        ev = ButtonEvent::UP;
       }
 
       if (ev == ButtonEvent::QUIT || ev == ButtonEvent::BACK) {
