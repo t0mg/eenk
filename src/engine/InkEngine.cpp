@@ -175,6 +175,13 @@ void InkEngine::tickRunningText() {
       if (!s.empty() && s.back() == '\n') {
         s.pop_back();
       }
+      size_t first = s.find_first_not_of(" \t\r\n");
+      if (first == std::string::npos) {
+        s.clear();
+      } else {
+        size_t last = s.find_last_not_of(" \t\r\n");
+        s = s.substr(first, (last - first + 1));
+      }
 
       bool hasImage = false;
       std::string imagePath = "";
@@ -223,7 +230,7 @@ void InkEngine::tickRunningText() {
         wl.endOfParagraph = true;
         _displayManager.addWrappedLine(wl);
         newLinesCount++;
-      } else if (!s.empty() || !runner->has_tags()) {
+      } else if (!s.empty()) {
         pushLine(s);
       }
 
