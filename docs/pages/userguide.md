@@ -43,8 +43,6 @@ TODO: document this alternative method for X4.
 
 ### Power & Sleep / Wake
 
-The Xteink devices feature a **hardware latching power circuit**. When the device is put into deep sleep, power to the microcontroller is physically disconnected to ensure zero battery drain while idle.
-
 - **Power On / Wake Up**: Press and hold the **Power** button for ~2–3 seconds until the display refreshes.
 - **Power Off / Sleep**: Press and hold the **Power** button for ~2–3 seconds. The device will save your current progress and show the sleep cover before cutting power.
 - **Auto-Sleep**: By default, the device will automatically save and sleep after 2 minutes of inactivity (configurable in Settings).
@@ -96,17 +94,9 @@ On the X4 Pro, swipe down from the top edge to access quick controls:
 
 ## Getting & Transferring Stories
 
-Stories in eenk are distributed as **`.eenk` story packages** compiled with the companion [**eenky IDE**](../eenky/) or downloaded from the [**Stories Catalog**](../catalog/) and author websites.
+Stories in eenk are distributed as **`.eenk` story packages** compiled with the companion [**eenky IDE**](../eenky/) or downloaded from the [**Stories Catalog**](../stories/) and author websites. A `.eenk` file is a self-contained archive (ZIP format under the hood) that bundles everything needed to run your story.
 
-### The `.eenk` Package Format
-
-A `.eenk` file is a self-contained archive (ZIP format under the hood) that bundles everything needed to run your story:
-
-- **`story.bin`** *(Required)*: The compiled story bytecode with embedded metadata (`@title`, `@author`, `@font`, compile timestamp, etc.).
-- **`story.media`** *(Optional)*: Media sidecar containing 1-bit dithered cover images, thumbnails, and inline story illustrations.
-- **`fontname.epdfont`** *(Optional)*: Custom font files required by the story.
-
-### Method A: Transfer via USB Device Manager (Recommended)
+### Transfer via USB Device Manager (Recommended)
 
 The simplest and fastest way to install stories is over USB without removing the MicroSD card:
 
@@ -119,7 +109,7 @@ The simplest and fastest way to install stories is over USB without removing the
 
 > **Tip:** You can also install curated stories with a single click directly from the [Stories Catalog](../stories/)!
 
-### Method B: Manual Transfer via MicroSD Card (Not Recommended)
+### Manual Transfer via MicroSD Card
 
 > **Warning:** Direct MicroSD card transfer is **not recommended** because `.eenk` packages cannot be read by the firmware as a single file on the SD card. You must manually extract the package contents first.
 
@@ -243,7 +233,7 @@ The firmware includes embedded bitmap fonts ready to use out of the box:
 
 ### Adding Custom SD Fonts
 
-You can add any custom font by placing `.epdfont` files into the `/fonts/` directory on your SD card, or inside a story's folder:
+You can add any custom font by placing `.epdfont` files created with the eenky IDE into the `/fonts/` directory on your SD card, or inside a story's folder:
 
 - **Font Family Naming**: To support bold and italic formatting, provide matching style suffixes:
   - `myfont.epdfont` (Regular)
