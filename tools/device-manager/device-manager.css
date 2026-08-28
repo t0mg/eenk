@@ -208,6 +208,7 @@ body.iframe-embed .dm-header-title {
   flex: 1;
   overflow-y: auto;
   position: relative;
+  padding: 2rem;
 }
 
 /* ── Empty / disconnected state ─────────────────────────────── */
@@ -275,7 +276,7 @@ body.iframe-embed .dm-header-title {
 .file-item {
   display: flex;
   align-items: center;
-  padding: 0.65rem 1.25rem;
+  padding: 0.65rem 0;
   border-bottom: 1px solid var(--color-border-subtle);
   gap: 0.75rem;
   transition: background 0.1s;
@@ -348,7 +349,7 @@ body.iframe-embed .dm-header-title {
 
 /* ── Upload zone ────────────────────────────────────────────── */
 .upload-zone {
-  margin: 1rem 1.25rem;
+  margin-bottom: 1rem;
   border: var(--border);
   border-style: dashed;
   padding: 1.25rem;
@@ -587,6 +588,253 @@ body.iframe-embed .dm-header-title {
   border-bottom: var(--border);
 }
 
+/* ── Preloaded Story, Consent & Inspection Cards ────────── */
+.preload-story-card {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.consent-card,
+.inspect-card {
+  margin-bottom: 1.25rem;
+  border: var(--border);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-hard);
+  padding: 1.25rem;
+}
+
+.consent-card {
+  border-left: 6px solid var(--color-accent, #FFD166);
+  background: var(--color-bg-subtle, #fafafa);
+}
+
+.consent-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.consent-icon {
+  font-size: 2rem;
+  color: var(--color-accent, #EF476F);
+}
+
+.consent-host {
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  color: var(--color-gray, #666);
+}
+
+.consent-card p {
+  font-size: 0.85rem;
+  line-height: 1.4;
+  margin-bottom: 1rem;
+  color: var(--color-fg);
+}
+
+.consent-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* ── Inspecting State Card ──────────────────────────────────── */
+.inspect-spinner-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.spin,
+.inspect-spinner {
+  animation: spin 1.2s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(360deg);
+  }
+
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+/* ── Preload Story Card ─────────────────────────────────────── */
+.preload-card-body {
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+.preload-cover-wrap {
+  width: 152px;
+  height: 152px;
+  box-sizing: content-box;
+  border: var(--border);
+  background: #fff;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.preload-cover-wrap canvas,
+.preload-cover-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+.preload-cover-placeholder {
+  color: var(--color-gray, #888);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preload-cover-placeholder .material-symbols-outlined {
+  font-size: 2.5rem;
+}
+
+.preload-meta-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.preload-title {
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  font-weight: 800;
+  margin: 0;
+  color: var(--color-fg);
+}
+
+.preload-author {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.preload-inventory {
+  font-size: 0.8rem;
+  color: var(--color-gray, #666);
+  margin: 0.15rem 0 0.4rem;
+}
+
+/* ── Save / Version Conflict Box (aligned with .critical-warning) ─── */
+.preload-warning-box,
+.critical-warning {
+  background: var(--color-accent-light, #FFDCD1);
+  border: var(--border-accent, 2px solid var(--color-accent));
+  box-shadow: var(--shadow-hard-accent, 4px 4px 0 var(--color-accent));
+  padding: 1.25rem;
+  margin: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.preload-warning-box .warning-title,
+.critical-warning .warning-title {
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--color-fg);
+  margin-bottom: 0;
+}
+
+.preload-warning-box .warning-title .material-symbols-outlined,
+.preload-warning-box .warning-title .warning-icon,
+.critical-warning .warning-title .material-symbols-outlined,
+.critical-warning .warning-title .warning-icon {
+  font-size: 1.25rem;
+  color: var(--color-accent, #FF4D00);
+}
+
+.preload-warning-box p,
+.critical-warning p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--color-fg);
+  opacity: 0.95;
+}
+
+.preload-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ── Success Card (aligned with .flash-done from flasher.css) ──────── */
+.success-card,
+.flash-done {
+  border: 2px solid var(--color-success, #2D9048);
+  background: var(--color-success-bg, #EBF7EE);
+  box-shadow: 4px 4px 0 var(--color-success, #2D9048);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.success-card {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.success-card h3,
+.success-card .success-title {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-success-fg, #1A5C2F);
+  margin: 0;
+  border: none;
+  padding: 0;
+}
+
+.success-card p,
+.success-card .success-desc {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--color-fg);
+}
+
+.success-card .success-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+  flex-wrap: wrap;
+}
+
 /* ── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 700px) {
 
@@ -599,5 +847,14 @@ body.iframe-embed .dm-header-title {
   body.iframe-embed .dm-header-title,
   .dm-header-title {
     display: none;
+  }
+
+  .preload-card-body {
+    flex-direction: column;
+  }
+
+  .preload-cover-wrap {
+    width: 80px;
+    height: 80px;
   }
 }

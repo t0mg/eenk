@@ -96,57 +96,62 @@ On the X4 Pro, swipe down from the top edge to access quick controls:
 
 ## Getting & Transferring Stories
 
-Stories in eenk are packaged into binary files (`.bin`) compiled by the companion [**eenky IDE**](../eenky/).
+Stories in eenk are distributed as **`.eenk` story packages** compiled with the companion [**eenky IDE**](../eenky/) or downloaded from the [**Stories Catalog**](../catalog/) and author websites.
 
-### Story Package Files
+### The `.eenk` Package Format
 
-- **`storyname.bin`** *(Required)*: The compiled story bytecode with optopnal embedded metadata (`@title`, `@author`, `@font`, `@cover`, `@thumbnail`).
-- **`storyname.media`** *(Optional)*: Sidecar archive containing 1-bit dithered cover images, thumbnails, and inline story illustrations.
-- **`fontname.epdfont`** *(Optional)*: Custom font files for stories that use specific typography.
+A `.eenk` file is a self-contained archive (ZIP format under the hood) that bundles everything needed to run your story:
 
-### Sample Story
-
-<!-- You can download a ready-to-play sample story package to test your device:
-- [📥 Download The Intercept Demo Package (ZIP)](https://github.com/t0mg/eenk/raw/main/stories/the_intercept.bin) -->
-
-TODO: Add a sample story here :)
+- **`story.bin`** *(Required)*: The compiled story bytecode with embedded metadata (`@title`, `@author`, `@font`, compile timestamp, etc.).
+- **`story.media`** *(Optional)*: Media sidecar containing 1-bit dithered cover images, thumbnails, and inline story illustrations.
+- **`fontname.epdfont`** *(Optional)*: Custom font files required by the story.
 
 ### Method A: Transfer via USB Device Manager (Recommended)
 
-You can manage your story library directly from your computer without removing the SD card:
+The simplest and fastest way to install stories is over USB without removing the MicroSD card:
 
-1. Turn on your eenk device and stay on the **Library** screen.
-2. Connect the device to your computer via USB-C.
-3. Open the **Device Manager** in the [eenky IDE](../eenky/) if you have it installed, or use the [Web Device Manager](../device-manager/) in a browser that [supports Web serial](https://caniuse.com/wf-serial) such as Chrome.
-4. Click **Connect** and select your device port (typically named `USB JTAG/serial debug unit` or `USB Serial`).
-5. Click **Upload Story** and select your compiled `.bin` file. The Device Manager will remind you to add `.media` and `.epdfont` files as well if you have them around.
-6. Click **Disconnect**. Your device will automatically reboot and display the new story in the library.
+1. Turn on your eenk device and remain on the **Library** screen.
+2. Connect your device to your computer via USB-C.
+3. Open the **Device Manager** in the [eenky IDE](../eenky/) or open the [Web Device Manager](../device-manager/) in a browser that supports Web Serial (such as Google Chrome or Microsoft Edge).
+4. Click **Connect** and select your device port (typically named `USB JTAG/serial debug unit` or `USB Serial`)
+5. Drag your `.eenk` file onto the upload area. The Device Manager automatically inspects the package and uploads the story into a dedicated folder on your device.
+6. When the transfer finishes, click **Disconnect**. The device will refresh its library and your new story will be ready to play immediately.
 
-### Method B: Manual Transfer via MicroSD Card
+> **Tip:** You can also install curated stories with a single click directly from the [Stories Catalog](../stories/)!
 
-You can also copy stories directly to the SD card:
+### Method B: Manual Transfer via MicroSD Card (Not Recommended)
 
-1. Turn off the device, remove the MicroSD card, and insert it into your computer.
-2. Ensure the SD card has an `eenk` folder in the root directory.
-3. Copy your `.bin` story file and any companion files (`.media`, `.epdfont`) into `/eenk/` or a subfolder inside `/eenk/`:
+> **Warning:** Direct MicroSD card transfer is **not recommended** because `.eenk` packages cannot be read by the firmware as a single file on the SD card. You must manually extract the package contents first.
+
+If you cannot connect your device via USB, you can unpack and copy stories manually:
+
+1. Turn off your device, remove the MicroSD card, and connect it to your computer using an SD card reader.
+2. Rename your story package file from `storyname.eenk` to `storyname.zip`.
+3. Extract the ZIP archive on your computer. You will find `story.bin` and any accompanying `.media` or `.epdfont` files.
+4. On the MicroSD card, navigate to the `/stories/` folder (create it if it doesn't exist).
+5. Create a **new subfolder** named after your story (e.g. `/stories/my_adventure/`).
+6. Copy the extracted `story.bin` and sidecar files into that subfolder:
 
 ```text
 MicroSD Root
-├── eenk/
-│   ├── my_story.bin
-│   ├── my_story.media
-│   └── fantasy_quest/
-│       ├── quest.bin
-│       ├── quest.media
-│       └── medieval.epdfont
+├── stories/
+│   ├── the_intercept/
+│   │   ├── story.bin
+│   │   ├── story.media
+│   │   └── SpecialElite.epdfont
+│   └── my_adventure/
+│       ├── story.bin
+│       └── story.media
+├── books/
+│   └── frankenstein.epub
 ├── fonts/
 │   ├── Literata.epdfont
 │   └── Literata-bold.epdfont
 └── .eenk_saves/
-    └── my_story.sav
+    └── the_intercept.sav
 ```
 
-4. Eject the SD card safely, insert it back into your eenk device, and turn it on.
+7. Eject the MicroSD card safely, insert it back into your device, and power on.
 
 ## Playing Stories on eenk
 
@@ -216,7 +221,11 @@ This UI screen is still a work in progress and likely to be adjusted in the near
 
 eenk also includes a basic EPUB reader so you can take the occasional break between your adventures and read some traditional books.
 
-EPUB files can be uploaded on the SD card under `/books` or via the device manager. Books will appear in your Library, mixed in with your Ink-based stories.
+EPUB files can be uploaded via the Device Manager or copied directly to the `/books` folder on your MicroSD card. Books will appear in your Library alongside your interactive fiction stories.
+
+> **Important Note on Large EPUB Files (> 2 MB):**
+> Due to USB serial bandwidth limitations and hardware transfer timing constraints, transferring EPUB files larger than 2 MB over USB serial may be very slow or fail with transfer errors.
+> For books larger than 2 MB (especially EPUBs containing illustrations or complex layouts), **copying files directly to the `/books` folder on your MicroSD card via an SD card reader is strongly recommended**.
 
 A bookmark is stored in `.eenk_saves/` for each book you open. The `.eenk_cache` folder contains processed content such as images for faster loading between readings. This cache is cleaned up when you delete the book from the device manager.
 

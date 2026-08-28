@@ -30,10 +30,16 @@
     },
     {
       "id": "flasher",
-      "title": "Web Flasher",
+      "title": "Flasher",
       "src": null,
       "out": "flasher/index.html",
       "external": "../flasher/index.html"
+    },
+    {
+      "id": "stories",
+      "title": "Stories",
+      "src": "pages/stories.md",
+      "out": "stories/index.html"
     },
     {
       "id": "device-manager",
@@ -44,7 +50,7 @@
     },
     {
       "id": "build",
-      "title": "Build eenk",
+      "title": "Build",
       "src": "pages/build.md",
       "out": "build/index.html"
     },

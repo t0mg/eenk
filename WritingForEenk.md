@@ -4,7 +4,7 @@ Welcome to the eenk authoring guide! This document covers the eenk-specific feat
 
 ## Story Header Metadata
 
-You can define metadata for your story by adding a block comment at the very top of your main ink file using `@` tags. eenky parses these tags during compilation and bakes them into your compiled story binary (`.bin` file) so the device can display them in the library.
+You can define metadata for your story by adding a block comment at the very top of your main ink file using `@` tags. eenky parses these tags during compilation and bakes them into your compiled story package (`.eenk` file) so the device can display them in the library.
 
 ```ink
 /*
@@ -21,8 +21,8 @@ Once upon a time...
 - **@title**: The title of your story (maximum 63 characters).
 - **@author**: The author of the story (maximum 31 characters).
 - **@font**: The stem name of the font you want to use for the story (maximum 15 characters). See [Fonts in eenk](#fonts-in-eenk) below.
-- **@cover**: The cover image will automatically be resized to fit the device screen (480x800) for the sleep screen. Using this tag will create a `.media` file alongside your compiled story, see [Images in eenk](#images-in-eenk) below.
-- **@thumbnail**: A separate image path to be used as a 156x156 thumbnail in the library list. If not provided, the cover image will be resized and used instead. Using this tag will also create the `.media` file.
+- **@cover**: The cover image will automatically be resized to fit the device screen (480x800) for the sleep screen. Using this tag will pack the image into the `.media` sidecar inside your `.eenk` package, see [Images in eenk](#images-in-eenk) below.
+- **@thumbnail**: A separate image path to be used as a 156x156 thumbnail in the library list. If not provided, the cover image will be resized and used instead. Using this tag will also pack the image into the `.media` sidecar.
 
 > Note: Metadata tags are all optional. The whole metadata header is, too: you don't have to provide it to compile an ink story for eenk.
 
@@ -41,7 +41,7 @@ The device comes with built-in fonts that you can request directly by their toke
 
 ### Custom SD Card Fonts
 If the token doesn't match a built-in font, the engine will look for custom `.epdfont` font files on your SD card. The engine searches two locations in order:
-- **Story Folder**: Next to your story file. E.g., if your story is `/eenk/mystory/mystory.bin`, it looks in `/eenk/mystory/my-custom-font.epdfont`.
+- **Story Folder**: Inside the story's directory on SD (e.g. `/stories/mystory/my-custom-font.epdfont`).
 - **Global Font Folder**: A shared folder on the root of the SD card: `/fonts/my-custom-font.epdfont`.
 
 ### Variants for Custom Fonts
@@ -88,7 +88,7 @@ When formatted text is rendered:
 
 ## Images in eenk
 
-You can embed images in your story using the standard Ink `# IMAGE:` tag. eenky will automatically process these images during compilation and bundle them into an optimized `.media` sidecar file.
+You can embed images in your story using the standard Ink `# IMAGE:` tag. eenky will automatically process these images during compilation and bundle them into an optimized `.media` sidecar file inside your `.eenk` story package.
 
 ```ink
 # IMAGE: my-image.png
@@ -102,7 +102,7 @@ You can embed images in your story using the standard Ink `# IMAGE:` tag. eenky 
 
 During the compilation process, eenky collects all the `# IMAGE:` tags it finds in your story, processes the images (scaling, dithering, and converting to 1-bit format for the e-ink display), and packs them into a single binary file named after your story with the `.media` extension (e.g., `mystory.media`).
 
-When transferring your story to the device using the Device Manager in eenky, this `.media` file is automatically transferred alongside your main `.bin` story file and any custom `.epdfont` files.
+When compiling, eenky packages this `.media` file alongside your compiled binary (`story.bin`) and any custom `.epdfont` files into a single `.eenk` package. When installing via the Device Manager, all assets are automatically extracted and transferred to the device.
 
 > Note: eenky inherits the classic Web export mode from Inky, which also supports the very same `# IMAGE:` tag format for rendering images in the browser! What are the odds!?
 
@@ -124,7 +124,7 @@ You stand before three levers. A skull is etched above the center one.
 ```
 
 - Each occurrence of `# CHECKPOINT` updates the player's quick-save to that exact position. 
-- There is no visual clue that a checkpoint has been reached, it is left to you whether or not to reveal it (for example with an explicit `[checkpoint]`, or a sutbler in game message).
+- There is no visual clue that a checkpoint has been reached, it is left to you whether or not to reveal it (for example with an explicit `[checkpoint]`, or a subtler in-game message).
 - In the Story Menu, this is presented as **`Rewind to last checkpoint`**.
 
 ### Chapters (`# CHECKPOINT: <Title>`)
@@ -145,36 +145,38 @@ Sirens echoed in the distance as the hovercraft engine roared to life...
 
 - Each named checkpoint is added chronologically to the Story Menu, under **`Rewind to...`**.
 - Rewinding to a chapter will remove access to subsequent ones: it's a linear chain and you snip it when you rewind.
-- There is no visual clue that a chapter has been reached, it is left to you whether or not to reveal it (for example with an explicit `Act I`, or a sutbler in game message).
+- There is no visual clue that a chapter has been reached, it is left to you whether or not to reveal it (for example with an explicit `Act I`, or a subtler in-game message).
 
 ## Building with eenky
 
-eenky is the desktop companion application that compiles your `.ink` files into a `.bin` file optimized for the eenk hardware. It uses a customized compiler pipeline (`inklecate` -> `inkcpp_cl`).
+eenky is the desktop companion application that compiles your `.ink` files into a `.eenk` package file optimized for the eenk hardware. It uses a customized compiler pipeline (`inklecate` -> `inkcpp_cl` -> `eenkPackage`).
 
 1. Open your Ink project folder in eenky.
-2. Click the **Compile** button in the toolbar (also available from the File menu or with Ctrl+B or Cmd+B keyboard shortcut).
+2. Click the **Build** button in the toolbar (also available from the File menu or with Ctrl+B or Cmd+B keyboard shortcut).
 
-eenky will automatically extract your metadata headers, compile the ink script, and generate a `.bin` file in the same directory. It will also convert the source `.ttf` fonts to `.epdfont` files and generate a `.media` file if there are any `# IMAGE:` tags in your story.
+eenky will automatically extract your metadata headers, compile the ink script, convert source `.ttf` fonts to `.epdfont` files, dither and pack images into `.media`, and bundle everything into a single `.eenk` story package.
 
-You can play it in eenky's simulator by clicking the device button in the toolbar (also available from the Device menu or with Ctrl+L or Cmd+L keyboard shortcut).
+You can play it immediately in eenky's simulator by clicking the device button in the toolbar (also available from the Device menu or with Ctrl+L or Cmd+L keyboard shortcut). This creates a temporary package in the simulator but does not save it.
 
 ## Transferring to the eenk device
 
-To play your compiled story on the hardware device you can either take the SD card out and put it in your computer, or transfer directly from eenky to the device over USB.
+To play your compiled story on the hardware device, use the USB Device Manager (recommended) or copy files manually via SD card.
 
-### Using the Device Manager in eenky
+### Using the Device Manager
 
-1. Wake up your eenk device and put it into the menu screen.
-2. Connect it to your computer via USB.
-3. Open eenky's **Device Manager** from the home screen, Device menu or keyboard shortcut (Ctrl+D or Cmd+D). 
-4. Click **Connect** and select the correct COM port (e.g. `USB jtag/serial debug unit`).
-5. Click **Upload Story** and select your story `.bin` file. Add associated files like `.epdfont` and `.media` if necessary and proceed with the upload.
-6. Click **Disconnect** and the device will reboot to reveal your new story in the library!
+1. Wake up your eenk device and remain on the library screen.
+2. Connect it to your computer via USB-C.
+3. Open the **Device Manager** in eenky (Ctrl+D / Cmd+D) or use the [Web Device Manager](https://t0mg.github.io/eenk/device-manager/).
+4. Click **Connect** and select the serial port.
+5. Drag and drop your `.eenk` package file into the upload zone (or click **Upload Story** and select the `.eenk` file). The Device Manager will unpack, verify, display the cover preview, and stream all story assets into `/stories/<story_name>/` automatically.
+6. Click **Disconnect** and the device will refresh to reveal your new story in the library!
 
-### Manual write to the SD card
+### Manual Transfer to SD Card
 
-1. Remove the SD card from your device and plug it into your computer.
-2. Ensure there is an `eenk` folder on the root of the SD card.
-3. Copy the compiled `.bin` file into the `/eenk/` directory, or in a subfolder in this directory (useful if there are additional files such as fonts).
-4. If you have custom fonts or a `.media` file, place them next to our story file (fonts can also go in the `/fonts/` folder).
-5. Eject the SD card, put it back in the device, and turn it on. Your story will appear in the library!
+Direct SD card copying is not recommended because the device firmware requires unpacked story files in subfolders rather than the single `.eenk` archive:
+
+1. Rename `mystory.eenk` to `mystory.zip` and extract it on your computer.
+2. Remove the MicroSD card from your device and connect it to your computer.
+3. Create a folder under `/stories/` on the SD card (e.g. `/stories/mystory/`).
+4. Copy `story.bin` and any companion files (`.media`, `.epdfont`) into `/stories/mystory/`.
+5. Eject the SD card, re-insert it into your device, and power on.

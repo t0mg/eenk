@@ -192,6 +192,55 @@ function mdToHtml(filePath) {
   return marked.parse(raw);
 }
 
+/** Generate HTML cards grid from catalog.json */
+function generateCatalogGrid(catalogJsonPath) {
+  if (!fs.existsSync(catalogJsonPath)) return '';
+  const catalog = JSON.parse(fs.readFileSync(catalogJsonPath, 'utf8'));
+  const cards = Object.entries(catalog).map(([slug, story]) => {
+    const thumbHtml = story.thumbnail
+      ? `<img class="story-card-thumbnail" src="${story.thumbnail}" alt="${story.title}"/>`
+      : '';
+
+    const websiteLink = story.website || story.url || story.link || null;
+    let websiteHost = '';
+    if (websiteLink) {
+      try {
+        websiteHost = new URL(websiteLink).hostname.replace(/^www\./, '');
+      } catch (_) {
+        websiteHost = 'Website';
+      }
+    }
+    const hasFiles = Array.isArray(story.files) && story.files.length > 0;
+    const installBtn = hasFiles
+      ? `<a href="../device-manager/?story=${encodeURIComponent(slug)}" class="btn btn-primary" style="text-decoration:none;">
+        <span class="material-symbols-outlined">bolt</span>
+        <span class="btn-label">Install</span>
+      </a>`
+      : '';
+
+    const websiteBtnClass = hasFiles ? 'btn-secondary' : 'btn-primary';
+    const websiteBtn = websiteLink
+      ? `<a href="${websiteLink}" target="_blank" rel="noopener noreferrer" class="btn ${websiteBtnClass}" title="${websiteHost}">
+        <span class="material-symbols-outlined">open_in_new</span>
+        <span class="btn-label">${websiteHost}</span>
+      </a>`
+      : '';
+
+    return `<div class="story-card">
+<h3>${story.title}</h3>
+${thumbHtml}
+<p>By <strong>${story.author || 'Unknown'}</strong></p>
+<p>${story.description || ''}</p>
+<div class="story-card-footer">
+${installBtn}
+${websiteBtn}
+</div>
+</div>`;
+  }).join('\n\n');
+
+  return `<div class="stories-grid">\n${cards}\n</div>`;
+}
+
 /** Resolve all nav href paths relative to output location. */
 function resolveNavHrefs(navHtml, assetRootPrefix) {
   // Replace plain out paths with correct relative paths
@@ -237,6 +286,17 @@ async function build() {
     console.warn('  ⚠ device-manager/ directory not found — skipping');
   }
 
+  // 2.5 Copy catalog.json if present
+  const catalogPath = path.join(DOCS_DIR, 'catalog.json');
+  if (fs.existsSync(catalogPath)) {
+    fs.copyFileSync(catalogPath, path.join(DIST_DIR, 'catalog.json'));
+    const dmDir = path.join(DIST_DIR, 'device-manager');
+    if (fs.existsSync(dmDir)) {
+      fs.copyFileSync(catalogPath, path.join(dmDir, 'catalog.json'));
+    }
+    console.log('  ✓ Copied catalog.json');
+  }
+
   // 3. Build each page
   for (const page of nav) {
     const outFile = page.out;
@@ -268,6 +328,11 @@ async function build() {
             console.warn(`  ⚠ importAppend file not found: ${appendPath}`);
           }
         }
+      }
+
+      if (mdContent.includes('<!-- CATALOG_GRID -->')) {
+        const catalogPath = path.join(DOCS_DIR, 'catalog.json');
+        mdContent = mdContent.replace('<!-- CATALOG_GRID -->', generateCatalogGrid(catalogPath));
       }
 
       bodyHtml = marked.parse(mdContent);

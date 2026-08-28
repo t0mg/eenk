@@ -104,6 +104,15 @@
           }).catch(() => { });
         }
       });
+
+      // Forward query parameters to embedded tool iframe (e.g. ?story= or ?url= to Device Manager)
+      const moduleIframe = document.querySelector('.module-iframe');
+      if (moduleIframe && window.location.search) {
+        const baseSrc = moduleIframe.getAttribute('src');
+        if (baseSrc && !baseSrc.includes('?')) {
+          moduleIframe.src = baseSrc + window.location.search;
+        }
+      }
     })();
   </script>
   </body>

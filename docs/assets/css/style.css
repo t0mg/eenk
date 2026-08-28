@@ -513,6 +513,15 @@ hr {
   cursor: pointer;
   transition: transform 0.1s, box-shadow 0.1s;
   box-shadow: var(--shadow-hard);
+  max-width: 100%;
+}
+
+.btn .btn-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  display: inline-block;
 }
 
 .btn:active {
@@ -569,7 +578,8 @@ hr {
   margin: 2rem 0;
 }
 
-.feature-card {
+.feature-card,
+.story-card {
   background: var(--color-bg);
   border: var(--border);
   box-shadow: var(--shadow-hard);
@@ -577,6 +587,7 @@ hr {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .feature-card .feature-icon {
@@ -584,7 +595,8 @@ hr {
   line-height: 1;
 }
 
-.feature-card h3 {
+.feature-card h3,
+.story-card h3 {
   font-family: var(--font-heading);
   font-size: 0.9rem;
   text-transform: uppercase;
@@ -603,6 +615,24 @@ hr {
   font-size: 0.9rem;
   color: #444;
   margin: 0;
+}
+
+/* ── Stories ────────────────────────────────────────── */
+
+.stories-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.story-card-footer {
+  flex-grow: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 /* ── Device Gallery ─────────────────────────────────────────── */

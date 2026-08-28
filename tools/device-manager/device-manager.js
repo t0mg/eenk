@@ -5,15 +5,11 @@
  * Mirrors the logic from eenky's deviceStore.js (Pinia) and DeviceApp.vue.
  *
  * Requires: serial-protocol.js (loaded first, defines global EenkSerialProtocol)
+ *           zip-unpacker.js   (defines global unpackZip)
  *
  * Runs in:
  *   - Chrome / Edge browser (GitHub Pages)
  *   - Electron iframe (eenky Device Manager window)
- *
- * Sidecar handling:
- *   - Electron: uses window.api.fs + window.api.path (preload bridge) to
- *     auto-discover .epdfont/.media files alongside the selected .bin
- *   - Browser: shows an "associated files" prompt with a secondary file picker
  */
 
 'use strict';
@@ -43,6 +39,14 @@ const state = {
   transferState: null,
   error: null,
   currentTab: 'stories',
+
+  // Preloaded Story State (from .eenk package, catalog, or drag-and-drop)
+  preloadedStory: null, // { title, author, compileTime, fontName, folderName, binData, binName, sidecars: [{name, data}], coverBitmap, coverImgUrl, rawBlobUrl, sourceFileName }
+  pendingExternalUrl: null,
+  externalHost: null,
+  uploadSuccess: null, // { title }
+  isPreloadUploading: false,
+  isConfirming: false,
 };
 
 let protocol = null;
@@ -85,19 +89,50 @@ const transferFilename = $('transfer-filename');
 const transferPct = $('transfer-pct');
 const transferBar = $('transfer-bar');
 const confirmModal = $('confirm-modal');
+const confirmHeading = $('confirm-heading');
 const confirmText = $('confirm-text');
 const confirmOk = $('confirm-ok');
 const confirmCancel = $('confirm-cancel');
 const errorBanner = $('error-banner');
 const errorText = $('error-text');
 
-/* ── Pending upload context (for sidecar prompt) ─────────────────── */
+// Upload Success Elements
+const uploadSuccessCard = $('upload-success-card');
+const successStoryTitle = $('success-story-title');
+const successStoryDesc = $('success-story-desc');
+const successDisconnectBtn = $('success-disconnect-btn');
+const successContinueBtn = $('success-continue-btn');
+
+// Preload & Consent Elements
+const externalConsentCard = $('external-consent-card');
+const consentHost = $('consent-host');
+const consentProceedBtn = $('consent-proceed-btn');
+const consentDismissBtn = $('consent-dismiss-btn');
+
+const inspectProgressCard = $('inspect-progress-card');
+const inspectStatusText = $('inspect-status-text');
+const inspectProgressBar = $('inspect-progress-bar');
+
+const storyPreloadCard = $('story-preload-card');
+const preloadCoverCanvas = $('preload-cover-canvas');
+const preloadCoverImg = $('preload-cover-img');
+const preloadCoverPlaceholder = $('preload-cover-placeholder');
+const preloadTitle = $('preload-title');
+const preloadAuthor = $('preload-author');
+const preloadInventory = $('preload-inventory');
+const preloadSaveWarning = $('preload-save-warning');
+const preloadWarningText = $('preload-warning-text');
+const preloadInstallBtn = $('preload-install-btn');
+const preloadDownloadBtn = $('preload-download-btn');
+const preloadDismissBtn = $('preload-dismiss-btn');
+
+/* ── Pending upload context (for manual browser sidecar prompt) ──── */
 let _pendingBin = null;  // { file, data, folderName }
 let _pendingSidecars = [];    // Array<File> from browser picker
 
 /* ── Render ─────────────────────────────────────────────────────── */
 function render() {
-  const { isConnected, isConnecting, sdInfo, stories, books, saves, transferState, error, currentTab } = state;
+  const { isConnected, isConnecting, sdInfo, stories, books, saves, transferState, error, currentTab, preloadedStory, pendingExternalUrl } = state;
 
   // Header status
   statusDot.className = 'status-dot' + (isConnecting ? ' connecting' : isConnected ? ' connected' : '');
@@ -120,9 +155,104 @@ function render() {
     sdSizeText.textContent = `${formatSize(sdInfo.used)} / ${formatSize(sdInfo.total)}`;
   }
 
+  // Consent card
+  if (externalConsentCard) {
+    if (pendingExternalUrl) {
+      externalConsentCard.style.display = '';
+      if (consentHost) consentHost.textContent = state.externalHost || '';
+    } else {
+      externalConsentCard.style.display = 'none';
+    }
+  }
+
+  // Preloaded story card
+  if (storyPreloadCard) {
+    if (preloadedStory && !pendingExternalUrl) {
+      storyPreloadCard.style.display = '';
+      preloadTitle.textContent = preloadedStory.title;
+      preloadAuthor.textContent = `By ${preloadedStory.author || 'Unknown'}`;
+
+      const totalBytes = (preloadedStory.binData?.length || 0) +
+        (preloadedStory.sidecars || []).reduce((acc, s) => acc + (s.data?.length || 0), 0);
+      const fileCount = 1 + (preloadedStory.sidecars?.length || 0);
+      const filesStr = `${fileCount} ${fileCount === 1 ? 'file' : 'files'} (${formatSize(totalBytes)})`;
+
+      let buildStr = '';
+      if (preloadedStory.compileTime) {
+        const d = new Date(preloadedStory.compileTime * 1000);
+        buildStr = `Built on ${d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`;
+      }
+
+      const metaParts = [filesStr];
+      if (buildStr) metaParts.push(buildStr);
+      preloadInventory.textContent = metaParts.join(' • ');
+
+      // Cover rendering: prioritize authentic 1-bit decoded bitmap from .media, then image URL, then placeholder
+      if (preloadedStory.coverBitmap) {
+        render1BitCoverToCanvas(preloadCoverCanvas, preloadedStory.coverBitmap);
+        preloadCoverCanvas.style.display = 'block';
+        preloadCoverImg.style.display = 'none';
+        preloadCoverPlaceholder.style.display = 'none';
+      } else if (preloadedStory.coverImgUrl) {
+        preloadCoverImg.src = preloadedStory.coverImgUrl;
+        preloadCoverImg.style.display = 'block';
+        preloadCoverCanvas.style.display = 'none';
+        preloadCoverPlaceholder.style.display = 'none';
+      } else {
+        preloadCoverPlaceholder.style.display = 'flex';
+        preloadCoverCanvas.style.display = 'none';
+        preloadCoverImg.style.display = 'none';
+      }
+
+      // Existing story & save collision check
+      const storyExists = isConnected && stories.some(s => s.name === preloadedStory.folderName || s.path === `/stories/${preloadedStory.folderName}`);
+      if (storyExists) {
+        preloadSaveWarning.style.display = '';
+        preloadInstallBtn.innerHTML = '<span class="material-symbols-outlined">bolt</span> Reinstall';
+      } else {
+        preloadSaveWarning.style.display = 'none';
+        preloadInstallBtn.innerHTML = isConnected
+          ? '<span class="material-symbols-outlined">bolt</span> Install'
+          : '<span class="material-symbols-outlined">usb</span> Connect &amp; Install';
+      }
+
+      if (transferState && transferState.type === 'upload') {
+        preloadInstallBtn.disabled = true;
+        preloadInstallBtn.innerHTML = '<span class="material-symbols-outlined spin">sync</span> Uploading…';
+        if (preloadDismissBtn) preloadDismissBtn.disabled = true;
+      } else {
+        preloadInstallBtn.disabled = isConnecting;
+        if (preloadDismissBtn) preloadDismissBtn.disabled = isConnecting;
+      }
+
+      if (preloadedStory.rawBlobUrl && preloadDownloadBtn) {
+        preloadDownloadBtn.style.display = '';
+        preloadDownloadBtn.href = preloadedStory.rawBlobUrl;
+        preloadDownloadBtn.download = preloadedStory.sourceFileName || `${preloadedStory.folderName}.eenk`;
+      } else if (preloadDownloadBtn) {
+        preloadDownloadBtn.style.display = 'none';
+      }
+    } else {
+      storyPreloadCard.style.display = 'none';
+    }
+  }
+
+  // Upload Success card
+  if (uploadSuccessCard) {
+    if (isConnected && state.uploadSuccess) {
+      uploadSuccessCard.style.display = '';
+      if (successStoryTitle) {
+        successStoryTitle.textContent = `"${state.uploadSuccess.title}" Installed!`;
+      }
+    } else {
+      uploadSuccessCard.style.display = 'none';
+    }
+  }
+
   // Content area
-  const showFiles = isConnected && !isConnecting;
-  emptyState.style.display = showFiles ? 'none' : '';
+  const isPreloadOrPromptVisible = !!(preloadedStory || pendingExternalUrl || state.isPreloadUploading || state.isConfirming || state.uploadSuccess);
+  const showFiles = isConnected && !isConnecting && !isPreloadOrPromptVisible;
+  emptyState.style.display = (isConnected || isPreloadOrPromptVisible) ? 'none' : '';
   panelStories.style.display = showFiles && currentTab === 'stories' ? 'block' : 'none';
   if (panelBooks) panelBooks.style.display = showFiles && currentTab === 'books' ? 'block' : 'none';
   panelSaves.style.display = showFiles && currentTab === 'saves' ? 'block' : 'none';
@@ -212,6 +342,357 @@ function clearTransfer() { setState({ transferState: null }); }
 function showError(msg) { setState({ error: msg }); }
 function clearError() { setState({ error: null }); }
 
+function setInspectProgress(text, pct = 0) {
+  if (inspectProgressCard) {
+    inspectProgressCard.style.display = '';
+    if (inspectStatusText) inspectStatusText.textContent = text;
+    if (inspectProgressBar) inspectProgressBar.style.width = `${pct}%`;
+  }
+}
+
+function hideInspectProgress() {
+  if (inspectProgressCard) inspectProgressCard.style.display = 'none';
+}
+
+function cleanUrlParams() {
+  if (typeof window !== 'undefined' && window.history?.replaceState) {
+    const cleanUrl = window.location.pathname + window.location.hash;
+    window.history.replaceState({}, document.title, cleanUrl);
+  }
+}
+
+function dismissPreloadedStory() {
+  if (state.preloadedStory?.coverImgUrl && state.preloadedStory.coverImgUrl.startsWith('blob:')) {
+    URL.revokeObjectURL(state.preloadedStory.coverImgUrl);
+  }
+  if (state.preloadedStory?.rawBlobUrl) {
+    URL.revokeObjectURL(state.preloadedStory.rawBlobUrl);
+  }
+  setState({ preloadedStory: null, pendingExternalUrl: null, externalHost: null });
+  cleanUrlParams();
+}
+
+/* ── Binary Metadata & Cover Art Helpers ────────────────────────── */
+
+// 32-bit FNV-1a hash matching eenk compiler
+function fnv1a(str) {
+  let hash = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+/** Parse eenk StoryMetadata 128-byte header from beginning of .bin */
+function parseStoryMetadata(binData) {
+  if (!binData || binData.length < 128) return null;
+  const magic = new TextDecoder('ascii').decode(binData.slice(0, 4));
+  if (magic !== 'eenk') return null;
+
+  const view = new DataView(binData.buffer, binData.byteOffset, binData.byteLength);
+  const version = view.getUint16(4, true);
+  if (version !== 1) return null;
+
+  const titleBytes = binData.slice(8, 72);
+  const titleEnd = titleBytes.indexOf(0);
+  const title = new TextDecoder('utf-8').decode(titleEnd >= 0 ? titleBytes.slice(0, titleEnd) : titleBytes).trim() || 'Untitled Story';
+
+  const authorBytes = binData.slice(72, 104);
+  const authorEnd = authorBytes.indexOf(0);
+  const author = new TextDecoder('utf-8').decode(authorEnd >= 0 ? authorBytes.slice(0, authorEnd) : authorBytes).trim() || 'Unknown Author';
+
+  const compileTime = view.getUint32(104, true);
+  const flags = view.getUint32(108, true);
+  const fontLen = view.getUint8(112);
+  let fontName = '';
+  if (fontLen > 0 && fontLen <= 15) {
+    fontName = new TextDecoder('utf-8').decode(binData.slice(113, 113 + fontLen)).trim();
+  }
+
+  return { title, author, compileTime, flags, fontName, hasMedia: (flags & 1) !== 0 };
+}
+
+/** Extract 1-bit Floyd-Steinberg cover bitmap from .media sidecar buffer */
+function extractMediaCover(mediaData) {
+  if (!mediaData || mediaData.length < 28) return null;
+  const magic = new TextDecoder('ascii').decode(mediaData.slice(0, 4));
+  if (magic !== 'ENKM') return null;
+
+  const view = new DataView(mediaData.buffer, mediaData.byteOffset, mediaData.byteLength);
+  const numEntries = view.getUint32(4, true);
+  const thumbHash = fnv1a('@thumbnail');
+  const coverHash = fnv1a('@cover');
+
+  let coverEntry = null;
+  let thumbEntry = null;
+  let offset = 8;
+  for (let i = 0; i < numEntries; i++) {
+    if (offset + 20 > mediaData.length) break;
+    const hash = view.getUint32(offset, true);
+    const blobOffset = view.getUint32(offset + 4, true);
+    const size = view.getUint32(offset + 8, true);
+    const width = view.getUint32(offset + 12, true);
+    const height = view.getUint32(offset + 16, true);
+
+    if (hash === coverHash) {
+      coverEntry = { offset: blobOffset, size, width, height };
+    } else if (hash === thumbHash) {
+      thumbEntry = { offset: blobOffset, size, width, height };
+    }
+    offset += 20;
+  }
+
+  const targetEntry = thumbEntry || coverEntry;
+  if (!targetEntry || targetEntry.offset + targetEntry.size > mediaData.length) return null;
+  return {
+    width: targetEntry.width,
+    height: targetEntry.height,
+    data: mediaData.subarray(targetEntry.offset, targetEntry.offset + targetEntry.size)
+  };
+}
+
+/** Render Floyd-Steinberg 1-bit raw bitmap to an HTML canvas */
+function render1BitCoverToCanvas(canvas, coverObj) {
+  if (!canvas || !coverObj) return;
+  const { width, height, data } = coverObj;
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  const imgData = ctx.createImageData(width, height);
+  const pixels = imgData.data;
+
+  const paddedW = Math.ceil(width / 8) * 8;
+  const widthBytes = paddedW / 8;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const byteIdx = y * widthBytes + Math.floor(x / 8);
+      const bitOffset = 7 - (x % 8);
+      const isWhite = (data[byteIdx] & (1 << bitOffset)) !== 0;
+      const val = isWhite ? 255 : 0;
+      const pIdx = (y * width + x) * 4;
+      pixels[pIdx] = val;
+      pixels[pIdx + 1] = val;
+      pixels[pIdx + 2] = val;
+      pixels[pIdx + 3] = 255;
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+/** Inspects and loads an unpacked or raw .eenk / .zip package into preloaded state */
+async function loadPreloadedStoryPackage(buffer, originalFileName, rawBlobUrl = null) {
+  try {
+    setInspectProgress('Unpacking and verifying story package…', 30);
+    const files = await unpackZip(buffer);
+    const binEntry = files.find(f => f.name.toLowerCase().endsWith('.bin'));
+    if (!binEntry) {
+      throw new Error('No .bin story file found inside the package.');
+    }
+
+    const meta = parseStoryMetadata(binEntry.data);
+    if (!meta) {
+      throw new Error('Installation blocked: The package does not contain a valid compiled eenk story binary.');
+    }
+
+    const sidecars = files.filter(f => f !== binEntry && (f.name.endsWith('.media') || f.name.endsWith('.epdfont')));
+    const mediaEntry = files.find(f => f.name.endsWith('.media'));
+
+    let coverBitmap = null;
+    if (mediaEntry) {
+      coverBitmap = extractMediaCover(mediaEntry.data);
+    }
+
+    let coverImgUrl = null;
+    if (!coverBitmap) {
+      const imgEntry = files.find(f => /\.(png|jpg|jpeg|webp)$/i.test(f.name));
+      if (imgEntry) {
+        const mime = imgEntry.name.endsWith('.png') ? 'image/png' : 'image/jpeg';
+        const blob = new Blob([imgEntry.data], { type: mime });
+        coverImgUrl = URL.createObjectURL(blob);
+      }
+    }
+
+    const folderName = (meta.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'story').substring(0, 32);
+
+    setState({
+      preloadedStory: {
+        title: meta.title,
+        author: meta.author,
+        compileTime: meta.compileTime,
+        fontName: meta.fontName,
+        folderName,
+        binData: binEntry.data,
+        binName: binEntry.name,
+        sidecars: sidecars.map(s => ({ name: s.name, data: s.data })),
+        coverBitmap,
+        coverImgUrl,
+        rawBlobUrl,
+        sourceFileName: originalFileName
+      }
+    });
+
+    hideInspectProgress();
+  } catch (err) {
+    hideInspectProgress();
+    showError(err.message);
+  }
+}
+
+/** Loads a story directly from catalog.json without unzipping */
+async function loadCatalogStory(slug) {
+  try {
+    setInspectProgress(`Loading "${slug}" from catalog…`, 20);
+    let catalog = null;
+    const catalogPaths = ['catalog.json', '../catalog.json', '../../catalog.json', '/catalog.json', 'docs/catalog.json'];
+    for (const p of catalogPaths) {
+      try {
+        const res = await fetch(p);
+        if (res.ok) {
+          catalog = await res.json();
+          break;
+        }
+      } catch (_) { }
+    }
+    if (!catalog || !catalog[slug]) {
+      throw new Error(`Story "${slug}" not found in catalog.`);
+    }
+
+    const entry = catalog[slug];
+    const files = Array.isArray(entry.files) ? entry.files : [entry.bin, entry.media, entry.font].filter(Boolean);
+    if (!files || files.length === 0) {
+      throw new Error(`"${entry.title || slug}" is featured as a showcase and is not hosted for 1-click install. Please visit the author's website.`);
+    }
+
+    setInspectProgress(`Downloading story files for "${entry.title || slug}"…`, 40);
+
+    const fileEntries = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const fileUrl = files[i];
+      const res = await fetch(fileUrl);
+      if (!res.ok) throw new Error(`Failed to download ${fileUrl} (HTTP ${res.status})`);
+      const buf = await res.arrayBuffer();
+      const filename = fileUrl.split(/[\\\/]/).pop();
+      fileEntries.push({ name: filename, data: new Uint8Array(buf) });
+    }
+
+    const binEntry = fileEntries.find(f => f.name.toLowerCase().endsWith('.bin'));
+    if (!binEntry) throw new Error('Catalog entry is missing a .bin story file.');
+
+    const meta = parseStoryMetadata(binEntry.data);
+    if (!meta) throw new Error('Installation blocked: Catalog story binary is invalid.');
+
+    const sidecars = fileEntries.filter(f => f !== binEntry && (f.name.endsWith('.media') || f.name.endsWith('.epdfont')));
+    const mediaEntry = fileEntries.find(f => f.name.endsWith('.media'));
+
+    let coverBitmap = null;
+    if (mediaEntry) {
+      coverBitmap = extractMediaCover(mediaEntry.data);
+    }
+    let coverImgUrl = (!coverBitmap && (entry.thumbnail || entry.cover)) ? (entry.thumbnail || entry.cover) : null;
+
+    const folderName = (meta.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || slug || 'story').substring(0, 32);
+
+    setState({
+      preloadedStory: {
+        title: meta.title || entry.title,
+        author: meta.author || entry.author,
+        compileTime: meta.compileTime,
+        fontName: meta.fontName,
+        folderName,
+        binData: binEntry.data,
+        binName: binEntry.name,
+        sidecars: sidecars.map(s => ({ name: s.name, data: s.data })),
+        coverBitmap,
+        coverImgUrl,
+        rawBlobUrl: null,
+        sourceFileName: `${slug}.eenk`
+      }
+    });
+
+    hideInspectProgress();
+  } catch (err) {
+    hideInspectProgress();
+    showError(`Catalog load error: ${err.message}`);
+  }
+}
+
+/** Resolves CORS-restricted host URLs (e.g. GitHub blobs & raw links) into CORS-friendly CDN URLs */
+function resolveCorsFriendlyUrl(urlStr) {
+  try {
+    const parsed = new URL(urlStr, window.location.href);
+
+    // Case 1: https://github.com/<owner>/<repo>/blob/<ref>/<path...>
+    // -> https://cdn.jsdelivr.net/gh/<owner>/<repo>@<ref>/<path...>
+    if (parsed.hostname === 'github.com') {
+      const match = parsed.pathname.match(/^\/([^\/]+)\/([^\/]+)\/blob\/([^\/]+)\/(.+)$/);
+      if (match) {
+        const [, owner, repo, ref, filePath] = match;
+        return {
+          url: `https://cdn.jsdelivr.net/gh/${owner}/${repo}@${ref}/${filePath}`,
+          host: `github.com (${owner}/${repo})`
+        };
+      }
+    }
+
+    // Case 2: https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path...>
+    // -> https://cdn.jsdelivr.net/gh/<owner>/<repo>@<ref>/<path...>
+    if (parsed.hostname === 'raw.githubusercontent.com') {
+      const match = parsed.pathname.match(/^\/([^\/]+)\/([^\/]+)\/([^\/]+)\/(.+)$/);
+      if (match) {
+        const [, owner, repo, ref, filePath] = match;
+        return {
+          url: `https://cdn.jsdelivr.net/gh/${owner}/${repo}@${ref}/${filePath}`,
+          host: `github.com (${owner}/${repo})`
+        };
+      }
+    }
+
+    return { url: urlStr, host: parsed.hostname };
+  } catch (_) {
+    return { url: urlStr, host: urlStr };
+  }
+}
+
+/** Handles external package URL with origin verification */
+async function handleExternalPackageUrl(urlStr) {
+  try {
+    const resolved = resolveCorsFriendlyUrl(urlStr);
+    const parsed = new URL(resolved.url, window.location.href);
+    const isSameOrigin = parsed.origin === window.location.origin;
+
+    if (!isSameOrigin) {
+      setState({ pendingExternalUrl: resolved.url, externalHost: resolved.host });
+      return;
+    }
+
+    await fetchAndInspectPackage(resolved.url);
+  } catch (err) {
+    showError(`Invalid package URL: ${err.message}`);
+  }
+}
+
+async function fetchAndInspectPackage(urlStr) {
+  try {
+    const hostname = new URL(urlStr, window.location.href).hostname;
+    setInspectProgress(`Downloading package from ${hostname}…`, 25);
+    const res = await fetch(urlStr);
+    if (!res.ok) {
+      throw new Error(`Failed to download package (HTTP ${res.status})`);
+    }
+    const buf = await res.arrayBuffer();
+    const filename = urlStr.split(/[\\\/]/).pop() || 'story.eenk';
+    const blob = new Blob([buf], { type: 'application/octet-stream' });
+    const rawBlobUrl = URL.createObjectURL(blob);
+    await loadPreloadedStoryPackage(buf, filename, rawBlobUrl);
+  } catch (err) {
+    hideInspectProgress();
+    showError(`Could not download story package: ${err.message}. If blocked by CORS, download the file directly and drop it here.`);
+  }
+}
+
 /* ── Protocol actions ───────────────────────────────────────────── */
 async function connect() {
   if (!('serial' in navigator)) return;
@@ -235,7 +716,8 @@ async function disconnect() {
   setState({
     isConnected: false, protocolVersion: null,
     stories: [], books: [], saves: [], sdInfo: { total: 0, used: 0, free: 0 },
-    transferState: null, error: null,
+    transferState: null, error: null, uploadSuccess: null,
+    isPreloadUploading: false, isConfirming: false,
   });
 }
 
@@ -280,15 +762,12 @@ async function deleteItem(path, name) {
   try {
     await protocol.deleteFile(path);
 
-    // If deleting an epub book or a file in /books, also clean up the related .eenk_cache subfolder
     if (path.startsWith('/books/') || name.toLowerCase().endsWith('.epub')) {
       const stem = name.replace(/\.[^/.]+$/, '');
       if (stem) {
         try {
           await protocol.deleteFile(`/.eenk_cache/${stem}`);
-        } catch (_) {
-          // Cache subfolder may not exist if book was never opened
-        }
+        } catch (_) { }
       }
     }
 
@@ -305,7 +784,6 @@ async function downloadFile(path, filename) {
     const data = await protocol.downloadFile(path, (transferred, total) => {
       setState({ transferState: { type: 'download', filename, bytesTransferred: transferred, bytesTotal: total } });
     });
-    // Trigger browser download
     const blob = new Blob([data]);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -322,42 +800,80 @@ async function downloadFile(path, filename) {
   }
 }
 
-/** Upload a .bin and optional sidecars. Called after sidecar decision is made. */
+/** Upload a .bin and optional sidecars with continuous proportional progress. */
 async function executeUpload(binFile, binData, sidecars) {
   if (!state.isConnected || !protocol) return;
   try {
-    // Parse eenk header magic (bytes 0-3) to extract story title for folder name
-    let title = binFile.name.replace(/\.bin$/i, '');
-    if (binData.length >= 72) {
-      const magic = new TextDecoder().decode(binData.slice(0, 4));
-      if (magic === 'eenk') {
-        const titleBytes = binData.slice(8, 72);
-        const endIdx = titleBytes.indexOf(0);
-        if (endIdx > 0) title = new TextDecoder().decode(titleBytes.slice(0, endIdx));
-      }
-    }
+    let title = binFile.name ? binFile.name.replace(/\.bin$/i, '') : 'story';
+    const meta = parseStoryMetadata(binData);
+    if (meta && meta.title) title = meta.title;
+
     const folderName = (title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'story').substring(0, 32);
 
     try { await protocol.mkdir(`/stories/${folderName}`); } catch (_) { }
 
-    // Upload story .bin
-    setState({ transferState: { type: 'upload', filename: binFile.name, bytesTransferred: 0, bytesTotal: binData.length } });
-    await protocol.uploadFile(`/stories/${folderName}/story.bin`, binData, (transferred, total) => {
-      setState({ transferState: { type: 'upload', filename: binFile.name, bytesTransferred: transferred, bytesTotal: total } });
+    // Pre-collect all batch files and resolve binary buffers
+    const batch = [];
+    const mainBinData = binData instanceof Uint8Array ? binData : new Uint8Array(binData);
+    batch.push({
+      name: binFile.name || 'story.bin',
+      destPath: `/stories/${folderName}/story.bin`,
+      data: mainBinData
     });
 
-    // Upload sidecars — normalize any .media sidecar to story.media
-    for (const sidecar of sidecars) {
-      const buf = await sidecar.arrayBuffer();
-      const data = new Uint8Array(buf);
+    for (const sidecar of (sidecars || [])) {
+      let data = null;
+      if (sidecar.data) {
+        data = sidecar.data instanceof Uint8Array ? sidecar.data : new Uint8Array(sidecar.data);
+      } else if (sidecar.arrayBuffer) {
+        const buf = await sidecar.arrayBuffer();
+        data = new Uint8Array(buf);
+      }
+      if (!data) continue;
+
       const destName = sidecar.name.endsWith('.media') ? 'story.media' : sidecar.name;
-      setState({ transferState: { type: 'upload', filename: sidecar.name, bytesTransferred: 0, bytesTotal: data.length } });
-      await protocol.uploadFile(`/stories/${folderName}/${destName}`, data, (transferred, total) => {
-        setState({ transferState: { type: 'upload', filename: sidecar.name, bytesTransferred: transferred, bytesTotal: total } });
+      batch.push({
+        name: sidecar.name,
+        destPath: `/stories/${folderName}/${destName}`,
+        data
       });
     }
 
+    const totalBatchBytes = batch.reduce((sum, item) => sum + item.data.length, 0);
+    let completedBytes = 0;
+
+    for (let i = 0; i < batch.length; i++) {
+      const item = batch[i];
+      const itemSize = item.data.length;
+      const label = batch.length > 1
+        ? `${item.name} (${i + 1}/${batch.length})`
+        : item.name;
+
+      setState({
+        transferState: {
+          type: 'upload',
+          filename: label,
+          bytesTransferred: completedBytes,
+          bytesTotal: totalBatchBytes
+        }
+      });
+
+      await protocol.uploadFile(item.destPath, item.data, (transferred, total) => {
+        setState({
+          transferState: {
+            type: 'upload',
+            filename: label,
+            bytesTransferred: completedBytes + transferred,
+            bytesTotal: totalBatchBytes
+          }
+        });
+      });
+
+      completedBytes += itemSize;
+    }
+
     await refreshFiles();
+    setState({ uploadSuccess: { title } });
   } catch (e) {
     showError('Upload failed: ' + e.message);
   } finally {
@@ -368,14 +884,31 @@ async function executeUpload(binFile, binData, sidecars) {
   }
 }
 
+/** Executes upload of currently preloaded story */
+let _isPreloadUploading = false;
+async function executePreloadedUpload() {
+  if (!state.preloadedStory || _isPreloadUploading || state.transferState) return;
+  _isPreloadUploading = true;
+  setState({ isPreloadUploading: true });
+  try {
+    const { binName, binData, sidecars, title } = state.preloadedStory;
+    await executeUpload({ name: binName }, binData, sidecars);
+    dismissPreloadedStory();
+    setState({ uploadSuccess: { title } });
+  } finally {
+    _isPreloadUploading = false;
+    setState({ isPreloadUploading: false });
+  }
+}
+
 /** Handle a .bin file selection — discover sidecars then decide next step. */
 async function handleBinSelected(binFile, providedFiles = []) {
   const buf = await binFile.arrayBuffer();
   const binData = new Uint8Array(buf);
   _pendingBin = { file: binFile, data: binData };
 
-  // Validate magic byte
-  if (binData.length < 4 || new TextDecoder().decode(binData.slice(0, 4)) !== 'eenk') {
+  const meta = parseStoryMetadata(binData);
+  if (!meta) {
     showError('This does not appear to be a valid eenk story file (missing magic header).');
     return;
   }
@@ -394,22 +927,19 @@ async function handleBinSelected(binFile, providedFiles = []) {
         if (SIDECAR_EXTS.includes(ext) && (ext === '.epdfont' || entry.startsWith(baseName))) {
           const fullPath = await window.api.path.join(dirPath, entry);
           const rawBuf = await window.api.fs.readFile(fullPath);
-          // Wrap in a pseudo-File so executeUpload can call .arrayBuffer()
           found.push({ name: entry, arrayBuffer: () => Promise.resolve(rawBuf.buffer ?? rawBuf) });
         }
       }
-      // Skip prompt — upload everything automatically (matches existing eenky behaviour)
       await executeUpload(binFile, binData, found);
     } catch (e) {
       console.warn('[device-manager] Sidecar scan failed:', e);
       await executeUpload(binFile, binData, []);
     }
   } else {
-    // Browser: no filesystem access — check if sidecars were provided in the same drop/selection
+    // Browser: check if sidecars were provided in the same drop/selection
     const SIDECAR_EXTS = ['.epdfont', '.media'];
     const baseName = binFile.name.replace(/\.bin$/i, '');
 
-    // Auto-detect from providedFiles
     const autoFound = providedFiles.filter(f => {
       const ext = f.name.substring(f.name.lastIndexOf('.')).toLowerCase();
       return f !== binFile && SIDECAR_EXTS.includes(ext) && (ext === '.epdfont' || f.name.startsWith(baseName));
@@ -437,7 +967,6 @@ async function handleBinSelected(binFile, providedFiles = []) {
       descEl.textContent = 'If your story uses custom fonts (.epdfont) or images (.media), you must select them now to upload them alongside the story.';
     }
 
-    // Always offer an "add sidecars" file picker inside the prompt
     const label = document.createElement('label');
     label.className = 'btn btn-secondary';
     label.style.marginTop = autoFound.length > 0 ? '0.5rem' : '0.25rem';
@@ -448,15 +977,11 @@ async function handleBinSelected(binFile, providedFiles = []) {
     input.multiple = true;
     input.style.display = 'none';
     input.addEventListener('change', () => {
-      // Append manually picked files
       const newFiles = Array.from(input.files || []);
       if (newFiles.length > 0) {
-        // Only keep unique files by name
         const existingNames = new Set(_pendingSidecars.map(f => f.name));
         const uniqueNew = newFiles.filter(f => !existingNames.has(f.name));
-
         _pendingSidecars = [..._pendingSidecars, ...uniqueNew];
-        // Re-render list
         sidecarFileList.innerHTML = '';
         _pendingSidecars.forEach(f => {
           const row = document.createElement('div');
@@ -472,25 +997,52 @@ async function handleBinSelected(binFile, providedFiles = []) {
 }
 
 /* ── Confirm modal ──────────────────────────────────────────────── */
-let _pendingDelete = null;
+let _pendingConfirmCallback = null;
 
-function promptDelete(path, name) {
-  _pendingDelete = { path, name };
-  confirmText.textContent = `Delete "${name}"? This cannot be undone.`;
-  confirmModal.style.display = '';
+function showConfirmDialog({ title, messageHtml, okText = 'Confirm', okColor = '', cancelText = 'Cancel' }) {
+  return new Promise((resolve) => {
+    setState({ isConfirming: true });
+    if (confirmHeading) confirmHeading.textContent = title || 'Confirm Action';
+    confirmText.innerHTML = messageHtml;
+    confirmOk.textContent = okText;
+    confirmOk.style.background = okColor || '#CC0000';
+    confirmOk.style.borderColor = okColor || '#CC0000';
+    confirmCancel.textContent = cancelText;
+    confirmModal.style.display = '';
+
+    _pendingConfirmCallback = (result) => {
+      confirmModal.style.display = 'none';
+      _pendingConfirmCallback = null;
+      // Reset styling
+      if (confirmHeading) confirmHeading.textContent = 'Delete item?';
+      confirmOk.textContent = 'Delete';
+      confirmOk.style.background = '#CC0000';
+      confirmOk.style.borderColor = '#CC0000';
+      confirmCancel.textContent = 'Cancel';
+      setState({ isConfirming: false });
+      resolve(result);
+    };
+  });
 }
 
-confirmOk.addEventListener('click', async () => {
-  confirmModal.style.display = 'none';
-  if (_pendingDelete) {
-    await deleteItem(_pendingDelete.path, _pendingDelete.name);
-    _pendingDelete = null;
+async function promptDelete(path, name) {
+  const ok = await showConfirmDialog({
+    title: 'Delete item?',
+    messageHtml: `Delete "${name}"? This cannot be undone.`,
+    okText: 'Delete',
+    okColor: '#CC0000'
+  });
+  if (ok) {
+    await deleteItem(path, name);
   }
+}
+
+confirmOk.addEventListener('click', () => {
+  if (_pendingConfirmCallback) _pendingConfirmCallback(true);
 });
 
 confirmCancel.addEventListener('click', () => {
-  confirmModal.style.display = 'none';
-  _pendingDelete = null;
+  if (_pendingConfirmCallback) _pendingConfirmCallback(false);
 });
 
 /* ── Event wiring ───────────────────────────────────────────────── */
@@ -498,38 +1050,152 @@ connectBtn.addEventListener('click', connect);
 disconnectBtn.addEventListener('click', disconnect);
 refreshBtn.addEventListener('click', refreshFiles);
 
+// Preload & Consent Buttons
+if (consentProceedBtn) {
+  consentProceedBtn.addEventListener('click', async () => {
+    if (state.pendingExternalUrl) {
+      const url = state.pendingExternalUrl;
+      setState({ pendingExternalUrl: null, externalHost: null });
+      await fetchAndInspectPackage(url);
+    }
+  });
+}
+
+if (consentDismissBtn) {
+  consentDismissBtn.addEventListener('click', () => {
+    setState({ pendingExternalUrl: null, externalHost: null });
+    cleanUrlParams();
+  });
+}
+
+if (preloadInstallBtn) {
+  preloadInstallBtn.addEventListener('click', async () => {
+    if (_isPreloadUploading || state.transferState || state.isConnecting) return;
+    const wasConnected = state.isConnected;
+    if (!state.isConnected) {
+      await connect();
+    }
+
+    if (!state.isConnected || !state.preloadedStory || _isPreloadUploading || state.transferState) return;
+
+    const storyExists = state.stories.some(
+      s => s.name === state.preloadedStory.folderName || s.path === `/stories/${state.preloadedStory.folderName}`
+    );
+
+    // If device was just connected and an existing story conflict was detected,
+    // do NOT start uploading automatically. The save warning is now displayed;
+    // wait for user to click "Update & Overwrite Story" to confirm.
+    if (!wasConnected && storyExists) {
+      return;
+    }
+
+    await executePreloadedUpload();
+  });
+}
+
+if (preloadDismissBtn) {
+  preloadDismissBtn.addEventListener('click', () => {
+    dismissPreloadedStory();
+  });
+}
+
+if (successDisconnectBtn) {
+  successDisconnectBtn.addEventListener('click', async () => {
+    setState({ uploadSuccess: null });
+    await disconnect();
+  });
+}
+
+if (successContinueBtn) {
+  successContinueBtn.addEventListener('click', () => {
+    setState({ uploadSuccess: null });
+  });
+}
+
 // Tabs
 document.querySelectorAll('.dm-tab').forEach(btn => {
   btn.addEventListener('click', () => {
-    setState({ currentTab: btn.dataset.tab });
+    setState({ currentTab: btn.dataset.tab, uploadSuccess: null });
   });
 });
 
 async function executeBookUpload(epubFile) {
-  if (!state.isConnected || !protocol) return;
+  return handleEpubSelected([epubFile]);
+}
+
+const LARGE_EPUB_THRESHOLD = 2 * 1024 * 1024; // 2 MB
+
+async function handleEpubSelected(epubFiles) {
+  if (!epubFiles || !epubFiles.length || !state.isConnected || !protocol) return;
+
+  const validFiles = [];
+  for (const epub of epubFiles) {
+    if (epub.size && epub.size > LARGE_EPUB_THRESHOLD) {
+      const proceed = await showConfirmDialog({
+        title: 'Large EPUB Warning',
+        messageHtml: `<strong>${epub.name}</strong> is ${formatSize(epub.size)} (&gt; 2 MB).<br><br>EPUB files over 2 MB frequently encounter read/transfer errors over USB serial, and transfer speeds are limited.<br><br><strong>Recommendation:</strong> Copy this book directly into the <code>/books</code> directory on your MicroSD card via an SD card reader instead.<br><br>Do you still want to attempt upload over USB?`,
+        okText: 'Upload Anyway',
+        okColor: '#e67e22',
+        cancelText: 'Cancel'
+      });
+      if (!proceed) continue;
+    }
+    validFiles.push(epub);
+  }
+
+  if (validFiles.length === 0) return;
+
   try {
     try { await protocol.mkdir('/books'); } catch (_) { }
 
-    const buf = await epubFile.arrayBuffer();
-    const data = new Uint8Array(buf);
+    const batch = [];
+    for (const epub of validFiles) {
+      const buf = await epub.arrayBuffer();
+      batch.push({
+        name: epub.name,
+        destPath: `/books/${epub.name}`,
+        data: new Uint8Array(buf)
+      });
+    }
 
-    setState({ transferState: { type: 'upload', filename: epubFile.name, bytesTransferred: 0, bytesTotal: data.length } });
-    await protocol.uploadFile(`/books/${epubFile.name}`, data, (transferred, total) => {
-      setState({ transferState: { type: 'upload', filename: epubFile.name, bytesTransferred: transferred, bytesTotal: total } });
-    });
+    const totalBatchBytes = batch.reduce((sum, b) => sum + b.data.length, 0);
+    let completedBytes = 0;
+
+    for (let i = 0; i < batch.length; i++) {
+      const item = batch[i];
+      const itemSize = item.data.length;
+      const label = batch.length > 1
+        ? `${item.name} (${i + 1}/${batch.length})`
+        : item.name;
+
+      setState({
+        transferState: {
+          type: 'upload',
+          filename: label,
+          bytesTransferred: completedBytes,
+          bytesTotal: totalBatchBytes
+        }
+      });
+
+      await protocol.uploadFile(item.destPath, item.data, (transferred, total) => {
+        setState({
+          transferState: {
+            type: 'upload',
+            filename: label,
+            bytesTransferred: completedBytes + transferred,
+            bytesTotal: totalBatchBytes
+          }
+        });
+      });
+
+      completedBytes += itemSize;
+    }
 
     await refreshFiles();
   } catch (e) {
-    showError(`Upload failed for ${epubFile.name}: ` + e.message);
+    showError('Upload failed: ' + e.message);
   } finally {
     clearTransfer();
-  }
-}
-
-async function handleEpubSelected(epubFiles) {
-  if (!epubFiles || !epubFiles.length) return;
-  for (const epub of epubFiles) {
-    await executeBookUpload(epub);
   }
 }
 
@@ -583,9 +1249,17 @@ async function extractDroppedFiles(e) {
 uploadInput.addEventListener('change', async () => {
   const files = Array.from(uploadInput.files || []);
   uploadInput.value = '';
+
+  const pkg = files.find(f => f.name.endsWith('.eenk') || f.name.endsWith('.zip'));
+  if (pkg) {
+    const buf = await pkg.arrayBuffer();
+    await loadPreloadedStoryPackage(buf, pkg.name);
+    return;
+  }
+
   const bin = files.find(f => f.name.endsWith('.bin'));
   if (bin) await handleBinSelected(bin, files);
-  else if (files.length > 0) showError("Please include a .bin story file.");
+  else if (files.length > 0) showError("Please include a .eenk or .bin story file.");
 });
 
 // Upload zone click → trigger hidden input (Stories)
@@ -600,9 +1274,17 @@ uploadZone.addEventListener('drop', async e => {
   uploadZone.classList.remove('drag-over');
 
   const files = await extractDroppedFiles(e);
+
+  const pkg = files.find(f => f.name.endsWith('.eenk') || f.name.endsWith('.zip'));
+  if (pkg) {
+    const buf = await pkg.arrayBuffer();
+    await loadPreloadedStoryPackage(buf, pkg.name);
+    return;
+  }
+
   const bin = files.find(f => f.name.endsWith('.bin'));
   if (bin) await handleBinSelected(bin, files);
-  else if (files.length > 0) showError("Please include a .bin story file.");
+  else if (files.length > 0) showError("Please include a .eenk or .bin story file.");
 });
 
 // Upload input (Books)
@@ -624,7 +1306,6 @@ if (uploadBookZone) {
   uploadBookZone.addEventListener('click', () => uploadBookInput?.click());
   uploadBookZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') uploadBookInput?.click(); });
 
-  // Drag-and-drop on upload zone (Books)
   uploadBookZone.addEventListener('dragover', e => { e.preventDefault(); uploadBookZone.classList.add('drag-over'); });
   uploadBookZone.addEventListener('dragleave', () => uploadBookZone.classList.remove('drag-over'));
   uploadBookZone.addEventListener('drop', async e => {
@@ -673,11 +1354,26 @@ window.addEventListener('message', e => {
   }
 });
 
-/* ── Web Serial availability check ─────────────────────────────── */
+/* ── Query Parameter Handler & Startup ─────────────────────────── */
+async function processQueryParams() {
+  if (typeof window === 'undefined' || !window.location.search) return;
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.has('story')) {
+    const slug = params.get('story');
+    if (slug) await loadCatalogStory(slug);
+  } else if (params.has('url')) {
+    const url = params.get('url');
+    if (url) await handleExternalPackageUrl(url);
+  }
+}
+
+/* ── Web Serial availability check & init ──────────────────────── */
 (function init() {
   if (!('serial' in navigator)) {
     $('serial-warn').style.display = '';
     connectBtn.disabled = true;
   }
   render();
+  processQueryParams();
 })();

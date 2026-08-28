@@ -1,0 +1,25 @@
+{
+  "the-intercept": {
+    "title": "The Intercept",
+    "author": "Jon Ingold",
+    "description": "Bletchley Park, 1942. A component from the Bombe machine, used to decode intercepted German messages, has gone missing. One of the cryptographers is waiting to be interviewed, under direst suspicion. Is he stupid enough to have attempted treason? Or is he clever enough to get away?",
+    "website": "https://www.inklestudios.com/ink/theintercept/",
+    "thumbnail": "../assets/stories/the_intercept/thumbnail.jpg",
+    "files": [
+      "../assets/stories/the_intercept/story.bin",
+      "../assets/stories/the_intercept/story.media",
+      "../assets/stories/the_intercept/SpecialElite.epdfont"
+    ]
+  },
+  "let-that-sink-in": {
+    "title": "Let That SINK In!",
+    "author": "Holly Maley",
+    "description": "This is a game about a bathroom sink that won't stop knocking at your front door, written for Inkjam 2026. It is a story of cathartic destruction that should only take about five minutes to play, but that is a five minutes you will never get back.",
+    "website": "https://hollylynnmaley.itch.io/let-that-sink-in",
+    "thumbnail": "../assets/stories/let_that_sink_in/thumbnail.jpg",
+    "files": [
+      "../assets/stories/let_that_sink_in/story.bin",
+      "../assets/stories/let_that_sink_in/story.media"
+    ]
+  }
+}

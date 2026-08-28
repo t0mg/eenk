@@ -78,6 +78,89 @@
     <!-- ── Main content ────────────────────────────────────── -->
     <main class="dm-content" id="dm-content">
 
+      <!-- External link consent card -->
+      <div class="consent-card" id="external-consent-card" style="display:none;" role="region"
+        aria-labelledby="consent-title">
+        <div class="consent-header">
+          <span class="material-symbols-outlined consent-icon">security</span>
+          <div>
+            <h3 id="consent-title">External Story Link</h3>
+            <span class="consent-host" id="consent-host"></span>
+          </div>
+        </div>
+        <p>This link points to an external story package. Downloading foreign files will fetch data from this
+          third-party site onto your computer and device.</p>
+        <div class="consent-actions">
+          <button class="btn btn-primary" id="consent-proceed-btn">Download &amp; Inspect</button>
+          <button class="btn btn-ghost" id="consent-dismiss-btn">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Package Inspecting Progress card -->
+      <div class="inspect-card" id="inspect-progress-card" style="display:none;" role="status" aria-live="polite">
+        <div class="inspect-spinner-row">
+          <span class="material-symbols-outlined inspect-spinner">sync</span>
+          <span id="inspect-status-text">Fetching story package…</span>
+        </div>
+        <div class="progress-bar-wrap" style="margin-top:0.6rem;">
+          <div class="progress-bar-fill" id="inspect-progress-bar" style="width:0%;"></div>
+        </div>
+      </div>
+
+      <!-- Verified Preload Story Card -->
+      <div class="preload-story-card" id="story-preload-card" style="display:none;" role="region"
+        aria-label="Ready to install story">
+        <div class="preload-card-body">
+          <div class="preload-cover-wrap">
+            <canvas id="preload-cover-canvas" width="152" height="152" style="display:none;"></canvas>
+            <img id="preload-cover-img" alt="Cover art" style="display:none;" />
+            <div id="preload-cover-placeholder" class="preload-cover-placeholder">
+              <span class="material-symbols-outlined">auto_stories</span>
+            </div>
+          </div>
+          <div class="preload-meta-wrap">
+            <h3 class="preload-title" id="preload-title">Story Title</h3>
+            <div class="preload-author" id="preload-author">By Author</div>
+            <div class="preload-inventory" id="preload-inventory"></div>
+
+            <!-- Version/Save Invalidation Warning Banner (aligned with .critical-warning) -->
+            <div class="preload-warning-box critical-warning" id="preload-save-warning" style="display:none;">
+              <div class="warning-title">
+                <span class="material-symbols-outlined warning-icon">warning</span> Story already installed
+              </div>
+              <p id="preload-warning-text">Reinstalling will invalidate previous save games if the story version
+                changes.</p>
+            </div>
+
+            <div class="preload-actions">
+              <button class="btn btn-primary" id="preload-install-btn">
+                <span class="material-symbols-outlined">bolt</span> Install
+              </button>
+              <a class="btn btn-secondary" id="preload-download-btn" style="display:none;" download>
+                <span class="material-symbols-outlined">download</span> Download
+              </a>
+              <button class="btn btn-ghost" id="preload-dismiss-btn">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Story Upload Success Card -->
+      <div class="success-card flash-done" id="upload-success-card" style="display:none;" role="region"
+        aria-label="Story installation complete">
+        <h3 class="success-title" id="success-story-title">Story Installed Successfully</h3>
+        <p class="success-desc" id="success-story-desc">The story and its assets have been transferred to your
+          device. You can disconnect now to reboot and start playing, or continue managing files.</p>
+        <div class="success-actions">
+          <button class="btn btn-primary" id="success-disconnect-btn">
+            <span class="material-symbols-outlined">usb_off</span> Disconnect
+          </button>
+          <button class="btn btn-secondary" id="success-continue-btn">
+            Continue
+          </button>
+        </div>
+      </div>
+
       <!-- Disconnected empty state -->
       <div class="dm-empty" id="empty-state">
         <div class="dm-empty-icon"><span class="material-symbols-outlined" style="font-size:3rem;">usb</span></div>
@@ -89,7 +172,7 @@
       <!-- Stories tab -->
       <div class="tab-panel active" id="panel-stories" role="tabpanel" aria-labelledby="tab-stories"
         style="display:none;">
-        <input type="file" id="upload-input" accept=".bin,.epdfont,.media" style="display:none;" multiple />
+        <input type="file" id="upload-input" accept=".eenk,.zip,.bin,.epdfont,.media" style="display:none;" multiple />
 
         <!-- Sidecar prompt (browser context: shown after picking a .bin) -->
         <div class="sidecar-prompt" id="sidecar-prompt" style="display:none;">
@@ -104,9 +187,11 @@
         </div>
 
         <!-- Upload drop zone -->
-        <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Drop .bin file here to upload">
+        <div class="upload-zone" id="upload-zone" role="button" tabindex="0"
+          aria-label="Drop .eenk or .bin file here to upload">
           <span class="upload-icon"><span class="material-symbols-outlined" style="font-size:2rem;">upload</span></span>
-          <span class="upload-hint">Drop your <strong>.bin</strong> story file or folder or click here</span>
+          <span class="upload-hint">Drop your <strong>.eenk</strong> or <strong>.bin</strong> story file or click
+            here</span>
         </div>
 
         <div class="file-list" id="stories-list"></div>
@@ -115,6 +200,17 @@
       <!-- Books tab -->
       <div class="tab-panel" id="panel-books" role="tabpanel" aria-labelledby="tab-books" style="display:none;">
         <input type="file" id="upload-book-input" accept=".epub" style="display:none;" multiple />
+
+        <div class="critical-warning" style="margin-bottom:1rem;">
+          <div class="warning-title" style="font-size:0.88rem;">
+            <span class="material-symbols-outlined warning-icon">info</span> Large EPUBs
+            (&gt; 2
+            MB)
+          </div>
+          <p style="font-size:0.82rem;">USB serial transfer is not recommended for files over 2 MB. For
+            faster, reliable transfers, copy books directly into the <code>/books</code> directory on your MicroSD card.
+          </p>
+        </div>
 
         <!-- Upload drop zone -->
         <div class="upload-zone" id="upload-book-zone" role="button" tabindex="0"
@@ -161,6 +257,7 @@
   </div>
 
   <script src="serial-protocol.js"></script>
+  <script src="zip-unpacker.js"></script>
   <script src="device-manager.js"></script>
 </body>
 

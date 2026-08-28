@@ -89,7 +89,8 @@ Ready to get started? Flash the latest firmware directly from your browser, no i
 <p class="hero-ctas">
   <a href="flasher/" class="btn btn-primary"><span class="material-symbols-outlined">bolt</span>Flash eenk now</a>
   <a href="userguide/" class="btn btn-secondary">Read user guide</a>
-  <a href="eenky/" class="btn btn-secondary">Write Stories</a>
+  <a href="stories/" class="btn btn-secondary">Play stories</a>
+  <a href="eenky/" class="btn btn-secondary">Write stories</a>
 </p>
 
 </div>
