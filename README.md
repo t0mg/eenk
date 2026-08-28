@@ -32,7 +32,7 @@ The native configuration compiles a host executable that runs the compiled story
 ### Building the Native Target
 
 > [!NOTE]
-> This has only been tested on Windows so far.
+> This has only been tested on Windows and Mac so far. I currently have no idea if the linux build works :)
 
 Ensure that the MinGW compiler suite (`g++`) is in your PATH. For example on Windows, you can install it via [MSYS2](https://www.msys2.org/), and the compiler path is typically `C:\msys64\mingw64\bin`.
 
