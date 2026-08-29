@@ -20,6 +20,12 @@
       "out": "userguide/index.html"
     },
     {
+      "id": "stories",
+      "title": "Stories",
+      "src": "pages/stories.md",
+      "out": "stories/index.html"
+    },
+    {
       "id": "eenky",
       "title": "Eenky IDE",
       "src": "pages/eenky.md",
@@ -34,12 +40,6 @@
       "src": null,
       "out": "flasher/index.html",
       "external": "../flasher/index.html"
-    },
-    {
-      "id": "stories",
-      "title": "Stories",
-      "src": "pages/stories.md",
-      "out": "stories/index.html"
     },
     {
       "id": "device-manager",
