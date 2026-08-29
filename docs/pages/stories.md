@@ -8,20 +8,12 @@ Click **Install** to open the Device Manager and install over USB with a single 
 
 <!-- CATALOG_GRID -->
 
----
-
 ### Distributing Your Own Stories
 
-Coming soon!
+It's easy! Ink stories compiled with the [eenky IDE](../eenky/) (`.eenk` packages) can be shared online and installed on the device over USB, by dropping them in the [Device Manager](../device-manager/).
 
-<!-- 
-Want to share your interactive story with other eenk players?
+There is also the possibility to create 1-click install links that skip the package download step entirely (as in the above cards), and to feature your story on this page.
 
-1. **Export from eenky**: Click the **Build** button in the [eenky IDE](../eenky/) to compile your `.ink` project directly into a `.eenk` package.
-2. **Publish**: Host your `.eenk` file on **itch.io**, GitHub Releases, or your own website.
-3. **Deep Link**: Link directly to the web installer so players can install your story in one click:
-   ```markdown
-   [Install on eenk Device](https://t0mg.github.io/eenk/device-manager/?url=https://yourdomain.com/mystory.eenk)
-   ```
+See the [eenky documentation on publishing stories](../eenky/#sharing-your-stories) for more details!
+
 </div>
--->

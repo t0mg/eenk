@@ -231,17 +231,36 @@ The firmware includes embedded bitmap fonts ready to use out of the box:
 - `serif` / `serif-medium`: Elegant 16pt serif font (Literata).
 - `serif-large`: Larger serif font for comfortable reading.
 
-### Adding Custom SD Fonts
+### Custom Fonts
 
-You can add any custom font by placing `.epdfont` files created with the eenky IDE into the `/fonts/` directory on your SD card, or inside a story's folder:
+Custom fonts can be bundled with stories, but you can also manually add global fonts by placing `.epdfont` files created with the eenky IDE into the `/fonts/` directory on your SD card.
 
-- **Font Family Naming**: To support bold and italic formatting, provide matching style suffixes:
+#### Font Family Naming
+
+To support bold and italic formatting, provide matching style suffixes:
+
   - `myfont.epdfont` (Regular)
   - `myfont-bold.epdfont` (Bold)
   - `myfont-italic.epdfont` (Italic)
   - `myfont-bolditalic.epdfont` (Bold Italic)
-- **Synthetic Fallbacks**: If your custom font does not include separate bold or italic files, eenk automatically generates synthetic bold and oblique styles on the fly!
-- **Converting Fonts**: You can convert standard TrueType (`.ttf`) or OpenType (`.otf`) fonts to `.epdfont` format using the [eenky IDE](../eenky/).
+
+> **Note:** If your custom font does not include separate bold or italic files, eenk automatically generates synthetic bold and oblique styles on the fly. These fallbacks are not as good as a dedicated font variant.
+
+#### Creating global custom fonts
+
+You can convert standard TrueType (`.ttf`) or OpenType (`.otf`) fonts to `.epdfont` format using the [eenky IDE](../eenky/).
+
+1. Create a new (empty) ink project file.
+2. Use the metadata header to attach your `.ttf` font to the story.
+3. Build the story to trigger the coversion tools
+4. Rename the resulting `.eenk` file to `.zip` and unpack it.
+5. Retreive the `.epdfont` file(s).
+6. Place them in the `fonts/` directory on your MicroSD card.
+7. Reboot your device and select the font from the settings menu.
+
+#### Creating custom fonts per story
+
+You can also embed fonts in individual stories. See [Fonts](../stories/fonts) for more information on how to do this.
 
 ## Recovery & Troubleshooting
 

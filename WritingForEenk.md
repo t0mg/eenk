@@ -1,6 +1,6 @@
 # Writing for eenk
 
-Welcome to the eenk authoring guide! This document covers the eenk-specific features that extend the standard Ink language when writing stories for the Xteink X4 hardware.
+Welcome to the eenk authoring guide! This chapter covers the eenk-specific features that extend the standard Ink language when writing stories for the eenk firmware.
 
 ## Story Header Metadata
 
@@ -28,21 +28,19 @@ Once upon a time...
 
 ## Fonts in eenk
 
-By default, eenk uses the user's preferred font setting from the device menu. However, you can force a specific font for your story by using the `@font` metadata tag.
+By default, eenk uses the user's preferred font setting from the device menu. However, you can set a specific font for your story by using the `@font` metadata tag.
 
-The runtime will attempt to resolve your requested font stem in the following order:
+The runtime will attempt to resolve the font defined by the metadata tag in the following order: built-in, custom bundled, custom global (see below). Note that users can also choose to override the `@font` tag via firmware settings.
 
 ### Built-in Fonts
 The device comes with built-in fonts that you can request directly by their token name:
-- `sans` (or `sans-medium`): The default readable sans-serif font (Medium, ~16pt).
-- `sans-small`: A smaller variant of the sans-serif font (Small, ~14pt).
-- `serif` (or `serif-medium`): The classic serif font (Literata Medium, ~16pt).
-- `serif-small`: A smaller variant of the serif font (Literata Small, ~14pt).
+- `sans` (or `sans-medium`): The default sans-serif font, Reader, from the Papyrix firmware.
+- `sans-small`: A smaller variant of the sans-serif font.
+- `serif` (or `serif-medium`): The classic serif font (Literata).
+- `serif-small`: A smaller variant of the serif font.
 
-### Custom SD Card Fonts
-If the token doesn't match a built-in font, the engine will look for custom `.epdfont` font files on your SD card. The engine searches two locations in order:
-- **Story Folder**: Inside the story's directory on SD (e.g. `/stories/mystory/my-custom-font.epdfont`).
-- **Global Font Folder**: A shared folder on the root of the SD card: `/fonts/my-custom-font.epdfont`.
+### Custom Fonts
+If the token doesn't match a built-in font, the engine will look for custom `.epdfont` font files, first in the story bundle, then in the global `fonts/` directory on the SD card.
 
 ### Variants for Custom Fonts
 Font variants may also be provided by adding a suffix to the font stem. If the story contains bold text, the engine will look for `my-custom-font-bold.epdfont`. Supported suffixes are `-bold`, `-italic`, `-bolditalic`.
@@ -54,7 +52,9 @@ If the requested font stem cannot be found in any of the above locations, eenk w
 
 ## Text Formatting
 
-eenk supports inline text styling in both narrative text and interactive choice options. You can use standard Markdown syntax or HTML tags (supported for backwards compatibility with Inky web exports).
+eenk supports inline text styling in both narrative text and interactive choice options. You can use standard Markdown syntax or HTML tags.
+
+> Note: If you use formatting with a custom font, consider providing the necessary font variants (e.g., `my-custom-font-bold.epdfont`) in your story bundle. While eenk will automatically generate synthetic fallbacks (algorithmic emboldening and obliquing), having dedicated files ensures the best quality. See [Variants for Custom Fonts](#variants-for-custom-fonts).
 
 ### Markdown Formatting
 
@@ -80,12 +80,6 @@ The guard stepped forward. <b>"Halt!"</b> he yelled.<br><i>He did not look pleas
 + [<i>Reason</i> with him] -> reason
 ```
 
-### Font Variant Resolution for Formatted Text
-
-When formatted text is rendered:
-1. eenk will look for dedicated font files matching the style suffix: `-bold`, `-italic`, or `-bolditalic` (e.g. `literata-bold.epdfont`).
-2. If dedicated variant files are not present on the SD card, eenk automatically generates a **synthetic fallback** (algorithmic emboldening and obliquing), ensuring your formatted text always displays correctly without crashing or missing text.
-
 ## Images in eenk
 
 You can embed images in your story using the standard Ink `# IMAGE:` tag. eenky will automatically process these images during compilation and bundle them into an optimized `.media` sidecar file inside your `.eenk` story package.
@@ -97,12 +91,6 @@ You can embed images in your story using the standard Ink `# IMAGE:` tag. eenky 
 
 - **Local Images:** You can reference local images by placing them in the same folder as your `.ink` file (or a subfolder relative to it).
 - **Online Images:** You can also provide a direct URL to an online image. eenky will download it automatically during compilation.
-
-### The Media Sidecar
-
-During the compilation process, eenky collects all the `# IMAGE:` tags it finds in your story, processes the images (scaling, dithering, and converting to 1-bit format for the e-ink display), and packs them into a single binary file named after your story with the `.media` extension (e.g., `mystory.media`).
-
-When compiling, eenky packages this `.media` file alongside your compiled binary (`story.bin`) and any custom `.epdfont` files into a single `.eenk` package. When installing via the Device Manager, all assets are automatically extracted and transferred to the device.
 
 > Note: eenky inherits the classic Web export mode from Inky, which also supports the very same `# IMAGE:` tag format for rendering images in the browser! What are the odds!?
 
@@ -149,7 +137,7 @@ Sirens echoed in the distance as the hovercraft engine roared to life...
 
 ## Building with eenky
 
-eenky is the desktop companion application that compiles your `.ink` files into a `.eenk` package file optimized for the eenk hardware. It uses a customized compiler pipeline (`inklecate` -> `inkcpp_cl` -> `eenkPackage`).
+eenky compiles your `.ink` files into a `.eenk` package file optimized for the eenk hardware. It uses a customized compiler pipeline (`inklecate` -> `inkcpp_cl` -> `eenkPackage`).
 
 1. Open your Ink project folder in eenky.
 2. Click the **Build** button in the toolbar (also available from the File menu or with Ctrl+B or Cmd+B keyboard shortcut).
@@ -178,5 +166,34 @@ Direct SD card copying is not recommended because the device firmware requires u
 1. Rename `mystory.eenk` to `mystory.zip` and extract it on your computer.
 2. Remove the MicroSD card from your device and connect it to your computer.
 3. Create a folder under `/stories/` on the SD card (e.g. `/stories/mystory/`).
-4. Copy `story.bin` and any companion files (`.media`, `.epdfont`) into `/stories/mystory/`.
+4. Copy `story.bin` and any companion files (`.media` for image data, `.epdfont` for custom fonts) into `/stories/mystory/`.
 5. Eject the SD card, re-insert it into your device, and power on.
+
+## Sharing Your Stories
+
+You can, of course, share the `.eenk` file for others to upload by dragging it into the Device Manager.
+
+There are also a couple of alternatives for an even smoother installation experience.
+
+### One-Click Install Deeplinks
+
+You can also skip the manual download phase by providing a one-click installation link formatted as such:
+```
+https://t0mg.github.io/eenk/device-manager?url=https://example.com/mystory.eenk
+```
+
+Where `https://example.com/mystory.eenk` is the location of your compiled story file.
+
+#### Limitations
+
+For this to work, you need a host that allows any origin in their [CORS headers](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Access-Control-Allow-Origin).
+
+If you don't have a personal website, or don't know what CORS headers are, a good place to host your story for free is [GitHub](https://github.com/). Just provide the link to the file on GitHub in the `url` query parameter, and the Device Manager will handle the rest (via [jsdelivr](https://www.jsdelivr.com/) in this case).
+
+Typically, if you prefer to host your story on a place like [itch.io](https://itch.io/), the download will be blocked. In that case, submitting the Story to the showcase page (see below) is a viable alternative.
+
+### Stories Showcase
+
+The [online Stories Showcase](https://t0mg.github.io/eenk/stories/) also hosts free stories with a 1-click install button.
+
+If you would like to add your story there, just [open an issue on GitHub](https://github.com/t0mg/eenk/issues/new).
