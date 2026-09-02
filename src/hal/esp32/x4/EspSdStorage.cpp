@@ -91,6 +91,48 @@ bool EspSdStorage::writeStream(const char* path, const std::function<bool(IFileW
     return ok;
 }
 
+class EspSdFileReader : public IFileReader {
+    File& _f;
+public:
+    explicit EspSdFileReader(File& f) : _f(f) {}
+    size_t read(void* dest, size_t size) override {
+        if (!_f) return 0;
+        return _f.read(static_cast<uint8_t*>(dest), size);
+    }
+    bool seek(size_t offset) override {
+        if (!_f) return false;
+        return _f.seek(offset);
+    }
+    size_t tell() const override {
+        if (!_f) return 0;
+        return _f.position();
+    }
+    size_t size() const override {
+        if (!_f) return 0;
+        return _f.size();
+    }
+};
+
+bool EspSdStorage::readStream(const char* path, const std::function<bool(IFileReader&)>& reader)
+{
+    if (!_initialized) return false;
+    File file = SD.open(path, FILE_READ);
+    if (!file) return false;
+    EspSdFileReader fr(file);
+    bool ok = reader(fr);
+    file.close();
+    return ok;
+}
+
+bool EspSdStorage::renameFile(const char* oldPath, const char* newPath)
+{
+    if (!_initialized) return false;
+    if (SD.exists(newPath)) {
+        SD.remove(newPath);
+    }
+    return SD.rename(oldPath, newPath);
+}
+
 bool EspSdStorage::writeFileBinary(const char* path, const unsigned char* data, std::size_t size)
 {
     if (!_initialized) return false;

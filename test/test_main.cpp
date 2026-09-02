@@ -1662,6 +1662,63 @@ void test_save_manager_enk2_serialization(void) {
   storage.deleteFile(testSavePath);
 }
 
+void test_save_manager_streaming_large_save(void) {
+  SDLStorage storage;
+  StorySaveManager mgr;
+  const char *srcPath = "stories/psyphon/psyphon_chapter5.sav";
+  const char *copyPath = "test/test_ch5_streaming.sav";
+
+  if (!storage.fileExists(srcPath)) {
+    return; // Skip if file not present
+  }
+
+  // Copy to test location
+  std::size_t sz = 0;
+  const unsigned char *data = storage.readFileBinary(srcPath, &sz);
+  TEST_ASSERT_NOT_NULL(data);
+  TEST_ASSERT_TRUE(storage.writeFileBinary(copyPath, data, sz));
+  storage.freeBuffer(data);
+
+  mgr.init(copyPath, 0x1119cd91);
+  TEST_ASSERT_TRUE(mgr.loadSaveFile(storage));
+  TEST_ASSERT_TRUE(mgr.hasMainProgress());
+  TEST_ASSERT_EQUAL(12890, mgr.getMainSnapshot().size());
+  TEST_ASSERT_EQUAL(4, mgr.getCheckpoints().size());
+
+  // Verify lazy-loaded in RAM: snapshotData vector MUST be empty to save heap!
+  TEST_ASSERT_TRUE(mgr.getCheckpoints()[0].snapshotData.empty());
+  TEST_ASSERT_EQUAL_STRING("Room Service", mgr.getCheckpoints()[0].title.c_str());
+  TEST_ASSERT_EQUAL(11966, mgr.getCheckpoints()[0].snapshotLen);
+  TEST_ASSERT_EQUAL(12925, mgr.getCheckpoints()[0].fileOffset);
+
+  TEST_ASSERT_TRUE(mgr.getCheckpoints()[1].snapshotData.empty());
+  TEST_ASSERT_EQUAL_STRING("The Hotel Thiz", mgr.getCheckpoints()[1].title.c_str());
+  TEST_ASSERT_EQUAL(12207, mgr.getCheckpoints()[1].snapshotLen);
+
+  TEST_ASSERT_TRUE(mgr.getCheckpoints()[2].snapshotData.empty());
+  TEST_ASSERT_EQUAL_STRING("Deposits", mgr.getCheckpoints()[2].title.c_str());
+  TEST_ASSERT_EQUAL(12296, mgr.getCheckpoints()[2].snapshotLen);
+
+  TEST_ASSERT_TRUE(mgr.getCheckpoints()[3].snapshotData.empty());
+  TEST_ASSERT_EQUAL_STRING("Target Acquired", mgr.getCheckpoints()[3].title.c_str());
+  TEST_ASSERT_EQUAL(12890, mgr.getCheckpoints()[3].snapshotLen);
+
+  // Test rewriting save file with disk-streamed checkpoints
+  TEST_ASSERT_TRUE(mgr.writeSaveFile(storage));
+
+  // Reload and verify integrity
+  StorySaveManager mgr2;
+  mgr2.init(copyPath, 0x1119cd91);
+  TEST_ASSERT_TRUE(mgr2.loadSaveFile(storage));
+  TEST_ASSERT_TRUE(mgr2.hasMainProgress());
+  TEST_ASSERT_EQUAL(12890, mgr2.getMainSnapshot().size());
+  TEST_ASSERT_EQUAL(4, mgr2.getCheckpoints().size());
+  TEST_ASSERT_EQUAL_STRING("Room Service", mgr2.getCheckpoints()[0].title.c_str());
+  TEST_ASSERT_EQUAL_STRING("Target Acquired", mgr2.getCheckpoints()[3].title.c_str());
+
+  storage.deleteFile(copyPath);
+}
+
 void test_save_manager_universal_key_deduplication(void) {
   StorySaveManager mgr;
   mgr.init("test/dummy.sav", 0x11223344);
@@ -2734,6 +2791,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_sd_font_catalogue_family_detection);
   // Save manager & Menu modal tests
   RUN_TEST(test_save_manager_enk2_serialization);
+  RUN_TEST(test_save_manager_streaming_large_save);
   RUN_TEST(test_save_manager_universal_key_deduplication);
   RUN_TEST(test_save_manager_restart_clear);
   RUN_TEST(test_checkpoint_tag_parsing);

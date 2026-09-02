@@ -13,6 +13,19 @@ public:
 };
 
 /**
+ * Interface for streaming reads to avoid loading large files into heap.
+ */
+class IFileReader
+{
+public:
+    virtual ~IFileReader() = default;
+    virtual std::size_t read(void* dest, std::size_t size) = 0;
+    virtual bool seek(std::size_t offset) = 0;
+    virtual std::size_t tell() const = 0;
+    virtual std::size_t size() const = 0;
+};
+
+/**
  * eenk — IStorage: Platform-agnostic storage interface
  *
  * Implemented by:
@@ -61,6 +74,23 @@ public:
      * @return True if file was opened, written, and closed successfully
      */
     virtual bool writeStream(const char* path, const std::function<bool(IFileWriter&)>& writer) = 0;
+
+    /**
+     * Stream binary data from a file via an IFileReader callback.
+     * Avoids holding large file buffers in RAM.
+     * @param path File path
+     * @param reader Callback invoked with an IFileReader reference
+     * @return True if file was opened, read, and closed successfully
+     */
+    virtual bool readStream(const char* path, const std::function<bool(IFileReader&)>& reader) = 0;
+
+    /**
+     * Rename a file.
+     * @param oldPath Source file path
+     * @param newPath Destination file path
+     * @return True on success
+     */
+    virtual bool renameFile(const char* oldPath, const char* newPath) = 0;
 
     /**
      * Delete a file.

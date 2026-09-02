@@ -267,7 +267,7 @@ void InkInputHandler::showStoryMenu(
                              "progress will be lost.",
                              "", menuW, menuH, false)) {
       int cpIdx = saveMgr.getUnnamedCheckpointIndex();
-      if (cpIdx >= 0 && saveMgr.restoreCheckpoint(cpIdx, story, display)) {
+      if (cpIdx >= 0 && saveMgr.restoreCheckpoint(cpIdx, story, display, &engine.getStorage())) {
         saveMgr.writeSaveFile(engine.getStorage());
         engine.incrementRefreshCount();
         engine.setState(InkEngine::State::RUNNING_TEXT);
@@ -295,7 +295,7 @@ void InkInputHandler::showStoryMenu(
       if (ui.showConfirmDialog(_input, "Confirm Rewind", confirmMsg.c_str(), "",
                                subW, subH, false)) {
         size_t actualIdx = namedCheckpoints[subChoice].first;
-        if (saveMgr.restoreCheckpoint(actualIdx, story, display)) {
+        if (saveMgr.restoreCheckpoint(actualIdx, story, display, &engine.getStorage())) {
           saveMgr.writeSaveFile(engine.getStorage());
           engine.incrementRefreshCount();
           engine.setState(InkEngine::State::RUNNING_TEXT);

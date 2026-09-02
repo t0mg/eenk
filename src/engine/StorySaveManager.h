@@ -13,8 +13,20 @@ class InkStoryManager;
 
 struct CheckpointEntry {
   std::string title; // "" for unnamed checkpoint, non-empty for named milestone
-  std::vector<uint8_t> snapshotData;
+  std::vector<uint8_t> snapshotData; // In-memory snapshot payload (cleared once persisted to disk)
   std::deque<WrappedLine> history;
+
+  // On-disk location in save file when snapshotData is empty
+  size_t fileOffset = 0;
+  size_t snapshotLen = 0;
+
+  CheckpointEntry() = default;
+  CheckpointEntry(std::string t, std::vector<uint8_t> snap, std::deque<WrappedLine> hist)
+      : title(std::move(t)), snapshotData(std::move(snap)), history(std::move(hist)) {}
+  CheckpointEntry(const CheckpointEntry &) = default;
+  CheckpointEntry(CheckpointEntry &&) noexcept = default;
+  CheckpointEntry &operator=(const CheckpointEntry &) = default;
+  CheckpointEntry &operator=(CheckpointEntry &&) noexcept = default;
 };
 
 class StorySaveManager {
@@ -54,7 +66,8 @@ public:
       std::vector<std::pair<size_t, std::string>> &outNamed) const;
 
   bool restoreCheckpoint(size_t index, InkStoryManager &story,
-                         InkDisplayManager &display);
+                         InkDisplayManager &display,
+                         IStorage *storage = nullptr);
 
   // Restart / wipe
   void clearAll(IStorage &storage);
@@ -73,11 +86,16 @@ public:
                                class IFileWriter &writer);
   static void serializeHistory(const std::deque<WrappedLine> &history,
                                std::vector<uint8_t> &out);
+  static bool deserializeHistory(class IFileReader &reader,
+                                 std::deque<WrappedLine> &out,
+                                 InkStoryManager *storyMgr = nullptr);
   static bool deserializeHistory(const uint8_t *&ptr, size_t &remaining,
                                  std::deque<WrappedLine> &out,
                                  InkStoryManager *storyMgr = nullptr);
 
 private:
+  bool writeSaveData(class IFileWriter &writer, class IFileReader *oldReader);
+
   std::string _saveFilePath;
   uint32_t _storyHash = 0;
 
