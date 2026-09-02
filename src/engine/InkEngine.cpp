@@ -21,6 +21,8 @@
 #ifdef PLATFORM_NATIVE
 #include "hal/sdl/mock/FS.h"
 #include <SDL.h> // for SDL_Delay
+#elif defined(PLATFORM_ESP32)
+#include <Arduino.h>
 #endif
 
 extern int g_marginPx;
@@ -137,6 +139,62 @@ bool InkEngine::loadSnapshot(const unsigned char *data, std::size_t length) {
   return false;
 }
 
+bool InkEngine::parseCheckpointTag(const char *rawTag, std::string &outTitle) {
+  if (!rawTag)
+    return false;
+  while (*rawTag == ' ' || *rawTag == '\t')
+    rawTag++;
+
+  size_t prefixLen = 0;
+  if (strncasecmp(rawTag, "CHECKPOINT", 10) == 0) {
+    prefixLen = 10;
+  } else if (strncasecmp(rawTag, "CHAPTER", 7) == 0) {
+    prefixLen = 7;
+  }
+
+  if (prefixLen == 0)
+    return false;
+
+  const char *after = rawTag + prefixLen;
+  while (*after == ' ' || *after == '\t')
+    after++;
+  if (*after == ':') {
+    after++;
+    while (*after == ' ' || *after == '\t')
+      after++;
+  }
+  std::string t(after);
+  while (!t.empty() &&
+         (t.back() == ' ' || t.back() == '\t' || t.back() == '\r' ||
+          t.back() == '\n')) {
+    t.pop_back();
+  }
+  outTitle = t;
+  return true;
+}
+
+void InkEngine::triggerCheckpoint(const std::string &checkpointTitle) {
+#ifdef PLATFORM_ESP32
+  // Ensure at least 30 KB free heap to safely create and serialize snapshot
+  if (ESP.getFreeHeap() < 30720) {
+    printf("[InkEngine] Low heap (%u bytes free), skipping checkpoint snapshot\n",
+           (unsigned)ESP.getFreeHeap());
+    return;
+  }
+#endif
+  size_t snapLen = 0;
+  const unsigned char *snap = _storyManager.createSnapshot(&snapLen);
+  if (snap && snapLen > 0) {
+    _saveManager.saveCheckpoint(checkpointTitle, snap, snapLen,
+                                _displayManager.getHistory());
+    if (_saveManager.writeSaveFile(_storage)) {
+      printf("[InkEngine] Checkpoint saved to SD: '%s' (%u bytes snapshot)\n",
+             checkpointTitle.c_str(), (unsigned)snapLen);
+    }
+  }
+  _storyManager.freeSnapshot();
+}
+
 void InkEngine::tickRunningText() {
   GfxRenderer *renderer = _display.getRenderer();
   int marginX = g_marginPx;
@@ -188,37 +246,35 @@ void InkEngine::tickRunningText() {
       bool hasCheckpointTag = false;
       std::string checkpointTitle = "";
 
+      auto processTag = [&](const char *rawTag) {
+        if (!rawTag)
+          return;
+        while (*rawTag == ' ' || *rawTag == '\t')
+          rawTag++;
+
+        if (strncasecmp(rawTag, "IMAGE:", 6) == 0) {
+          const char *pathStr = rawTag + 6;
+          while (*pathStr == ' ' || *pathStr == '\t')
+            pathStr++;
+          hasImage = true;
+          imagePath = pathStr;
+        } else {
+          std::string title;
+          if (parseCheckpointTag(rawTag, title)) {
+            hasCheckpointTag = true;
+            checkpointTitle = title;
+          }
+        }
+      };
+
       if (runner->has_tags()) {
         for (size_t i = 0; i < runner->num_tags(); i++) {
-          const char *tag = runner->get_tag(i);
-          if (!tag)
-            continue;
-          while (*tag == ' ' || *tag == '\t')
-            tag++;
-
-          if (strncasecmp(tag, "IMAGE:", 6) == 0) {
-            const char *pathStr = tag + 6;
-            while (*pathStr == ' ')
-              pathStr++;
-            hasImage = true;
-            imagePath = pathStr;
-          } else if (strcasecmp(tag, "CHECKPOINT") == 0) {
-            hasCheckpointTag = true;
-            checkpointTitle = "";
-          } else if (strncasecmp(tag, "CHECKPOINT:", 11) == 0 ||
-                     strncasecmp(tag, "CHECKPOINT ", 11) == 0) {
-            hasCheckpointTag = true;
-            const char *titleStr = tag + 11;
-            while (*titleStr == ' ' || *titleStr == '\t')
-              titleStr++;
-            std::string t(titleStr);
-            while (!t.empty() &&
-                   (t.back() == ' ' || t.back() == '\t' || t.back() == '\r' ||
-                    t.back() == '\n')) {
-              t.pop_back();
-            }
-            checkpointTitle = t;
-          }
+          processTag(runner->get_tag(i));
+        }
+      }
+      if (runner->has_knot_tags()) {
+        for (size_t i = 0; i < runner->num_knot_tags(); i++) {
+          processTag(runner->get_knot_tag(i));
         }
       }
 
@@ -235,13 +291,7 @@ void InkEngine::tickRunningText() {
       }
 
       if (hasCheckpointTag) {
-        size_t snapLen = 0;
-        const unsigned char *snap = _storyManager.createSnapshot(&snapLen);
-        if (snap && snapLen > 0) {
-          _saveManager.saveCheckpoint(checkpointTitle, snap, snapLen,
-                                      _displayManager.getHistory());
-          _saveManager.writeSaveFile(_storage);
-        }
+        triggerCheckpoint(checkpointTitle);
       }
     }
   }

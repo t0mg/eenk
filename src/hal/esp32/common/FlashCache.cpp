@@ -114,10 +114,16 @@ bool FlashCache::loadStoryStreaming(EspSdStorage& sdStorage,
 
     File file = SD.open(sdPath, FILE_READ);
     if (!file) {
+        Serial.printf("[FlashCache] Failed to open %s\n", sdPath);
         return false;
     }
 
     size_t fileSize = file.size();
+    if (fileSize < 128) {
+        Serial.printf("[FlashCache] File %s too small (%u bytes)\n", sdPath, (unsigned)fileSize);
+        file.close();
+        return false;
+    }
     
     // First pass: Compute CRC32 over the file
     uint32_t fileCrc = 0;
@@ -128,12 +134,18 @@ bool FlashCache::loadStoryStreaming(EspSdStorage& sdStorage,
     
     while (offset < fileSize) {
         size_t toRead = std::min(sizeof(buf), fileSize - offset);
-        file.read(buf, toRead);
+        size_t n = file.read(buf, toRead);
+        if (n != toRead) {
+            Serial.printf("[FlashCache] CRC pass read error at offset %u (expected %u, got %u)\n",
+                          (unsigned)offset, (unsigned)toRead, (unsigned)n);
+            file.close();
+            return false;
+        }
         fileCrc = crc32_le(fileCrc, buf, toRead);
         offset += toRead;
     }
     
-    file.seek(0);
+    file.close();
     
     uint32_t cachedHash = 0;
     std::size_t cachedSize = 0;
@@ -146,9 +158,19 @@ bool FlashCache::loadStoryStreaming(EspSdStorage& sdStorage,
     }
     
     if (!hashMatches) {
+        // Ensure any existing mapping is released before modifying flash partition
+        unload();
+
+        file = SD.open(sdPath, FILE_READ);
+        if (!file) {
+            Serial.printf("[FlashCache] Failed to reopen %s for flashing\n", sdPath);
+            return false;
+        }
+
         // Need to write to flash
         esp_err_t err = esp_partition_erase_range(_partition, 0, alignUp(fileSize, 4096));
         if (err != ESP_OK) {
+            Serial.printf("[FlashCache] Failed to erase partition range: %d\n", err);
             file.close();
             return false;
         }
@@ -156,7 +178,13 @@ bool FlashCache::loadStoryStreaming(EspSdStorage& sdStorage,
         offset = 0;
         while (offset < fileSize) {
             size_t toRead = std::min(sizeof(buf), fileSize - offset);
-            file.read(buf, toRead);
+            size_t n = file.read(buf, toRead);
+            if (n != toRead) {
+                Serial.printf("[FlashCache] Write pass read error at offset %u (expected %u, got %u)\n",
+                              (unsigned)offset, (unsigned)toRead, (unsigned)n);
+                file.close();
+                return false;
+            }
             
             // Pad to 4-byte boundary for esp_partition_write
             size_t toWrite = (toRead + 3) & ~3;
@@ -166,6 +194,7 @@ bool FlashCache::loadStoryStreaming(EspSdStorage& sdStorage,
             
             err = esp_partition_write(_partition, offset, buf, toWrite);
             if (err != ESP_OK) {
+                Serial.printf("[FlashCache] Failed to write partition at offset %u: %d\n", (unsigned)offset, err);
                 file.close();
                 return false;
             }
@@ -175,13 +204,21 @@ bool FlashCache::loadStoryStreaming(EspSdStorage& sdStorage,
                 _progressCb((float)offset / fileSize, _progressCtx);
             }
         }
+        file.close();
         
+        // Verify header written in flash
+        uint8_t verifyHeader[128];
+        err = esp_partition_read(_partition, 0, verifyHeader, sizeof(verifyHeader));
+        if (err != ESP_OK || memcmp(verifyHeader, "eenk", 4) != 0) {
+            Serial.printf("[FlashCache] Flash write verification failed! First 4 bytes in flash: %02X %02X %02X %02X\n",
+                          verifyHeader[0], verifyHeader[1], verifyHeader[2], verifyHeader[3]);
+            return false;
+        }
+
         saveHashToNvs(fileCrc, fileSize);
     } else {
         if (_progressCb) _progressCb(1.0f, _progressCtx);
     }
-    
-    file.close();
     
     // Ensure any previously mapped file is unmapped
     unload();

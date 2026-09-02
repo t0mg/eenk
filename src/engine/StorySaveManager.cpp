@@ -18,6 +18,37 @@ void StorySaveManager::init(const std::string &saveFilePath,
   _checkpoints.clear();
 }
 
+bool StorySaveManager::serializeHistory(const std::deque<WrappedLine> &history,
+                                        IFileWriter &writer) {
+  uint16_t historySize = static_cast<uint16_t>(history.size());
+  uint8_t szBuf[2] = {static_cast<uint8_t>(historySize & 0xFF),
+                      static_cast<uint8_t>((historySize >> 8) & 0xFF)};
+  if (!writer.write(szBuf, 2))
+    return false;
+
+  for (const auto &line : history) {
+    std::string text = line.block.getText();
+    if (line.isImage) {
+      text = "\x1B[IMG:" + line.imagePath + "]";
+    }
+    uint16_t len = static_cast<uint16_t>(text.length());
+    uint8_t lenBuf[2] = {static_cast<uint8_t>(len & 0xFF),
+                         static_cast<uint8_t>((len >> 8) & 0xFF)};
+    if (!writer.write(lenBuf, 2))
+      return false;
+
+    if (len > 0) {
+      if (!writer.write(text.data(), len))
+        return false;
+    }
+
+    uint8_t flags = (line.isOld ? 1 : 0) | (line.endOfParagraph ? 2 : 0);
+    if (!writer.write(&flags, 1))
+      return false;
+  }
+  return true;
+}
+
 void StorySaveManager::serializeHistory(const std::deque<WrappedLine> &history,
                                         std::vector<uint8_t> &out) {
   uint16_t historySize = static_cast<uint16_t>(history.size());
@@ -245,60 +276,73 @@ bool StorySaveManager::writeSaveFile(IStorage &storage) {
   if (_saveFilePath.empty())
     return false;
 
-  std::vector<uint8_t> out;
+  return storage.writeStream(
+      _saveFilePath.c_str(), [&](IFileWriter &writer) -> bool {
+        auto writeU8 = [&](uint8_t val) -> bool {
+          return writer.write(&val, 1);
+        };
+        auto writeU16 = [&](uint16_t val) -> bool {
+          uint8_t buf[2] = {static_cast<uint8_t>(val & 0xFF),
+                            static_cast<uint8_t>((val >> 8) & 0xFF)};
+          return writer.write(buf, 2);
+        };
+        auto writeU32 = [&](uint32_t val) -> bool {
+          uint8_t buf[4] = {static_cast<uint8_t>(val & 0xFF),
+                            static_cast<uint8_t>((val >> 8) & 0xFF),
+                            static_cast<uint8_t>((val >> 16) & 0xFF),
+                            static_cast<uint8_t>((val >> 24) & 0xFF)};
+          return writer.write(buf, 4);
+        };
 
-  // Header: magic (4), storyHash (4)
-  uint32_t magic = MAGIC_ENK2;
-  out.push_back(static_cast<uint8_t>(magic & 0xFF));
-  out.push_back(static_cast<uint8_t>((magic >> 8) & 0xFF));
-  out.push_back(static_cast<uint8_t>((magic >> 16) & 0xFF));
-  out.push_back(static_cast<uint8_t>((magic >> 24) & 0xFF));
+        // Header: magic (4), storyHash (4)
+        if (!writeU32(MAGIC_ENK2))
+          return false;
+        if (!writeU32(_storyHash))
+          return false;
 
-  out.push_back(static_cast<uint8_t>(_storyHash & 0xFF));
-  out.push_back(static_cast<uint8_t>((_storyHash >> 8) & 0xFF));
-  out.push_back(static_cast<uint8_t>((_storyHash >> 16) & 0xFF));
-  out.push_back(static_cast<uint8_t>((_storyHash >> 24) & 0xFF));
+        // Section 1: Main progress
+        if (!writeU8(_hasMainProgress ? 1 : 0))
+          return false;
+        if (_hasMainProgress) {
+          uint32_t snapLen = static_cast<uint32_t>(_mainSnapshot.size());
+          if (!writeU32(snapLen))
+            return false;
+          if (snapLen > 0) {
+            if (!writer.write(_mainSnapshot.data(), snapLen))
+              return false;
+          }
+          if (!serializeHistory(_mainHistory, writer))
+            return false;
+        }
 
-  // Section 1: Main progress
-  out.push_back(_hasMainProgress ? 1 : 0);
-  if (_hasMainProgress) {
-    uint32_t snapLen = static_cast<uint32_t>(_mainSnapshot.size());
-    out.push_back(static_cast<uint8_t>(snapLen & 0xFF));
-    out.push_back(static_cast<uint8_t>((snapLen >> 8) & 0xFF));
-    out.push_back(static_cast<uint8_t>((snapLen >> 16) & 0xFF));
-    out.push_back(static_cast<uint8_t>((snapLen >> 24) & 0xFF));
-    out.insert(out.end(), _mainSnapshot.begin(), _mainSnapshot.end());
+        // Section 2: Unified Checkpoints List
+        uint16_t cpCount = static_cast<uint16_t>(_checkpoints.size());
+        if (!writeU16(cpCount))
+          return false;
 
-    serializeHistory(_mainHistory, out);
-  }
+        for (const auto &cp : _checkpoints) {
+          uint16_t titleLen = static_cast<uint16_t>(cp.title.length());
+          if (!writeU16(titleLen))
+            return false;
+          if (titleLen > 0) {
+            if (!writer.write(cp.title.data(), titleLen))
+              return false;
+          }
 
-  // Section 2: Unified Checkpoints List
-  uint16_t cpCount = static_cast<uint16_t>(_checkpoints.size());
-  out.push_back(static_cast<uint8_t>(cpCount & 0xFF));
-  out.push_back(static_cast<uint8_t>((cpCount >> 8) & 0xFF));
+          uint32_t snapLen = static_cast<uint32_t>(cp.snapshotData.size());
+          if (!writeU32(snapLen))
+            return false;
+          if (snapLen > 0) {
+            if (!writer.write(cp.snapshotData.data(), snapLen))
+              return false;
+          }
 
-  for (const auto &cp : _checkpoints) {
-    uint16_t titleLen = static_cast<uint16_t>(cp.title.length());
-    out.push_back(static_cast<uint8_t>(titleLen & 0xFF));
-    out.push_back(static_cast<uint8_t>((titleLen >> 8) & 0xFF));
-    if (titleLen > 0) {
-      const uint8_t *tBytes =
-          reinterpret_cast<const uint8_t *>(cp.title.c_str());
-      out.insert(out.end(), tBytes, tBytes + titleLen);
-    }
+          if (!serializeHistory(cp.history, writer))
+            return false;
+        }
 
-    uint32_t snapLen = static_cast<uint32_t>(cp.snapshotData.size());
-    out.push_back(static_cast<uint8_t>(snapLen & 0xFF));
-    out.push_back(static_cast<uint8_t>((snapLen >> 8) & 0xFF));
-    out.push_back(static_cast<uint8_t>((snapLen >> 16) & 0xFF));
-    out.push_back(static_cast<uint8_t>((snapLen >> 24) & 0xFF));
-    out.insert(out.end(), cp.snapshotData.begin(), cp.snapshotData.end());
-
-    serializeHistory(cp.history, out);
-  }
-
-  return storage.writeFileBinary(_saveFilePath.c_str(), out.data(),
-                                 out.size());
+        return true;
+      });
 }
 
 void StorySaveManager::saveMainProgress(
@@ -341,8 +385,14 @@ void StorySaveManager::saveCheckpoint(
   }
 
   // 2. Append new checkpoint snapshot at the end (latest chronological tail)
-  _checkpoints.push_back(
-      {title, std::vector<uint8_t>(snapData, snapData + snapLen), history});
+  // Named checkpoints (chapters/milestones) do not need display history, saving significant RAM
+  if (!title.empty()) {
+    _checkpoints.push_back(
+        {title, std::vector<uint8_t>(snapData, snapData + snapLen), {}});
+  } else {
+    _checkpoints.push_back(
+        {title, std::vector<uint8_t>(snapData, snapData + snapLen), history});
+  }
 }
 
 bool StorySaveManager::hasUnnamedCheckpoint() const {
@@ -397,7 +447,10 @@ bool StorySaveManager::restoreCheckpoint(size_t index, InkStoryManager &story,
   _hasMainProgress = true;
 
   // Pruning: delete all checkpoint entries chronologically after index
-  _checkpoints.erase(_checkpoints.begin() + index + 1, _checkpoints.end());
+  if (index + 1 < _checkpoints.size()) {
+    _checkpoints.erase(_checkpoints.begin() + index + 1, _checkpoints.end());
+    _checkpoints.shrink_to_fit();
+  }
 
   return true;
 }

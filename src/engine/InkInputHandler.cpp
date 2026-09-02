@@ -3,6 +3,7 @@
 #include "InkDisplayManager.h"
 #include "InkEngine.h"
 #include "InkStoryManager.h"
+#include <choice.h>
 #include "os/AppSettings.h"
 #include "ui/QuickMenuWidget.h"
 #include "ui/SettingsView.h"
@@ -160,12 +161,31 @@ void InkInputHandler::handleCommonNavigation(
       engine.requestRedraw();
     } else if (display.getNumChoices() > 0) {
       if (!isStoryEnded) {
+        std::string choiceCpTitle;
+        bool choiceHasCp = false;
+        size_t chosenIdx = static_cast<size_t>(display.getSelectedChoice());
+        if (story.runner() && chosenIdx < story.runner()->num_choices()) {
+          const auto *choice = story.runner()->get_choice(chosenIdx);
+          if (choice && choice->has_tags()) {
+            for (size_t t = 0; t < choice->num_tags(); ++t) {
+              std::string tTitle;
+              if (InkEngine::parseCheckpointTag(choice->get_tag(t), tTitle)) {
+                choiceHasCp = true;
+                choiceCpTitle = tTitle;
+                break;
+              }
+            }
+          }
+        }
+
         display.flashChoiceActivation(story, settings,
                                       display.getSelectedChoice());
         display.markHistoryOld();
         if (story.runner()) {
-          story.runner()->choose(
-              static_cast<std::size_t>(display.getSelectedChoice()));
+          story.runner()->choose(chosenIdx);
+        }
+        if (choiceHasCp) {
+          engine.triggerCheckpoint(choiceCpTitle);
         }
         engine.incrementRefreshCount();
         engine.setState(InkEngine::State::RUNNING_TEXT);
@@ -235,6 +255,7 @@ void InkInputHandler::showStoryMenu(
       saveMgr.saveMainProgress(snap, snapLen, engine.getHistory());
       saveMgr.writeSaveFile(engine.getStorage());
     }
+    engine.freeSnapshot();
     engine.setShouldSleep(false);
     engine.setState(InkEngine::State::DONE);
     break;

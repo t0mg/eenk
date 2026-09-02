@@ -1,5 +1,17 @@
 #pragma once
 #include <cstddef>
+#include <functional>
+
+/**
+ * Interface for streaming writes to avoid buffering large files in heap.
+ */
+class IFileWriter
+{
+public:
+    virtual ~IFileWriter() = default;
+    virtual bool write(const void* data, std::size_t size) = 0;
+};
+
 /**
  * eenk — IStorage: Platform-agnostic storage interface
  *
@@ -35,7 +47,20 @@ public:
      * @param size Size in bytes
      * @return True on success
      */
-    virtual bool writeFileBinary(const char* path, const unsigned char* data, std::size_t size) = 0;
+    virtual bool writeFileBinary(const char* path, const unsigned char* data, std::size_t size) {
+        return writeStream(path, [data, size](IFileWriter& writer) {
+            return writer.write(data, size);
+        });
+    }
+
+    /**
+     * Stream binary data to a file via an IFileWriter callback.
+     * Avoids holding large serialized buffers in RAM.
+     * @param path File path
+     * @param writer Callback invoked with an IFileWriter reference
+     * @return True if file was opened, written, and closed successfully
+     */
+    virtual bool writeStream(const char* path, const std::function<bool(IFileWriter&)>& writer) = 0;
 
     /**
      * Delete a file.

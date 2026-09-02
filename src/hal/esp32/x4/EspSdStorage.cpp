@@ -70,6 +70,27 @@ void EspSdStorage::freeBuffer(const unsigned char* buf)
     }
 }
 
+class EspSdFileWriter : public IFileWriter {
+    File& _f;
+public:
+    explicit EspSdFileWriter(File& f) : _f(f) {}
+    bool write(const void* data, std::size_t size) override {
+        if (!_f) return false;
+        return _f.write(static_cast<const uint8_t*>(data), size) == size;
+    }
+};
+
+bool EspSdStorage::writeStream(const char* path, const std::function<bool(IFileWriter&)>& writer)
+{
+    if (!_initialized) return false;
+    File file = SD.open(path, FILE_WRITE);
+    if (!file) return false;
+    EspSdFileWriter fw(file);
+    bool ok = writer(fw);
+    file.close();
+    return ok;
+}
+
 bool EspSdStorage::writeFileBinary(const char* path, const unsigned char* data, std::size_t size)
 {
     if (!_initialized) return false;

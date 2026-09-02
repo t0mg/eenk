@@ -99,6 +99,26 @@ void EspSdmmcStorage::freeBuffer(const unsigned char* buf) {
     }
 }
 
+class EspSdmmcFileWriter : public IFileWriter {
+    File& _f;
+public:
+    explicit EspSdmmcFileWriter(File& f) : _f(f) {}
+    bool write(const void* data, std::size_t size) override {
+        if (!_f) return false;
+        return _f.write(static_cast<const uint8_t*>(data), size) == size;
+    }
+};
+
+bool EspSdmmcStorage::writeStream(const char* path, const std::function<bool(IFileWriter&)>& writer) {
+    if (!_initialized && !begin()) return false;
+    File f = SD_MMC.open(path, FILE_WRITE);
+    if (!f) return false;
+    EspSdmmcFileWriter fw(f);
+    bool ok = writer(fw);
+    f.close();
+    return ok;
+}
+
 bool EspSdmmcStorage::writeFileBinary(const char* path, const unsigned char* data, std::size_t size) {
     if (!_initialized && !begin()) return false;
     File f = SD_MMC.open(path, FILE_WRITE);

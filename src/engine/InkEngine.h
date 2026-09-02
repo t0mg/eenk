@@ -32,6 +32,9 @@ public:
     const StorySaveManager& getSaveManager() const { return _saveManager; }
     IStorage& getStorage() { return _storage; }
 
+    static bool parseCheckpointTag(const char* rawTag, std::string& outTitle);
+    void triggerCheckpoint(const std::string& checkpointTitle);
+
     void update();
     bool isDone() const { return _state == State::DONE; }
     bool shouldSleep() const { return _shouldSleep; }

@@ -76,6 +76,16 @@ BatteryMonitor *createBatteryMonitor() { return new BatteryMonitor(); }
 
 IFrontlight *createFrontlight() { return nullptr; }
 
+#if !defined(CONFIG_IDF_TARGET_ESP32S3)
+// Provide a robust analogReadMilliVolts implementation on ESP32-C3 that shares the ADC
+// cleanly with InputManager's analogRead() without conflicting cali handle collisions.
+extern "C" uint32_t analogReadMilliVolts(uint8_t pin) {
+  uint32_t raw = analogRead(pin);
+  // 12-bit ADC with 12dB attenuation (nominal ~3100 mV full-scale on ESP32-C3)
+  return (raw * 3100) / 4095;
+}
+#endif
+
 } // namespace HalInit
 
 #endif // PLATFORM_ESP32

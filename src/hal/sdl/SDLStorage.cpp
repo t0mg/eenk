@@ -44,6 +44,26 @@ void SDLStorage::freeBuffer(const unsigned char* buf)
     delete[] buf;
 }
 
+class SDLFileWriter : public IFileWriter {
+    FILE* _f;
+public:
+    explicit SDLFileWriter(FILE* f) : _f(f) {}
+    bool write(const void* data, std::size_t size) override {
+        if (!_f) return false;
+        return std::fwrite(data, 1, size, _f) == size;
+    }
+};
+
+bool SDLStorage::writeStream(const char* path, const std::function<bool(IFileWriter&)>& writer)
+{
+    FILE* f = fopen(path, "wb");
+    if (!f) return false;
+    SDLFileWriter fw(f);
+    bool ok = writer(fw);
+    fclose(f);
+    return ok;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 bool SDLStorage::writeFileBinary(const char* path, const unsigned char* data, std::size_t size)
 {

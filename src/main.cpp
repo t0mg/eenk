@@ -416,6 +416,12 @@ void setup() {
                   engine->loadStory(mappedPtr, mappedSize, sdStoryPath);
               currentStoryHash = flashCache->getHash();
             } else {
+              Serial.printf("[main] Metadata check failed: mappedSize=%u, header=[%02X %02X %02X %02X]\n",
+                            (unsigned)mappedSize,
+                            mappedPtr ? mappedPtr[0] : 0,
+                            mappedPtr ? mappedPtr[1] : 0,
+                            mappedPtr ? mappedPtr[2] : 0,
+                            mappedPtr ? mappedPtr[3] : 0);
               errorMessage =
                   "Story could not be read (missing or invalid metadata).";
               storyLoaded = false;
@@ -523,6 +529,7 @@ void saveProgress() {
     } else {
       Serial.println("Failed to write save file to SD.");
     }
+    engine->freeSnapshot();
   }
 #endif
 }

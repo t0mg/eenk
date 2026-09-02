@@ -69,6 +69,8 @@ public:
   const std::deque<WrappedLine> &getMainHistory() const { return _mainHistory; }
 
   // Serialization helpers (public for testing/utilities)
+  static bool serializeHistory(const std::deque<WrappedLine> &history,
+                               class IFileWriter &writer);
   static void serializeHistory(const std::deque<WrappedLine> &history,
                                std::vector<uint8_t> &out);
   static bool deserializeHistory(const uint8_t *&ptr, size_t &remaining,

@@ -1714,6 +1714,32 @@ void test_save_manager_restart_clear(void) {
   TEST_ASSERT_FALSE(storage.fileExists(testSavePath));
 }
 
+void test_checkpoint_tag_parsing(void) {
+  std::string title;
+  TEST_ASSERT_TRUE(InkEngine::parseCheckpointTag("CHECKPOINT", title));
+  TEST_ASSERT_EQUAL_STRING("", title.c_str());
+
+  TEST_ASSERT_TRUE(InkEngine::parseCheckpointTag("CHECKPOINT Room Service", title));
+  TEST_ASSERT_EQUAL_STRING("Room Service", title.c_str());
+
+  TEST_ASSERT_TRUE(InkEngine::parseCheckpointTag("CHECKPOINT: The Hotel Thiz", title));
+  TEST_ASSERT_EQUAL_STRING("The Hotel Thiz", title.c_str());
+
+  TEST_ASSERT_TRUE(InkEngine::parseCheckpointTag("CHAPTER 1: Awakening", title));
+  TEST_ASSERT_EQUAL_STRING("1: Awakening", title.c_str());
+
+  TEST_ASSERT_TRUE(InkEngine::parseCheckpointTag("CHAPTER: Escape", title));
+  TEST_ASSERT_EQUAL_STRING("Escape", title.c_str());
+
+  TEST_ASSERT_TRUE(InkEngine::parseCheckpointTag("  checkpoint : Spaced  ", title));
+  TEST_ASSERT_EQUAL_STRING("Spaced", title.c_str());
+
+  TEST_ASSERT_FALSE(InkEngine::parseCheckpointTag("IMAGE: /pic.png", title));
+  TEST_ASSERT_FALSE(InkEngine::parseCheckpointTag("OTHER_TAG", title));
+  TEST_ASSERT_FALSE(InkEngine::parseCheckpointTag(nullptr, title));
+}
+
+
 void test_story_menu_full_screenshot(void) {
   TestDisplay display;
   MockInput input;
@@ -2710,6 +2736,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_save_manager_enk2_serialization);
   RUN_TEST(test_save_manager_universal_key_deduplication);
   RUN_TEST(test_save_manager_restart_clear);
+  RUN_TEST(test_checkpoint_tag_parsing);
   RUN_TEST(test_story_menu_full_screenshot);
   RUN_TEST(test_story_menu_no_checkpoints_screenshot);
   RUN_TEST(test_rewind_to_submenu_screenshot);
