@@ -21,5 +21,16 @@
       "../assets/stories/let_that_sink_in/story.bin",
       "../assets/stories/let_that_sink_in/story.media"
     ]
+  },
+  "row-row-row": {
+    "title": "Row, Row, Row",
+    "author": "John Hedge",
+    "description": "A jolly little game about all the various ways you can get to shore. With a little bit of existential angst thrown in.",
+    "website": "https://memoriesofsunshine.itch.io/row-row-row",
+    "thumbnail": "../assets/stories/row_row_row/thumbnail.jpg",
+    "files": [
+      "../assets/stories/row_row_row/story.bin",
+      "../assets/stories/row_row_row/story.media"
+    ]
   }
 }
