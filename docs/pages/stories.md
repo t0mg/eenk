@@ -2,7 +2,7 @@
 
 # Stories Showcase
 
-Here are a couple of interactive fiction stories ready to play on your eenk device. More to come soon!
+Here is a selection of Interactive Fiction stories ready to play on your eenk device. More to come soon!
 
 Click **Install** to open the Device Manager and install over USB with a single click.
 

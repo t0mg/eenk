@@ -11,6 +11,17 @@
       "../assets/stories/the_intercept/SpecialElite.epdfont"
     ]
   },
+  "love": {
+    "title": "Love is like sinking into a pinpoint black hole ",
+    "author": "Anthony W. Eichenlaub",
+    "description": "You have the perfect life.<br><br>Side by side, you and your wife work in the engineering bay of the greatest starship ever made. The engine, a gravity core held at the edge of black hole collapse, powers interstellar travel with weird physics and incredible energy.<br><br>Perfect, that is, until everything collapses.<br><br><i>Winning entry of the 2026 InkJam</i>",
+    "website": "https://aweichenlaub.itch.io/love-is-like-sinking-into-a-pinpoint-black-hole",
+    "thumbnail": "../assets/stories/love/thumbnail.jpg",
+    "files": [
+      "../assets/stories/love/story.bin",
+      "../assets/stories/love/story.media"
+    ]
+  },
   "let-that-sink-in": {
     "title": "Let That SINK In!",
     "author": "Holly Maley",
