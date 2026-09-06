@@ -8,5 +8,5 @@
 [submodule "lib/freeink-sdk"]
 	path = lib/freeink-sdk
 	url = https://github.com/Free-Ink/freeink-sdk.git
-	branch = master
+	branch = main
 	ignore = all
