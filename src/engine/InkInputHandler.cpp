@@ -182,7 +182,14 @@ void InkInputHandler::handleCommonNavigation(
                                       display.getSelectedChoice());
         display.markHistoryOld();
         if (story.runner()) {
+          ink::g_ink_has_jmp_buf = true;
+          if (setjmp(ink::g_ink_jmp_buf) != 0) {
+            ink::g_ink_has_jmp_buf = false;
+            engine.handleRuntimeError(ink::g_ink_last_error);
+            return;
+          }
           story.runner()->choose(chosenIdx);
+          ink::g_ink_has_jmp_buf = false;
         }
         if (choiceHasCp) {
           engine.triggerCheckpoint(choiceCpTitle);

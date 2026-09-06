@@ -34,6 +34,7 @@ public:
 
     static bool parseCheckpointTag(const char* rawTag, std::string& outTitle);
     void triggerCheckpoint(const std::string& checkpointTitle);
+    void handleRuntimeError(const char* errorMsg);
 
     void update();
     bool isDone() const { return _state == State::DONE; }

@@ -2745,6 +2745,32 @@ void test_confirm_restart_modal_x3_screenshot(void) {
           display.getHeight());
   TEST_ASSERT_EQUAL(1, 1);
 }
+
+void test_runtime_error_modal_and_recovery(void) {
+  TestDisplay display;
+  MockInput input;
+  SDLStorage storage;
+  InkEngine engine(display, input, storage);
+
+  // Setup initial checkpoint so rewind path is exercised
+  uint8_t dummySnap[] = {0x01, 0x02, 0x03};
+  std::deque<WrappedLine> hist;
+  WrappedLine wl;
+  wl.block = TextBlock("Initial scene text.");
+  hist.push_back(wl);
+  engine.getSaveManager().saveCheckpoint("Chapter 1", dummySnap, sizeof(dummySnap), hist);
+
+  TEST_ASSERT_TRUE(engine.getSaveManager().hasNamedCheckpoints());
+
+  // Trigger error handler with mock assert
+  // MockInput returns QUIT on poll, so confirm dialog will decline rewind and exit cleanly
+  engine.handleRuntimeError("Synthetic assertion: invalid bytecode operation");
+
+  // Since user cancelled/quit the confirm dialog, state should transition to DONE
+  TEST_ASSERT_EQUAL(InkEngine::State::DONE, engine.getState());
+  TEST_ASSERT_FALSE(engine.shouldSleep());
+}
+
 #endif
 
 int main(int argc, char **argv) {
@@ -2795,6 +2821,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_save_manager_universal_key_deduplication);
   RUN_TEST(test_save_manager_restart_clear);
   RUN_TEST(test_checkpoint_tag_parsing);
+  RUN_TEST(test_runtime_error_modal_and_recovery);
   RUN_TEST(test_story_menu_full_screenshot);
   RUN_TEST(test_story_menu_no_checkpoints_screenshot);
   RUN_TEST(test_rewind_to_submenu_screenshot);

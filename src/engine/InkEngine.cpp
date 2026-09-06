@@ -195,6 +195,51 @@ void InkEngine::triggerCheckpoint(const std::string &checkpointTitle) {
   _storyManager.freeSnapshot();
 }
 
+void InkEngine::handleRuntimeError(const char *errorMsg) {
+  SystemUI ui(_display);
+  std::string msg = "A story error occurred:\n\n";
+  msg += (errorMsg && errorMsg[0]) ? errorMsg : "Unknown runtime assert";
+
+  bool hasCheckpoint = _saveManager.hasUnnamedCheckpoint() || _saveManager.hasNamedCheckpoints();
+  if (hasCheckpoint) {
+    msg += "\n\nRewind to last checkpoint?";
+    bool rewind = ui.showConfirmDialog(_input, "Story Error", msg.c_str());
+    if (rewind) {
+      int cpIdx = _saveManager.getUnnamedCheckpointIndex();
+      if (cpIdx < 0 && !_saveManager.getCheckpoints().empty()) {
+        cpIdx = static_cast<int>(_saveManager.getCheckpoints().size()) - 1;
+      }
+      if (cpIdx >= 0 && _saveManager.restoreCheckpoint(cpIdx, _storyManager, _displayManager, &_storage)) {
+        _saveManager.writeSaveFile(_storage);
+        incrementRefreshCount();
+        _state = State::RUNNING_TEXT;
+        requestRedraw();
+        return;
+      }
+    }
+  } else {
+    msg += "\n\nRestart story?";
+    bool restart = ui.showConfirmDialog(_input, "Story Error", msg.c_str());
+    if (restart) {
+      _saveManager.clearAll(_storage);
+      if (_storyManager.getStory()) {
+        _storyManager.globals() = _storyManager.getStory()->new_globals();
+        _storyManager.runner() = _storyManager.getStory()->new_runner(_storyManager.globals());
+      }
+      _displayManager.clearHistory();
+      _displayManager.setScrollY(0);
+      incrementRefreshCount();
+      _state = State::RUNNING_TEXT;
+      requestRedraw();
+      return;
+    }
+  }
+
+  // If user declined rewind/restart or restore failed, cleanly exit
+  setShouldSleep(false);
+  _state = State::DONE;
+}
+
 void InkEngine::tickRunningText() {
   GfxRenderer *renderer = _display.getRenderer();
   int marginX = g_marginPx;
@@ -226,8 +271,21 @@ void InkEngine::tickRunningText() {
   if (!runner)
     return;
 
-  while (runner->can_continue()) {
-    const char *line = runner->getline_alloc();
+  while (true) {
+    ink::g_ink_has_jmp_buf = true;
+    if (setjmp(ink::g_ink_jmp_buf) != 0) {
+      ink::g_ink_has_jmp_buf = false;
+      handleRuntimeError(ink::g_ink_last_error);
+      return;
+    }
+    bool canContinue = runner->can_continue();
+    const char *line = canContinue ? runner->getline_alloc() : nullptr;
+    ink::g_ink_has_jmp_buf = false;
+
+    if (!canContinue) {
+      break;
+    }
+
     if (line) {
       std::string s(line);
       if (!s.empty() && s.back() == '\n') {
