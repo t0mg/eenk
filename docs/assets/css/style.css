@@ -108,26 +108,28 @@ h4 {
   align-items: center;
   justify-content: center;
   margin-left: 0.35em;
+  margin-bottom: 0.1em;
   color: var(--color-gray);
   text-decoration: none;
   opacity: 0;
   vertical-align: middle;
-  transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out, color 0.15s ease-in-out;
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
 }
 
 .heading-anchor-icon {
-  width: 0.68em;
-  height: 0.68em;
-  fill: currentColor;
-  display: block;
+  line-height: 1;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.heading-anchor-icon.material-symbols-outlined {
+  font-size: max(0.85em, 18px);
 }
 
 .heading-anchor:hover {
   color: var(--color-accent);
-  transform: scale(1.2);
   text-decoration: none;
 }
 
@@ -157,6 +159,23 @@ h2 .heading-anchor {
 
 h2 .heading-anchor:hover {
   color: #FFFFFF;
+}
+
+.story-card h3 .heading-anchor {
+  color: var(--color-accent);
+}
+
+.story-card h3 .heading-anchor:hover {
+  color: #FFFFFF;
+}
+
+.story-card:hover .heading-anchor {
+  opacity: 1;
+}
+
+.story-card:has(:target) {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-hard-accent);
 }
 
 /* Touch devices support (reveal subtly when hover is unavailable) */
@@ -370,6 +389,7 @@ hr {
   flex-shrink: 0;
 }
 
+.hero-inner h1 span,
 .site-nav .nav-logo span {
   color: var(--color-accent);
 }
@@ -595,8 +615,7 @@ hr {
   line-height: 1;
 }
 
-.feature-card h3,
-.story-card h3 {
+.feature-card h3 {
   font-family: var(--font-heading);
   font-size: 0.9rem;
   text-transform: uppercase;
@@ -609,6 +628,20 @@ hr {
   display: flex;
   align-items: center;
   gap: 1em;
+}
+
+.story-card h3 {
+  font-family: var(--font-heading);
+  font-size: 0.9rem;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: none;
+  color: var(--color-bg);
+  background: var(--color-fg);
+  margin: -1.5rem -1.5rem 0 -1.5rem;
+  padding: 1rem;
+  display: block;
 }
 
 .feature-card p {

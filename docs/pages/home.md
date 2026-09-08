@@ -1,6 +1,6 @@
 <div class="hero">
   <div class="hero-inner">
-    <h1>eenk</h1>
+    <h1><span class="">e</span>enk</h1>
     <p class="tagline">Interactive Fiction Firmware for Xteink e-ink devices.<br>
     Run stories written in <a href="https://www.inklestudios.com/ink/">inkle's Ink</a> in the palm of your hand.</p>
     <div class="hero-ctas">
