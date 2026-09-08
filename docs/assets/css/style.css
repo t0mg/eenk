@@ -178,6 +178,12 @@ h2 .heading-anchor:hover {
   box-shadow: var(--shadow-hard-accent);
 }
 
+.story-card img {
+  width: 100%;
+  object-fit: contain;
+  flex-grow: 1;
+}
+
 /* Touch devices support (reveal subtly when hover is unavailable) */
 @media (hover: none) {
   .heading-anchor {
