@@ -312,7 +312,8 @@ bool StorySaveManager::loadSaveFile(IStorage &storage,
 }
 
 bool StorySaveManager::writeSaveData(IFileWriter &writer,
-                                     IFileReader *oldReader) {
+                                     IFileReader *oldReader,
+                                     std::vector<size_t> *outNewOffsets) {
   size_t currentOffset = 0;
 
   auto writeData = [&](const void *data, size_t size) -> bool {
@@ -346,11 +347,14 @@ bool StorySaveManager::writeSaveData(IFileWriter &writer,
   if (!writeU8(_hasMainProgress ? 1 : 0))
     return false;
   if (_hasMainProgress) {
-    uint32_t snapLen = static_cast<uint32_t>(_mainSnapshot.size());
+    uint32_t snapLen = static_cast<uint32_t>(
+        _borrowedMainSnapshot != nullptr ? _borrowedMainSnapLen : _mainSnapshot.size());
     if (!writeU32(snapLen))
       return false;
     if (snapLen > 0) {
-      if (!writeData(_mainSnapshot.data(), snapLen))
+      const uint8_t *dataPtr =
+          _borrowedMainSnapshot != nullptr ? _borrowedMainSnapshot : _mainSnapshot.data();
+      if (!writeData(dataPtr, snapLen))
         return false;
     }
     uint16_t historySize = static_cast<uint16_t>(_mainHistory.size());
@@ -379,6 +383,11 @@ bool StorySaveManager::writeSaveData(IFileWriter &writer,
   if (!writeU16(cpCount))
     return false;
 
+  if (outNewOffsets) {
+    outNewOffsets->clear();
+    outNewOffsets->reserve(_checkpoints.size());
+  }
+
   for (auto &cp : _checkpoints) {
     uint16_t titleLen = static_cast<uint16_t>(cp.title.length());
     if (!writeU16(titleLen))
@@ -389,13 +398,17 @@ bool StorySaveManager::writeSaveData(IFileWriter &writer,
     }
 
     uint32_t snapLen = static_cast<uint32_t>(
-        !cp.snapshotData.empty() ? cp.snapshotData.size() : cp.snapshotLen);
+        cp.borrowedSnapshot != nullptr ? cp.snapshotLen :
+        (!cp.snapshotData.empty() ? cp.snapshotData.size() : cp.snapshotLen));
     if (!writeU32(snapLen))
       return false;
 
     size_t newOffset = currentOffset;
 
-    if (!cp.snapshotData.empty()) {
+    if (cp.borrowedSnapshot != nullptr) {
+      if (!writeData(cp.borrowedSnapshot, snapLen))
+        return false;
+    } else if (!cp.snapshotData.empty()) {
       if (!writeData(cp.snapshotData.data(), snapLen))
         return false;
     } else if (oldReader && cp.fileOffset > 0 && snapLen > 0) {
@@ -413,7 +426,11 @@ bool StorySaveManager::writeSaveData(IFileWriter &writer,
       }
     }
 
-    cp.fileOffset = newOffset;
+    if (outNewOffsets) {
+      outNewOffsets->push_back(newOffset);
+    } else {
+      cp.fileOffset = newOffset;
+    }
     cp.snapshotLen = snapLen;
 
     uint16_t cpHistSize = static_cast<uint16_t>(cp.history.size());
@@ -452,6 +469,8 @@ bool StorySaveManager::writeSaveFile(IStorage &storage) {
     }
   }
 
+  std::vector<size_t> newOffsets;
+
   if (hasDiskCheckpoints && storage.fileExists(_saveFilePath.c_str())) {
     std::string tmpPath = _saveFilePath + ".tmp";
 
@@ -459,7 +478,7 @@ bool StorySaveManager::writeSaveFile(IStorage &storage) {
         _saveFilePath.c_str(), [&](IFileReader &oldReader) -> bool {
           return storage.writeStream(
               tmpPath.c_str(), [&](IFileWriter &writer) -> bool {
-                return writeSaveData(writer, &oldReader);
+                return writeSaveData(writer, &oldReader, &newOffsets);
               });
         });
 
@@ -473,54 +492,98 @@ bool StorySaveManager::writeSaveFile(IStorage &storage) {
       return false;
     }
 
-    for (auto &cp : _checkpoints) {
-      cp.snapshotData.clear();
-      cp.snapshotData.shrink_to_fit();
+    for (size_t i = 0; i < _checkpoints.size() && i < newOffsets.size(); ++i) {
+      _checkpoints[i].fileOffset = newOffsets[i];
+      _checkpoints[i].borrowedSnapshot = nullptr;
+      _checkpoints[i].snapshotData.clear();
+      _checkpoints[i].snapshotData.shrink_to_fit();
     }
+    _borrowedMainSnapshot = nullptr;
+    _borrowedMainSnapLen = 0;
     return true;
   }
 
   bool ok = storage.writeStream(
       _saveFilePath.c_str(),
-      [&](IFileWriter &writer) -> bool { return writeSaveData(writer, nullptr); });
+      [&](IFileWriter &writer) -> bool { return writeSaveData(writer, nullptr, &newOffsets); });
 
   if (ok) {
-    for (auto &cp : _checkpoints) {
-      cp.snapshotData.clear();
-      cp.snapshotData.shrink_to_fit();
+    for (size_t i = 0; i < _checkpoints.size() && i < newOffsets.size(); ++i) {
+      _checkpoints[i].fileOffset = newOffsets[i];
+      _checkpoints[i].borrowedSnapshot = nullptr;
+      _checkpoints[i].snapshotData.clear();
+      _checkpoints[i].snapshotData.shrink_to_fit();
     }
+    _borrowedMainSnapshot = nullptr;
+    _borrowedMainSnapLen = 0;
   }
   return ok;
 }
 
 void StorySaveManager::saveMainProgress(
     const uint8_t *snapData, size_t snapLen,
-    const std::deque<WrappedLine> &history) {
+    const std::deque<WrappedLine> &history,
+    bool borrowSnapshot) {
   if (snapData && snapLen > 0) {
-    _mainSnapshot.assign(snapData, snapData + snapLen);
+    if (borrowSnapshot) {
+      _borrowedMainSnapshot = snapData;
+      _borrowedMainSnapLen = snapLen;
+      _mainSnapshot.clear();
+      _mainSnapshot.shrink_to_fit();
+    } else {
+      _borrowedMainSnapshot = nullptr;
+      _borrowedMainSnapLen = 0;
+      _mainSnapshot.assign(snapData, snapData + snapLen);
+    }
     _mainHistory = history;
     _hasMainProgress = true;
   }
 }
 
+void StorySaveManager::clearMainProgress() {
+  _hasMainProgress = false;
+  _borrowedMainSnapshot = nullptr;
+  _borrowedMainSnapLen = 0;
+  _mainSnapshot.clear();
+  _mainSnapshot.shrink_to_fit();
+  _mainHistory.clear();
+}
+
 bool StorySaveManager::restoreMainProgress(InkStoryManager &story,
-                                           InkDisplayManager &display) {
-  if (!_hasMainProgress || _mainSnapshot.empty())
+                                           InkDisplayManager &display,
+                                           IStorage *storage) {
+  const uint8_t *dataPtr =
+      _borrowedMainSnapshot != nullptr ? _borrowedMainSnapshot : _mainSnapshot.data();
+  size_t dataLen =
+      _borrowedMainSnapshot != nullptr ? _borrowedMainSnapLen : _mainSnapshot.size();
+
+  if (!_hasMainProgress || dataLen == 0) {
+    if (!_checkpoints.empty()) {
+      return restoreCheckpoint(_checkpoints.size() - 1, story, display, storage);
+    }
     return false;
-  if (!story.loadSnapshot(_mainSnapshot.data(), _mainSnapshot.size()))
-    return false;
+  }
 
   display.clearHistory();
   display.setScrollY(0);
+
+  if (!story.loadSnapshot(dataPtr, dataLen))
+    return false;
+
   for (const auto &l : _mainHistory) {
     display.addWrappedLine(l);
   }
+
+  // Free restored snapshot payload from memory; inkcpp runner and display now own the state
+  clearMainProgress();
+
   return true;
 }
 
 void StorySaveManager::saveCheckpoint(
     const std::string &title, const uint8_t *snapData, size_t snapLen,
-    const std::deque<WrappedLine> &history) {
+    const std::deque<WrappedLine> &history,
+    bool borrowSnapshot) {
   if (!snapData || snapLen == 0)
     return;
 
@@ -534,13 +597,18 @@ void StorySaveManager::saveCheckpoint(
 
   // 2. Append new checkpoint snapshot at the end (latest chronological tail)
   // Named checkpoints (chapters/milestones) do not need display history, saving significant RAM
-  if (!title.empty()) {
-    _checkpoints.push_back(
-        {title, std::vector<uint8_t>(snapData, snapData + snapLen), {}});
+  CheckpointEntry cp;
+  cp.title = title;
+  cp.snapshotLen = snapLen;
+  if (borrowSnapshot) {
+    cp.borrowedSnapshot = snapData;
   } else {
-    _checkpoints.push_back(
-        {title, std::vector<uint8_t>(snapData, snapData + snapLen), history});
+    cp.snapshotData.assign(snapData, snapData + snapLen);
   }
+  if (title.empty()) {
+    cp.history = history;
+  }
+  _checkpoints.push_back(std::move(cp));
 }
 
 bool StorySaveManager::hasUnnamedCheckpoint() const {
@@ -582,22 +650,36 @@ bool StorySaveManager::restoreCheckpoint(size_t index, InkStoryManager &story,
 
   const auto &cp = _checkpoints[index];
 
+  // 1. Reclaim heap memory from active display history, mid-chapter progress,
+  //    and the current runner/globals before attempting to allocate snapshot buffers.
+  display.clearHistory();
+  display.setScrollY(0);
+  clearMainProgress();
+  story.resetRunner();
+
   if (!cp.snapshotData.empty()) {
     if (!story.loadSnapshot(cp.snapshotData.data(), cp.snapshotData.size()))
       return false;
-    _mainSnapshot = cp.snapshotData;
   } else if (cp.fileOffset > 0 && cp.snapshotLen > 0 && storage) {
     bool loaded = false;
     storage->readStream(
         _saveFilePath.c_str(), [&](IFileReader &reader) -> bool {
           if (!reader.seek(cp.fileOffset))
             return false;
-          std::vector<uint8_t> snapBuf(cp.snapshotLen);
-          if (reader.read(snapBuf.data(), cp.snapshotLen) != cp.snapshotLen)
+          uint8_t *snapBuf = (uint8_t *)malloc(cp.snapshotLen);
+          if (!snapBuf) {
+            printf("[StorySaveManager] Failed to allocate %u bytes for checkpoint snapshot\n",
+                   (unsigned)cp.snapshotLen);
             return false;
-          if (!story.loadSnapshot(snapBuf.data(), cp.snapshotLen))
+          }
+          if (reader.read(snapBuf, cp.snapshotLen) != cp.snapshotLen) {
+            free(snapBuf);
             return false;
-          _mainSnapshot = std::move(snapBuf);
+          }
+          bool ok = story.loadSnapshot(snapBuf, cp.snapshotLen);
+          free(snapBuf);
+          if (!ok)
+            return false;
           loaded = true;
           return true;
         });
@@ -607,15 +689,9 @@ bool StorySaveManager::restoreCheckpoint(size_t index, InkStoryManager &story,
     return false;
   }
 
-  display.clearHistory();
-  display.setScrollY(0);
   for (const auto &l : cp.history) {
     display.addWrappedLine(l);
   }
-
-  // Update main progress to this restored checkpoint state
-  _mainHistory = cp.history;
-  _hasMainProgress = true;
 
   // Pruning: delete all checkpoint entries chronologically after index
   if (index + 1 < _checkpoints.size()) {

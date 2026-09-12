@@ -523,12 +523,14 @@ void saveProgress() {
   const unsigned char *snapData = engine->createSnapshot(&snapLen);
   if (snapData && snapLen > 0) {
     engine->getSaveManager().saveMainProgress(snapData, snapLen,
-                                             engine->getHistory());
+                                             engine->getHistory(), /*borrowSnapshot=*/true);
     if (engine->getSaveManager().writeSaveFile(*storage)) {
       Serial.println("Game saved successfully!");
     } else {
       Serial.println("Failed to write save file to SD.");
     }
+    engine->freeSnapshot();
+  } else {
     engine->freeSnapshot();
   }
 #endif
@@ -542,6 +544,8 @@ void loop() {
 #ifdef PLATFORM_ESP32
       BootManager::setBootMode(BootMode::BOOK_READER);
       Serial.println("Power off requested. Entering deep sleep...");
+      delete bookEngine;
+      bookEngine = nullptr;
       systemUI->showSleepCover("Sleeping...", "Book Reader");
       delay(500);
       HalInit::prepareForSleep();
@@ -580,6 +584,9 @@ void loop() {
         snprintf(titleBuf, sizeof(titleBuf), "%s", meta.title);
       }
     }
+
+    delete engine;
+    engine = nullptr;
 
     if (titleBuf[0] != '\0') {
       systemUI->showSleepCover("Sleeping...", titleBuf);

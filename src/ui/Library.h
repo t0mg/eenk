@@ -46,22 +46,22 @@ protected:
   AppSettings &_settings;
 
   struct StoryEntry {
-    char path[128];         // "/eenk/filename.bin" or "/books/book.epub"
-    char title[64];         // From metadata or derived from filename
-    char author[32];        // From metadata or empty
-    uint32_t sizeBytes;     // File size in bytes
-    bool hasSave;           // Has a save in /.eenk_saves/<stem>.sav
-    bool isCurrentlyLoaded; // Path matches NVS boot.story_path
-    bool hasMetadata;       // Whether eenk header was found
+    char path[128] = {};         // "/eenk/filename.bin" or "/books/book.epub"
+    char title[64] = {};         // From metadata or derived from filename
+    char author[32] = {};        // From metadata or empty
+    uint32_t sizeBytes = 0;     // File size in bytes
+    bool hasSave = false;           // Has a save in /.eenk_saves/<stem>.sav
+    bool isCurrentlyLoaded = false; // Path matches NVS boot.story_path
+    bool hasMetadata = false;       // Whether eenk header was found
     enum class ContentType : uint8_t {
       INK_STORY = 0,
       EPUB_BOOK = 1,
-    } contentType;
-    uint32_t thumbOffset;   // Optional thumbnail offset in .media sidecar
-    uint32_t thumbSize;     // Optional thumbnail size
-    uint16_t thumbW;
-    uint16_t thumbH;
-    char thumbPath[128];    // EPUB cached thumbnail path
+    } contentType = ContentType::INK_STORY;
+    uint32_t thumbOffset = 0;   // Optional thumbnail offset in .media sidecar
+    uint32_t thumbSize = 0;     // Optional thumbnail size
+    uint16_t thumbW = 0;
+    uint16_t thumbH = 0;
+    char thumbPath[128] = {};    // EPUB cached thumbnail path
   };
 
   static constexpr int MAX_STORIES = 32;

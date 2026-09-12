@@ -38,7 +38,7 @@ bool EspSdmmcStorage::begin() {
             Serial.println("[SDMMC] Failed to set SDMMC pins");
         }
 
-        if (SD_MMC.begin("/sdcard", true /* 1-bit mode */, false /* format_if_mount_failed */, SDMMC_FREQ_DEFAULT, 5)) {
+        if (SD_MMC.begin("/sdcard", true /* 1-bit mode */, false /* format_if_mount_failed */, SDMMC_FREQ_DEFAULT, 16)) {
             Serial.println("[SDMMC] SD_MMC mounted successfully at /sdcard");
             _initialized = true;
             s_sdmmcMounted = true;

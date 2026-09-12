@@ -23,6 +23,7 @@
 #include <SDL.h> // for SDL_Delay
 #elif defined(PLATFORM_ESP32)
 #include <Arduino.h>
+#include <esp_heap_caps.h>
 #endif
 
 extern int g_marginPx;
@@ -71,8 +72,9 @@ bool InkEngine::loadStory(const char *path) {
   }
 
   _saveManager.init(saveBuf, storyHash);
-  if (_saveManager.loadSaveFile(_storage, &_storyManager)) {
-    _saveManager.restoreMainProgress(_storyManager, _displayManager);
+  if (_saveManager.loadSaveFile(_storage, &_storyManager) &&
+      _saveManager.restoreMainProgress(_storyManager, _displayManager, &_storage)) {
+    // Restored main progress or fallback checkpoint successfully
   } else {
     _displayManager.clearHistory();
     _displayManager.setScrollY(0);
@@ -100,8 +102,9 @@ bool InkEngine::loadStory(const unsigned char *data, std::size_t size,
     StoryMetadata::getSavePath(storyPath, saveBuf, sizeof(saveBuf));
     uint32_t storyHash = computeCrc32(data, size);
     _saveManager.init(saveBuf, storyHash);
-    if (_saveManager.loadSaveFile(_storage, &_storyManager)) {
-      _saveManager.restoreMainProgress(_storyManager, _displayManager);
+    if (_saveManager.loadSaveFile(_storage, &_storyManager) &&
+        _saveManager.restoreMainProgress(_storyManager, _displayManager, &_storage)) {
+      // Restored main progress or fallback checkpoint successfully
     } else {
       _displayManager.clearHistory();
       _displayManager.setScrollY(0);
@@ -173,26 +176,58 @@ bool InkEngine::parseCheckpointTag(const char *rawTag, std::string &outTitle) {
   return true;
 }
 
+bool InkEngine::choose(size_t index) {
+  if (!_storyManager.runner() || index >= _storyManager.runner()->num_choices()) {
+    return false;
+  }
+  bool choiceHasCp = false;
+  std::string choiceCpTitle;
+  const ink::runtime::choice *c = _storyManager.runner()->get_choice(index);
+  if (c && c->has_tags()) {
+    for (size_t ti = 0; ti < c->num_tags(); ++ti) {
+      std::string t;
+      if (parseCheckpointTag(c->get_tag(ti), t)) {
+        choiceHasCp = true;
+        choiceCpTitle = t;
+        break;
+      }
+    }
+  }
+  _displayManager.markHistoryOld();
+  _storyManager.runner()->choose(index);
+  if (choiceHasCp) {
+    triggerCheckpoint(choiceCpTitle);
+  }
+  _state = State::RUNNING_TEXT;
+  return true;
+}
+
 void InkEngine::triggerCheckpoint(const std::string &checkpointTitle) {
 #ifdef PLATFORM_ESP32
-  // Ensure at least 30 KB free heap to safely create and serialize snapshot
-  if (ESP.getFreeHeap() < 30720) {
-    printf("[InkEngine] Low heap (%u bytes free), skipping checkpoint snapshot\n",
-           (unsigned)ESP.getFreeHeap());
+  // Ensure sufficient contiguous free heap block to safely create snapshot (14 KB)
+  size_t largestFree = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+  if (largestFree < 14336) {
+    printf("[InkEngine] Low contiguous heap (%u bytes largest block, %u bytes free), skipping checkpoint snapshot\n",
+           (unsigned)largestFree, (unsigned)ESP.getFreeHeap());
     return;
   }
 #endif
   size_t snapLen = 0;
   const unsigned char *snap = _storyManager.createSnapshot(&snapLen);
   if (snap && snapLen > 0) {
+    _saveManager.clearMainProgress();
     _saveManager.saveCheckpoint(checkpointTitle, snap, snapLen,
-                                _displayManager.getHistory());
+                                _displayManager.getHistory(), /*borrowSnapshot=*/true);
     if (_saveManager.writeSaveFile(_storage)) {
       printf("[InkEngine] Checkpoint saved to SD: '%s' (%u bytes snapshot)\n",
              checkpointTitle.c_str(), (unsigned)snapLen);
+    } else {
+      printf("[InkEngine] Failed to write checkpoint to SD: '%s'\n", checkpointTitle.c_str());
     }
+    _storyManager.freeSnapshot();
+  } else {
+    _storyManager.freeSnapshot();
   }
-  _storyManager.freeSnapshot();
 }
 
 void InkEngine::handleRuntimeError(const char *errorMsg) {
@@ -222,12 +257,13 @@ void InkEngine::handleRuntimeError(const char *errorMsg) {
     bool restart = ui.showConfirmDialog(_input, "Story Error", msg.c_str());
     if (restart) {
       _saveManager.clearAll(_storage);
+      _displayManager.clearHistory();
+      _displayManager.setScrollY(0);
+      _storyManager.resetRunner();
       if (_storyManager.getStory()) {
         _storyManager.globals() = _storyManager.getStory()->new_globals();
         _storyManager.runner() = _storyManager.getStory()->new_runner(_storyManager.globals());
       }
-      _displayManager.clearHistory();
-      _displayManager.setScrollY(0);
       incrementRefreshCount();
       _state = State::RUNNING_TEXT;
       requestRedraw();

@@ -54,6 +54,7 @@ static uint32_t library_fnv1a_32(const char *str) {
 }
 
 void Library::parseThumbMetadata(Library::StoryEntry &e) {
+  e.thumbPath[0] = '\0';
   e.thumbOffset = 0;
   e.thumbSize = 0;
   e.thumbW = 0;
@@ -295,7 +296,9 @@ void Library::sortEntries() {
 
 void Library::scanSD() {
   _numEntries = 0;
-  memset(_entries, 0, sizeof(_entries));
+  for (auto &e : _entries) {
+    e = {};
+  }
 
   // Retrieve the currently-loaded story path from NVS so we can mark it.
   char currentPath[128] = {};

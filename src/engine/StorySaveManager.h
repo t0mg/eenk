@@ -14,6 +14,7 @@ class InkStoryManager;
 struct CheckpointEntry {
   std::string title; // "" for unnamed checkpoint, non-empty for named milestone
   std::vector<uint8_t> snapshotData; // In-memory snapshot payload (cleared once persisted to disk)
+  const uint8_t *borrowedSnapshot = nullptr; // Non-owning pointer to snapshot payload while writing
   std::deque<WrappedLine> history;
 
   // On-disk location in save file when snapshotData is empty
@@ -22,7 +23,7 @@ struct CheckpointEntry {
 
   CheckpointEntry() = default;
   CheckpointEntry(std::string t, std::vector<uint8_t> snap, std::deque<WrappedLine> hist)
-      : title(std::move(t)), snapshotData(std::move(snap)), history(std::move(hist)) {}
+      : title(std::move(t)), snapshotData(std::move(snap)), borrowedSnapshot(nullptr), history(std::move(hist)) {}
   CheckpointEntry(const CheckpointEntry &) = default;
   CheckpointEntry(CheckpointEntry &&) noexcept = default;
   CheckpointEntry &operator=(const CheckpointEntry &) = default;
@@ -51,12 +52,16 @@ public:
   // Main progress management
   bool hasMainProgress() const { return _hasMainProgress; }
   void saveMainProgress(const uint8_t *snapData, size_t snapLen,
-                        const std::deque<WrappedLine> &history);
-  bool restoreMainProgress(InkStoryManager &story, InkDisplayManager &display);
+                        const std::deque<WrappedLine> &history,
+                        bool borrowSnapshot = false);
+  void clearMainProgress();
+  bool restoreMainProgress(InkStoryManager &story, InkDisplayManager &display,
+                           IStorage *storage = nullptr);
 
   // Checkpoint management (universal key rule: title is the key)
   void saveCheckpoint(const std::string &title, const uint8_t *snapData,
-                      size_t snapLen, const std::deque<WrappedLine> &history);
+                      size_t snapLen, const std::deque<WrappedLine> &history,
+                      bool borrowSnapshot = false);
 
   bool hasUnnamedCheckpoint() const;
   int getUnnamedCheckpointIndex() const;
@@ -94,13 +99,16 @@ public:
                                  InkStoryManager *storyMgr = nullptr);
 
 private:
-  bool writeSaveData(class IFileWriter &writer, class IFileReader *oldReader);
+  bool writeSaveData(class IFileWriter &writer, class IFileReader *oldReader,
+                     std::vector<size_t> *outNewOffsets = nullptr);
 
   std::string _saveFilePath;
   uint32_t _storyHash = 0;
 
   bool _hasMainProgress = false;
   std::vector<uint8_t> _mainSnapshot;
+  const uint8_t *_borrowedMainSnapshot = nullptr;
+  size_t _borrowedMainSnapLen = 0;
   std::deque<WrappedLine> _mainHistory;
 
   std::vector<CheckpointEntry> _checkpoints;

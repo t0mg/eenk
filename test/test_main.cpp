@@ -22,6 +22,7 @@
 #include "StreamingEpdFontFamily.h"
 #include "book/BookEngine.h"
 #include "engine/InkEngine.h"
+#include <choice.h>
 #include "hal/sdl/mock/EInkDisplay.h"
 #include "os/AppSettings.h"
 #include "os/BootManager.h"
@@ -382,6 +383,9 @@ public:
 
 protected:
   void scanSD() override {
+    for (auto &e : _entries) {
+      e = {};
+    }
     _numEntries = 8;
 
     snprintf(_entries[0].title, sizeof(_entries[0].title),
@@ -468,6 +472,9 @@ public:
 
 protected:
   void scanSD() override {
+    for (auto &e : _entries) {
+      e = {};
+    }
     _numEntries = 8;
 
     snprintf(_entries[0].title, sizeof(_entries[0].title),
@@ -1719,6 +1726,279 @@ void test_save_manager_streaming_large_save(void) {
   storage.deleteFile(copyPath);
 }
 
+void test_checkpoint_then_save_main(void) {
+  SDLStorage storage;
+  StorySaveManager mgr;
+  const char *testSavePath = "test/test_cp_then_save.sav";
+  mgr.init(testSavePath, 0x46b28ab5);
+
+  // 1. Checkpoint triggered at start of story (like PSYPHON on page 1)
+  uint8_t snapCp[] = {10, 20, 30, 40, 50};
+  std::deque<WrappedLine> histCp;
+  mgr.saveCheckpoint("PSYPHON", snapCp, sizeof(snapCp), histCp);
+  TEST_ASSERT_TRUE(mgr.writeSaveFile(storage));
+
+  // Verify file has has_main = 0
+  {
+    StorySaveManager verifyMgr;
+    verifyMgr.init(testSavePath, 0x46b28ab5);
+    TEST_ASSERT_TRUE(verifyMgr.loadSaveFile(storage));
+    TEST_ASSERT_FALSE(verifyMgr.hasMainProgress());
+    TEST_ASSERT_EQUAL(1, verifyMgr.getCheckpoints().size());
+  }
+
+  // 2. User plays further, then saves main progress
+  uint8_t snapMain[] = {1, 2, 3, 4, 5, 6, 7, 8};
+  std::deque<WrappedLine> histMain;
+  histMain.push_back({TextBlock("Page 2 text"), false, false, "", 0, true});
+  mgr.saveMainProgress(snapMain, sizeof(snapMain), histMain);
+
+  // 3. User saves (Exit to menu or sleep)
+  TEST_ASSERT_TRUE(mgr.writeSaveFile(storage));
+
+  // 4. Verify save file has both main progress AND checkpoint
+  {
+    StorySaveManager verifyMgr;
+    verifyMgr.init(testSavePath, 0x46b28ab5);
+    TEST_ASSERT_TRUE(verifyMgr.loadSaveFile(storage));
+    TEST_ASSERT_TRUE(verifyMgr.hasMainProgress());
+    TEST_ASSERT_EQUAL(8, verifyMgr.getMainSnapshot().size());
+    TEST_ASSERT_EQUAL(1, verifyMgr.getMainHistory().size());
+    TEST_ASSERT_EQUAL(1, verifyMgr.getCheckpoints().size());
+    TEST_ASSERT_EQUAL_STRING("PSYPHON", verifyMgr.getCheckpoints()[0].title.c_str());
+  }
+
+  storage.deleteFile(testSavePath);
+}
+
+void test_save_manager_borrowed_snapshot(void) {
+  SDLStorage storage;
+  StorySaveManager mgr;
+  const char *testSavePath = "test/test_borrowed_snapshot.sav";
+  storage.deleteFile(testSavePath);
+  mgr.init(testSavePath, 0x46b28ab5);
+
+  // 1. Save checkpoint using borrowed snapshot (no allocation of cp.snapshotData)
+  uint8_t snapCp[] = {101, 102, 103, 104, 105};
+  mgr.saveCheckpoint("Borrowed Chapter", snapCp, sizeof(snapCp), {}, /*borrowSnapshot=*/true);
+
+  // 2. Save main progress using borrowed snapshot (no allocation of _mainSnapshot)
+  uint8_t snapMain[] = {201, 202, 203};
+  std::deque<WrappedLine> histMain;
+  histMain.push_back({TextBlock("Borrowed main line"), false, false, "", 0, true});
+  mgr.saveMainProgress(snapMain, sizeof(snapMain), histMain, /*borrowSnapshot=*/true);
+
+  // 3. Write to disk
+  TEST_ASSERT_TRUE(mgr.writeSaveFile(storage));
+
+  // 4. Verify contents by loading into another manager
+  {
+    StorySaveManager verifyMgr;
+    verifyMgr.init(testSavePath, 0x46b28ab5);
+    TEST_ASSERT_TRUE(verifyMgr.loadSaveFile(storage));
+    TEST_ASSERT_TRUE(verifyMgr.hasMainProgress());
+    TEST_ASSERT_EQUAL(3, verifyMgr.getMainSnapshot().size());
+    TEST_ASSERT_EQUAL(201, verifyMgr.getMainSnapshot()[0]);
+    TEST_ASSERT_EQUAL(203, verifyMgr.getMainSnapshot()[2]);
+    TEST_ASSERT_EQUAL(1, verifyMgr.getMainHistory().size());
+
+    TEST_ASSERT_EQUAL(1, verifyMgr.getCheckpoints().size());
+    TEST_ASSERT_EQUAL_STRING("Borrowed Chapter", verifyMgr.getCheckpoints()[0].title.c_str());
+    TEST_ASSERT_EQUAL(5, verifyMgr.getCheckpoints()[0].snapshotLen);
+  }
+
+  storage.deleteFile(testSavePath);
+}
+
+void test_save_manager_concurrent_open_files(void) {
+  SDLStorage storage;
+  StorySaveManager mgr;
+  const char *testSavePath = "test/test_concurrent_save.sav";
+  mgr.init(testSavePath, 0x12345678);
+
+  // Simulate multiple files open (like 4 font files + 1 media file)
+  const int NUM_DUMMY_FILES = 6;
+  FILE *dummyFps[NUM_DUMMY_FILES];
+  for (int i = 0; i < NUM_DUMMY_FILES; ++i) {
+    char dummyPath[64];
+    snprintf(dummyPath, sizeof(dummyPath), "test/dummy_handle_%d.tmp", i);
+    dummyFps[i] = fopen(dummyPath, "w+b");
+    TEST_ASSERT_NOT_NULL(dummyFps[i]);
+  }
+
+  // 1. Initial checkpoint
+  uint8_t snapCp1[] = {10, 20, 30};
+  std::deque<WrappedLine> histCp1;
+  mgr.saveCheckpoint("Chapter 1", snapCp1, sizeof(snapCp1), histCp1);
+  TEST_ASSERT_TRUE(mgr.writeSaveFile(storage));
+
+  // 2. Main progress and subsequent disk-streaming rewrite while files are open
+  uint8_t snapMain[] = {1, 2, 3, 4, 5};
+  std::deque<WrappedLine> histMain;
+  histMain.push_back({TextBlock("Concurrent line"), false, false, "", 0, true});
+  mgr.saveMainProgress(snapMain, sizeof(snapMain), histMain);
+
+  // This triggers reading the old save and writing .tmp simultaneously
+  TEST_ASSERT_TRUE(mgr.writeSaveFile(storage));
+
+  // 3. Verify saved data
+  {
+    StorySaveManager verifyMgr;
+    verifyMgr.init(testSavePath, 0x12345678);
+    TEST_ASSERT_TRUE(verifyMgr.loadSaveFile(storage));
+    TEST_ASSERT_TRUE(verifyMgr.hasMainProgress());
+    TEST_ASSERT_EQUAL(5, verifyMgr.getMainSnapshot().size());
+    TEST_ASSERT_EQUAL(1, verifyMgr.getCheckpoints().size());
+    TEST_ASSERT_EQUAL_STRING("Chapter 1", verifyMgr.getCheckpoints()[0].title.c_str());
+  }
+
+  // Clean up dummy files
+  for (int i = 0; i < NUM_DUMMY_FILES; ++i) {
+    fclose(dummyFps[i]);
+    char dummyPath[64];
+    snprintf(dummyPath, sizeof(dummyPath), "test/dummy_handle_%d.tmp", i);
+    remove(dummyPath);
+  }
+  storage.deleteFile(testSavePath);
+}
+
+void test_psyphon_story_snapshot(void) {
+  SDLStorage storage;
+  InkStoryManager storyMgr(storage);
+  StoryMetadata meta;
+  std::string base, dir;
+  bool loaded = storyMgr.loadStory("stories/psyphon/core.bin", meta, base, dir);
+  TEST_ASSERT_TRUE(loaded);
+
+  // Advance runner
+  while (storyMgr.runner()->can_continue()) {
+    storyMgr.runner()->getline_alloc();
+  }
+  if (storyMgr.runner()->has_choices()) {
+    storyMgr.runner()->choose(0);
+    while (storyMgr.runner()->can_continue()) {
+      storyMgr.runner()->getline_alloc();
+    }
+    if (storyMgr.runner()->has_choices()) {
+      storyMgr.runner()->choose(0);
+      while (storyMgr.runner()->can_continue()) {
+        storyMgr.runner()->getline_alloc();
+      }
+    }
+  }
+
+
+  // Create snapshot
+  size_t snapLen = 0;
+  const unsigned char *snap = storyMgr.createSnapshot(&snapLen);
+  TEST_ASSERT_NOT_NULL(snap);
+  TEST_ASSERT_GREATER_THAN(0, snapLen);
+
+  // Try loading snapshot
+  bool restored = storyMgr.loadSnapshot(snap, snapLen);
+  TEST_ASSERT_TRUE(restored);
+  TEST_ASSERT_TRUE(storyMgr.runner()->has_choices());
+}
+
+void test_psyphon_full_engine_run(void) {
+  TestDisplay display(800, 480);
+  MockInput input;
+  SDLStorage storage;
+  InkEngine engine(display, input, storage);
+
+  const char *testSavePath = "test/test_psyphon_engine.sav";
+  storage.deleteFile(testSavePath);
+
+  TEST_ASSERT_TRUE(engine.loadStory("stories/psyphon/core.bin"));
+  engine.getSaveManager().init(testSavePath, 0x46b28ab5);
+
+  engine.update();
+  TEST_ASSERT_TRUE(engine.choose(0)); // "Eat it."
+  engine.update();
+  TEST_ASSERT_TRUE(engine.choose(0)); // "Cab's stopped."
+  engine.update();
+  TEST_ASSERT_TRUE(engine.choose(0)); // "___PSYPHON___" (with CHECKPOINT: PSYPHON)
+  engine.update();
+  TEST_ASSERT_TRUE(engine.getSaveManager().hasNamedCheckpoints());
+  TEST_ASSERT_FALSE(engine.getSaveManager().hasMainProgress());
+
+  // Simulate Save and Exit
+  size_t snapLen = 0;
+  const unsigned char *snap = engine.createSnapshot(&snapLen);
+  engine.getSaveManager().saveMainProgress(snap, snapLen, engine.getHistory());
+  engine.freeSnapshot();
+  bool writeOk = engine.getSaveManager().writeSaveFile(storage);
+  TEST_ASSERT_TRUE(writeOk);
+
+  // Now create a 2nd engine instance and test loadStory with that save file
+  StorySaveManager verifyMgr;
+  verifyMgr.init(testSavePath, 0x46b28ab5);
+  bool loadOk = verifyMgr.loadSaveFile(storage);
+  TEST_ASSERT_TRUE(loadOk);
+  TEST_ASSERT_TRUE(verifyMgr.hasMainProgress());
+  TEST_ASSERT_EQUAL(1, verifyMgr.getCheckpoints().size());
+  TEST_ASSERT_EQUAL_STRING("PSYPHON", verifyMgr.getCheckpoints()[0].title.c_str());
+
+  InkStoryManager storyMgr2(storage);
+  StoryMetadata meta;
+  std::string base, dir;
+  TEST_ASSERT_TRUE(storyMgr2.loadStory("stories/psyphon/core.bin", meta, base, dir));
+  InkDisplayManager dispMgr2(display);
+  bool restoreOk = verifyMgr.restoreMainProgress(storyMgr2, dispMgr2, &storage);
+  TEST_ASSERT_TRUE(restoreOk);
+
+  // Now, does the runner have choices?
+  TEST_ASSERT_TRUE(storyMgr2.runner()->has_choices());
+
+  // Test fallback when has_main is 0 (e.g. legacy checkpoint save before this fix):
+  storage.deleteFile(testSavePath);
+  StorySaveManager noMainMgr;
+  noMainMgr.init(testSavePath, 0x46b28ab5);
+  snap = engine.createSnapshot(&snapLen);
+  noMainMgr.saveCheckpoint("PSYPHON", snap, snapLen, {});
+  engine.freeSnapshot();
+  // Notice: saveMainProgress is NOT called, so hasMain is false
+  TEST_ASSERT_FALSE(noMainMgr.hasMainProgress());
+  TEST_ASSERT_TRUE(noMainMgr.writeSaveFile(storage));
+
+  // Now load and restore from this save file:
+  StorySaveManager restoreNoMainMgr;
+  restoreNoMainMgr.init(testSavePath, 0x46b28ab5);
+  TEST_ASSERT_TRUE(restoreNoMainMgr.loadSaveFile(storage));
+  TEST_ASSERT_FALSE(restoreNoMainMgr.hasMainProgress());
+  TEST_ASSERT_EQUAL(1, restoreNoMainMgr.getCheckpoints().size());
+
+  InkStoryManager storyMgr3(storage);
+  TEST_ASSERT_TRUE(storyMgr3.loadStory("stories/psyphon/core.bin", meta, base, dir));
+  InkDisplayManager dispMgr3(display);
+  bool fallbackRestoreOk = restoreNoMainMgr.restoreMainProgress(storyMgr3, dispMgr3, &storage);
+  TEST_ASSERT_TRUE(fallbackRestoreOk);
+  TEST_ASSERT_FALSE(restoreNoMainMgr.hasMainProgress());
+  TEST_ASSERT_TRUE(storyMgr3.runner()->has_choices());
+
+  storage.deleteFile(testSavePath);
+
+  // Verify parsing of user's dumped legacy save file: stories/psyphon/psyphon.old.sav
+  if (storage.fileExists("stories/psyphon/psyphon.old.sav")) {
+    StorySaveManager legacyMgr;
+    legacyMgr.init("stories/psyphon/psyphon.old.sav", 0x46b28ab5);
+    TEST_ASSERT_TRUE(legacyMgr.loadSaveFile(storage));
+    TEST_ASSERT_FALSE(legacyMgr.hasMainProgress());
+    TEST_ASSERT_EQUAL(1, legacyMgr.getCheckpoints().size());
+    TEST_ASSERT_EQUAL_STRING("PSYPHON", legacyMgr.getCheckpoints()[0].title.c_str());
+  }
+
+  // Verify parsing of new save file: stories/psyphon/psyphon.sav
+  if (storage.fileExists("stories/psyphon/psyphon.sav")) {
+    StorySaveManager newMgr;
+    newMgr.init("stories/psyphon/psyphon.sav", 0x46b28ab5);
+    TEST_ASSERT_TRUE(newMgr.loadSaveFile(storage));
+    TEST_ASSERT_TRUE(newMgr.hasMainProgress());
+    TEST_ASSERT_EQUAL(1, newMgr.getCheckpoints().size());
+    TEST_ASSERT_EQUAL_STRING("PSYPHON", newMgr.getCheckpoints()[0].title.c_str());
+  }
+}
+
 void test_save_manager_universal_key_deduplication(void) {
   StorySaveManager mgr;
   mgr.init("test/dummy.sav", 0x11223344);
@@ -2818,6 +3098,11 @@ int main(int argc, char **argv) {
   // Save manager & Menu modal tests
   RUN_TEST(test_save_manager_enk2_serialization);
   RUN_TEST(test_save_manager_streaming_large_save);
+  RUN_TEST(test_checkpoint_then_save_main);
+  RUN_TEST(test_save_manager_borrowed_snapshot);
+  RUN_TEST(test_save_manager_concurrent_open_files);
+  RUN_TEST(test_psyphon_story_snapshot);
+  RUN_TEST(test_psyphon_full_engine_run);
   RUN_TEST(test_save_manager_universal_key_deduplication);
   RUN_TEST(test_save_manager_restart_clear);
   RUN_TEST(test_checkpoint_tag_parsing);

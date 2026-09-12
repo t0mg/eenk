@@ -37,6 +37,7 @@ public:
     void handleRuntimeError(const char* errorMsg);
 
     void update();
+    bool choose(size_t index);
     bool isDone() const { return _state == State::DONE; }
     bool shouldSleep() const { return _shouldSleep; }
     

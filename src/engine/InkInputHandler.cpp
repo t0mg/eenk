@@ -259,10 +259,12 @@ void InkInputHandler::showStoryMenu(
     size_t snapLen = 0;
     const unsigned char *snap = engine.createSnapshot(&snapLen);
     if (snap && snapLen > 0) {
-      saveMgr.saveMainProgress(snap, snapLen, engine.getHistory());
+      saveMgr.saveMainProgress(snap, snapLen, engine.getHistory(), /*borrowSnapshot=*/true);
       saveMgr.writeSaveFile(engine.getStorage());
+      engine.freeSnapshot();
+    } else {
+      engine.freeSnapshot();
     }
-    engine.freeSnapshot();
     engine.setShouldSleep(false);
     engine.setState(InkEngine::State::DONE);
     break;
@@ -302,6 +304,12 @@ void InkInputHandler::showStoryMenu(
       if (ui.showConfirmDialog(_input, "Confirm Rewind", confirmMsg.c_str(), "",
                                subW, subH, false)) {
         size_t actualIdx = namedCheckpoints[subChoice].first;
+        submenuItems.clear();
+        submenuItems.shrink_to_fit();
+        namedCheckpoints.clear();
+        namedCheckpoints.shrink_to_fit();
+        confirmMsg.clear();
+        confirmMsg.shrink_to_fit();
         if (saveMgr.restoreCheckpoint(actualIdx, story, display, &engine.getStorage())) {
           saveMgr.writeSaveFile(engine.getStorage());
           engine.incrementRefreshCount();
@@ -318,12 +326,13 @@ void InkInputHandler::showStoryMenu(
             "Are you sure you want to restart ?\n\nProgress will be lost.", "",
             menuW, menuH, false)) {
       saveMgr.clearAll(engine.getStorage());
+      display.clearHistory();
+      display.setScrollY(0);
+      story.resetRunner();
       if (story.getStory()) {
         story.globals() = story.getStory()->new_globals();
         story.runner() = story.getStory()->new_runner(story.globals());
       }
-      display.clearHistory();
-      display.setScrollY(0);
       engine.incrementRefreshCount();
       engine.setState(InkEngine::State::RUNNING_TEXT);
     }
