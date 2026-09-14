@@ -2051,6 +2051,52 @@ void test_save_manager_restart_clear(void) {
   TEST_ASSERT_FALSE(storage.fileExists(testSavePath));
 }
 
+void test_story_random_reseeding(void) {
+  SDLStorage storage;
+  StoryMetadata meta;
+  std::string base, dir;
+
+  if (storage.fileExists("stories/time-heist/test.bin")) {
+    InkStoryManager storyMgr(storage);
+    TEST_ASSERT_TRUE(storyMgr.loadStory("stories/time-heist/test.bin", meta, base, dir));
+    TEST_ASSERT_TRUE(storyMgr.runner()->can_continue());
+
+    std::string out1;
+    while (storyMgr.runner()->can_continue()) {
+      out1 += storyMgr.runner()->getline_alloc();
+      out1 += "\n";
+    }
+
+    TEST_ASSERT_TRUE(storyMgr.createFreshRunner());
+    TEST_ASSERT_TRUE(storyMgr.runner()->can_continue());
+
+    std::string out2;
+    while (storyMgr.runner()->can_continue()) {
+      out2 += storyMgr.runner()->getline_alloc();
+      out2 += "\n";
+    }
+
+    TEST_ASSERT_GREATER_THAN(0, out1.length());
+    TEST_ASSERT_GREATER_THAN(0, out2.length());
+    TEST_ASSERT_TRUE(out1 != out2);
+
+    TEST_ASSERT_TRUE(storyMgr.createFreshRunnerWithSeed(12345));
+    std::string outSeedA;
+    while (storyMgr.runner()->can_continue()) {
+      outSeedA += storyMgr.runner()->getline_alloc();
+      outSeedA += "\n";
+    }
+
+    TEST_ASSERT_TRUE(storyMgr.createFreshRunnerWithSeed(12345));
+    std::string outSeedB;
+    while (storyMgr.runner()->can_continue()) {
+      outSeedB += storyMgr.runner()->getline_alloc();
+      outSeedB += "\n";
+    }
+    TEST_ASSERT_EQUAL_STRING(outSeedA.c_str(), outSeedB.c_str());
+  }
+}
+
 void test_checkpoint_tag_parsing(void) {
   std::string title;
   TEST_ASSERT_TRUE(InkEngine::parseCheckpointTag("CHECKPOINT", title));
@@ -3179,6 +3225,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_psyphon_full_engine_run);
   RUN_TEST(test_save_manager_universal_key_deduplication);
   RUN_TEST(test_save_manager_restart_clear);
+  RUN_TEST(test_story_random_reseeding);
   RUN_TEST(test_checkpoint_tag_parsing);
   RUN_TEST(test_runtime_error_modal_and_recovery);
   RUN_TEST(test_story_menu_full_screenshot);

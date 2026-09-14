@@ -328,11 +328,7 @@ void InkInputHandler::showStoryMenu(
       saveMgr.clearAll(engine.getStorage());
       display.clearHistory();
       display.setScrollY(0);
-      story.resetRunner();
-      if (story.getStory()) {
-        story.globals() = story.getStory()->new_globals();
-        story.runner() = story.getStory()->new_runner(story.globals());
-      }
+      story.createFreshRunner();
       engine.incrementRefreshCount();
       engine.setState(InkEngine::State::RUNNING_TEXT);
     }

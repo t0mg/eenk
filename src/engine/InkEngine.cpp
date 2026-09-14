@@ -259,11 +259,7 @@ void InkEngine::handleRuntimeError(const char *errorMsg) {
       _saveManager.clearAll(_storage);
       _displayManager.clearHistory();
       _displayManager.setScrollY(0);
-      _storyManager.resetRunner();
-      if (_storyManager.getStory()) {
-        _storyManager.globals() = _storyManager.getStory()->new_globals();
-        _storyManager.runner() = _storyManager.getStory()->new_runner(_storyManager.globals());
-      }
+      _storyManager.createFreshRunner();
       incrementRefreshCount();
       _state = State::RUNNING_TEXT;
       requestRedraw();

@@ -3,6 +3,38 @@
 #include <cstdio>
 #include <cstring>
 
+#ifdef PLATFORM_ESP32
+#include <esp_random.h>
+#include <bootloader_random.h>
+#include <esp_timer.h>
+
+static uint32_t generateRandomSeed() {
+    bootloader_random_enable();
+    uint32_t seed = esp_random();
+    bootloader_random_disable();
+    seed ^= static_cast<uint32_t>(esp_timer_get_time());
+    if (seed == 0) {
+        seed = 1337;
+    }
+    return seed;
+}
+#else
+#include <chrono>
+#include <random>
+
+static uint32_t generateRandomSeed() {
+    std::random_device rd;
+    uint32_t seed = rd();
+    auto now = std::chrono::high_resolution_clock::now().time_since_epoch();
+    uint64_t ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now).count();
+    seed ^= static_cast<uint32_t>(ns ^ (ns >> 32));
+    if (seed == 0) {
+        seed = 1337;
+    }
+    return seed;
+}
+#endif
+
 // FNV-1a hash function
 static constexpr uint32_t fnv1a_32(const char* s, size_t count) {
     uint32_t hash = 2166136261u;
@@ -67,8 +99,12 @@ bool InkStoryManager::loadStory(const char* path, StoryMetadata& outMeta, std::s
         return false;
     }
 
-    _globals = _story->new_globals();
-    _runner = _story->new_runner(_globals);
+    if (!createFreshRunner()) {
+        fprintf(stderr, "[InkStoryManager] createFreshRunner() failed\n");
+        _storage.freeBuffer(_storyBuf);
+        _storyBuf = nullptr;
+        return false;
+    }
 
     printf("[InkStoryManager] Story loaded — %zu bytes\n", size);
 
@@ -116,8 +152,10 @@ bool InkStoryManager::loadStory(const unsigned char* data, std::size_t size, con
         return false;
     }
 
-    _globals = _story->new_globals();
-    _runner = _story->new_runner(_globals);
+    if (!createFreshRunner()) {
+        fprintf(stderr, "[InkStoryManager] createFreshRunner() failed\n");
+        return false;
+    }
 
     printf("[InkStoryManager] Story loaded from memory — %zu bytes\n", size);
 
@@ -173,6 +211,25 @@ void InkStoryManager::freeSnapshot() {
 void InkStoryManager::resetRunner() {
     _runner = nullptr;
     _globals = nullptr;
+}
+
+bool InkStoryManager::createFreshRunner() {
+    return createFreshRunnerWithSeed(generateRandomSeed());
+}
+
+bool InkStoryManager::createFreshRunnerWithSeed(uint32_t seed) {
+    resetRunner();
+    if (!_story) {
+        return false;
+    }
+    _globals = _story->new_globals();
+    _runner = _story->new_runner(_globals);
+    if (_runner) {
+        _runner->set_rng_seed(seed);
+        printf("[InkStoryManager] Runner initialized with seed: %lu\n", static_cast<unsigned long>(seed));
+        return true;
+    }
+    return false;
 }
 
 bool InkStoryManager::loadSnapshot(const unsigned char* data, std::size_t length) {

@@ -24,6 +24,8 @@ public:
     const unsigned char* createSnapshot(std::size_t* outLength);
     void freeSnapshot();
     void resetRunner();
+    bool createFreshRunner();
+    bool createFreshRunnerWithSeed(uint32_t seed);
     bool loadSnapshot(const unsigned char* data, std::size_t length);
 
     ink::runtime::runner& runner() { return _runner; }
