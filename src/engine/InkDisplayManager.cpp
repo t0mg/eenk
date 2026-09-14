@@ -247,9 +247,15 @@ void InkDisplayManager::markHistoryOld() {
   }
 }
 
-void InkDisplayManager::collectChoices(ink::runtime::runner &runner) {
+void InkDisplayManager::clearChoices() {
+  _choiceText.clear();
+  _wrappedChoices.clear();
   _numChoices = 0;
   _selectedChoice = 0;
+}
+
+void InkDisplayManager::collectChoices(ink::runtime::runner &runner) {
+  clearChoices();
 
   GfxRenderer *renderer = _display.getRenderer();
   int narrativeWidth = 0;
@@ -260,38 +266,33 @@ void InkDisplayManager::collectChoices(ink::runtime::runner &runner) {
   }
 
   for (const auto *c = runner->begin(); c != runner->end(); ++c) {
-    if (_numChoices >= MAX_CHOICES)
-      break;
     const char *txt = c->text();
-    if (txt) {
-      strncpy(_choiceText[_numChoices], txt, sizeof(_choiceText[0]) - 1);
-      _choiceText[_numChoices][sizeof(_choiceText[0]) - 1] = '\0';
-    } else {
-      _choiceText[_numChoices][0] = '\0';
-    }
+    std::string text = txt ? txt : "";
+    _choiceText.push_back(text);
 
-    _wrappedChoices[_numChoices].clear();
+    std::vector<TextBlock> wrapped;
     if (renderer && narrativeWidth > 0) {
       int indicatorWidth = 24;
-      std::vector<TextRun> runs =
-          InkRichTextParser::parse(_choiceText[_numChoices]);
-      _wrappedChoices[_numChoices] = renderer->wrapRichText(
+      std::vector<TextRun> runs = InkRichTextParser::parse(text.c_str());
+      wrapped = renderer->wrapRichText(
           FONT_CHOICE, runs, narrativeWidth - indicatorWidth, 100);
-      if (_wrappedChoices[_numChoices].empty()) {
+      if (wrapped.empty()) {
         TextBlock empty;
         empty.addRun("", EpdFontFamily::REGULAR);
-        _wrappedChoices[_numChoices].push_back(empty);
+        wrapped.push_back(empty);
       }
     }
+    _wrappedChoices.push_back(std::move(wrapped));
     ++_numChoices;
   }
 }
 
 void InkDisplayManager::setupStoryEndedChoices() {
+  clearChoices();
   _numChoices = 1;
-  _selectedChoice = 0;
-  strncpy(_choiceText[0], "The End", sizeof(_choiceText[0]) - 1);
+  _choiceText.push_back("The End");
 
+  std::vector<TextBlock> wrapped;
   GfxRenderer *renderer = _display.getRenderer();
   if (renderer) {
     int width = _display.getWidth();
@@ -300,37 +301,37 @@ void InkDisplayManager::setupStoryEndedChoices() {
     int indicatorWidth = 24;
     if (narrativeWidth > indicatorWidth) {
       int wrapWidth = narrativeWidth - indicatorWidth;
-      _wrappedChoices[0] = renderer->wrapRichText(
-          FONT_CHOICE, {TextRun(_choiceText[0], EpdFontFamily::Style::REGULAR)},
+      wrapped = renderer->wrapRichText(
+          FONT_CHOICE, {TextRun(_choiceText[0].c_str(), EpdFontFamily::Style::REGULAR)},
           wrapWidth, 2);
     }
   }
+  _wrappedChoices.push_back(std::move(wrapped));
 }
 
 #ifdef PIO_UNIT_TESTING
 void InkDisplayManager::setupTestChoices(const std::vector<std::string> &choices) {
-  _numChoices = 0;
-  _selectedChoice = 0;
+  clearChoices();
   GfxRenderer *renderer = _display.getRenderer();
   int width = _display.getWidth();
   int marginX = _settings.marginPx;
   int narrativeWidth = width - (2 * marginX);
   int indicatorWidth = 24;
 
-  for (size_t i = 0; i < choices.size() && i < MAX_CHOICES; ++i) {
-    strncpy(_choiceText[i], choices[i].c_str(), sizeof(_choiceText[i]) - 1);
-    _choiceText[i][sizeof(_choiceText[i]) - 1] = '\0';
-    _wrappedChoices[i].clear();
+  for (size_t i = 0; i < choices.size(); ++i) {
+    _choiceText.push_back(choices[i]);
+    std::vector<TextBlock> wrapped;
     if (renderer && narrativeWidth > indicatorWidth) {
       int wrapWidth = narrativeWidth - indicatorWidth;
-      std::vector<TextRun> runs = InkRichTextParser::parse(_choiceText[i]);
-      _wrappedChoices[i] = renderer->wrapRichText(FONT_CHOICE, runs, wrapWidth, 100);
-      if (_wrappedChoices[i].empty()) {
+      std::vector<TextRun> runs = InkRichTextParser::parse(choices[i].c_str());
+      wrapped = renderer->wrapRichText(FONT_CHOICE, runs, wrapWidth, 100);
+      if (wrapped.empty()) {
         TextBlock empty;
         empty.addRun("", EpdFontFamily::REGULAR);
-        _wrappedChoices[i].push_back(empty);
+        wrapped.push_back(empty);
       }
     }
+    _wrappedChoices.push_back(std::move(wrapped));
     ++_numChoices;
   }
   updateMaxScrollY();
@@ -457,9 +458,8 @@ void InkDisplayManager::scrollToSelectedChoice() {
   docY += (l.marginY / 2) + 2 + (l.marginY / 2);
   
   for (int i = 0; i < _selectedChoice; ++i) {
-     if (i > 0) docY += l.choicePadding;
      int lines = std::max((size_t)1, _wrappedChoices[i].size());
-     docY += getChoiceBlockHeight(l, lines);
+     docY += getChoiceBlockHeight(l, lines) + l.choicePadding;
   }
   
   if (docY < l.marginY) {
@@ -543,7 +543,7 @@ void InkDisplayManager::redraw(InkStoryManager &storyManager,
         _display.drawNarrativeLine("    [ v ]");
       } else {
         for (int i = 0; i < _numChoices; ++i) {
-          _display.drawChoiceLine(i, _choiceText[i], i == _selectedChoice);
+          _display.drawChoiceLine(i, _choiceText[i].c_str(), i == _selectedChoice);
         }
       }
     }

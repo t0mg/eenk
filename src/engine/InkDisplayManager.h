@@ -37,6 +37,7 @@ public:
     void markHistoryOld();
 
     void collectChoices(ink::runtime::runner& runner);
+    void clearChoices();
     int getChoicesHeight() const;
 
     int getScrollY() const { return _scrollY; }
@@ -86,9 +87,8 @@ private:
     
     std::deque<WrappedLine> _wrappedLines;
     
-    static constexpr int MAX_CHOICES = 8;
-    char  _choiceText[MAX_CHOICES][128] = {};
-    std::vector<TextBlock> _wrappedChoices[MAX_CHOICES];
+    std::vector<std::string> _choiceText;
+    std::vector<std::vector<TextBlock>> _wrappedChoices;
     int   _numChoices       = 0;
     int   _selectedChoice   = 0;
     int   _blinkingChoice   = -1;

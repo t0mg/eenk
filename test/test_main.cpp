@@ -2311,6 +2311,80 @@ void test_ink_display_manager_choice_overflow(void) {
       "Last choice should be selectable after scrolling down");
 }
 
+void test_ink_display_manager_ten_choices(void) {
+  TestDisplay display;
+  StoryMetadata meta;
+  AppSettings settings = AppSettings::defaults();
+  settings.touchChoicesEnabled = false;
+  settings.touchScrollEnabled = false;
+
+  InkDisplayManager dm(display);
+  dm.applySettings(settings);
+  dm.resolveAndApplyFont(meta, "story", "");
+
+  WrappedLine line;
+  line.block.addRun("Choose digit 1:", EpdFontFamily::REGULAR);
+  dm.addWrappedLine(line);
+
+  std::vector<std::string> digits = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"};
+  dm.setupTestChoices(digits);
+  dm.revealChoices();
+
+  TEST_ASSERT_EQUAL_MESSAGE(10, dm.getNumChoices(), "All 10 choices must be stored");
+
+  // In button mode on an 800px screen, 1 short line + 10 choices fit completely without scroll
+  TEST_ASSERT_EQUAL_MESSAGE(0, dm.getMaxScrollY(), "10 short choices should fit on 800px screen without scrolling");
+
+  // Verify all 10 choices can be hit-tested on screen
+  for (int i = 0; i < 10; ++i) {
+    bool found = false;
+    for (int y = 0; y < display.getHeight(); ++y) {
+      if (dm.getChoiceIndexAtY(y) == i) {
+        found = true;
+        break;
+      }
+    }
+    TEST_ASSERT_TRUE_MESSAGE(found, "Choice index should be selectable on screen");
+  }
+
+  // Switch to touch mode (min choice height 64px) -> document exceeds 800px
+  settings.touchChoicesEnabled = true;
+  settings.touchScrollEnabled = true;
+  dm.applySettings(settings);
+  dm.setupTestChoices(digits);
+  dm.revealChoices();
+
+  TEST_ASSERT_TRUE_MESSAGE(dm.getMaxScrollY() > 0, "Touch mode choices should require scrolling");
+
+  // Choice 9 should be scrolled into view when selected
+  dm.setSelectedChoice(9);
+  dm.scrollToSelectedChoice();
+  bool found9 = false;
+  for (int y = 0; y < display.getHeight(); ++y) {
+    if (dm.getChoiceIndexAtY(y) == 9) {
+      found9 = true;
+      break;
+    }
+  }
+  TEST_ASSERT_TRUE_MESSAGE(found9, "Choice 9 must be visible after scrolling to it");
+
+  // Wrapping back to choice 0 should scroll choice 0 back into view
+  dm.setSelectedChoice(0);
+  dm.scrollToSelectedChoice();
+  bool found0 = false;
+  for (int y = 0; y < display.getHeight(); ++y) {
+    if (dm.getChoiceIndexAtY(y) == 0) {
+      found0 = true;
+      break;
+    }
+  }
+  TEST_ASSERT_TRUE_MESSAGE(found0, "Choice 0 must be visible after scrolling to it");
+
+  // Clear choices
+  dm.clearChoices();
+  TEST_ASSERT_EQUAL(0, dm.getNumChoices());
+}
+
 void test_battery_widget_x3_screenshot(void) {
   TestDisplay display(528, 792);
   BatteryMonitor battery;
@@ -3115,6 +3189,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_menu_modal_touch_page_up);
   RUN_TEST(test_menu_modal_paginated_screenshot);
   RUN_TEST(test_ink_display_manager_choice_overflow);
+  RUN_TEST(test_ink_display_manager_ten_choices);
 
   // X3 (792x528) Golden Screenshot Tests
   RUN_TEST(test_battery_widget_x3_screenshot);
