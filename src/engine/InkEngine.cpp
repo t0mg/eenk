@@ -77,6 +77,7 @@ bool InkEngine::loadStory(const char *path) {
     // Restored main progress or fallback checkpoint successfully
   } else {
     _displayManager.clearHistory();
+    _displayManager.clearChoices();
     _displayManager.setScrollY(0);
   }
 
@@ -107,10 +108,12 @@ bool InkEngine::loadStory(const unsigned char *data, std::size_t size,
       // Restored main progress or fallback checkpoint successfully
     } else {
       _displayManager.clearHistory();
+      _displayManager.clearChoices();
       _displayManager.setScrollY(0);
     }
   } else {
     _displayManager.clearHistory();
+    _displayManager.clearChoices();
     _displayManager.setScrollY(0);
   }
 
@@ -141,6 +144,7 @@ void InkEngine::freeSnapshot() { _storyManager.freeSnapshot(); }
 bool InkEngine::loadSnapshot(const unsigned char *data, std::size_t length) {
   if (_storyManager.loadSnapshot(data, length)) {
     _displayManager.clearHistory();
+    _displayManager.clearChoices();
     _displayManager.setScrollY(0);
     _state = State::RUNNING_TEXT;
     return true;
@@ -257,7 +261,6 @@ void InkEngine::handleRuntimeError(const char *errorMsg) {
         _saveManager.writeSaveFile(_storage);
         incrementRefreshCount();
         _state = State::RUNNING_TEXT;
-        requestRedraw();
         return;
       }
     }
@@ -267,11 +270,11 @@ void InkEngine::handleRuntimeError(const char *errorMsg) {
     if (restart) {
       _saveManager.clearAll(_storage);
       _displayManager.clearHistory();
+      _displayManager.clearChoices();
       _displayManager.setScrollY(0);
       _storyManager.createFreshRunner();
       incrementRefreshCount();
       _state = State::RUNNING_TEXT;
-      requestRedraw();
       return;
     }
   }

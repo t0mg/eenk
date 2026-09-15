@@ -286,9 +286,12 @@ void InkDisplayManager::unloadStreamingFonts() {
 
 void InkDisplayManager::clearChoices() {
   _choiceText.clear();
+  _choiceText.shrink_to_fit();
   _wrappedChoices.clear();
+  _wrappedChoices.shrink_to_fit();
   _numChoices = 0;
   _selectedChoice = 0;
+  _choicesRevealed = false;
 }
 
 void InkDisplayManager::collectChoices(ink::runtime::runner &runner) {

@@ -295,7 +295,6 @@ void InkInputHandler::showStoryMenu(
         engine.setState(InkEngine::State::RUNNING_TEXT);
       }
     }
-    engine.requestRedraw();
     break;
   }
   case REWIND_NAMED: {
@@ -330,7 +329,6 @@ void InkInputHandler::showStoryMenu(
         }
       }
     }
-    engine.requestRedraw();
     break;
   }
   case RESTART_STORY: {
@@ -340,14 +338,19 @@ void InkInputHandler::showStoryMenu(
             menuW, menuH, false)) {
       saveMgr.clearAll(engine.getStorage());
       display.clearHistory();
+      display.clearChoices();
       display.setScrollY(0);
       story.createFreshRunner();
       engine.incrementRefreshCount();
       engine.setState(InkEngine::State::RUNNING_TEXT);
     }
-    engine.requestRedraw();
     break;
   }
+  }
+
+  if (engine.getState() == InkEngine::State::WAITING_INPUT ||
+      engine.getState() == InkEngine::State::STORY_ENDED) {
+    engine.requestRedraw();
   }
 }
 

@@ -640,6 +640,7 @@ bool StorySaveManager::restoreMainProgress(InkStoryManager &story,
   }
 
   display.clearHistory();
+  display.clearChoices();
   display.setScrollY(0);
   display.clearFontCache();
 
@@ -752,9 +753,10 @@ bool StorySaveManager::restoreCheckpoint(size_t index, InkStoryManager &story,
 
   const auto &cp = _checkpoints[index];
 
-  // 1. Reclaim heap memory from active display history, mid-chapter progress,
+  // 1. Reclaim heap memory from active display history, choices, mid-chapter progress,
   //    and the current runner/globals before attempting to allocate snapshot buffers.
   display.clearHistory();
+  display.clearChoices();
   display.setScrollY(0);
   display.clearFontCache();
   clearMainProgress();
