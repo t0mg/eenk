@@ -1628,13 +1628,13 @@ void GfxRenderer::renderChar(const EpdFontFamily &fontFamily, const uint32_t cp,
   auto streamingIt = _streamingFonts.find(fontId);
   if (streamingIt != _streamingFonts.end()) {
     const auto &slots = streamingIt->second;
-    // Fallback chain: BOLD_ITALIC→BOLD→REGULAR, ITALIC→REGULAR, BOLD→REGULAR
+    // Fallback chain: BOLD_ITALIC→BOLD→ITALIC→REGULAR, ITALIC→REGULAR, BOLD→REGULAR
     StreamingEpdFont *sf = slots[EpdFontFamily::externalStyleIndex(style)];
-    if (!sf && style == EpdFontFamily::BOLD_ITALIC)
+    if (!sf && style == EpdFontFamily::BOLD_ITALIC) {
       sf = slots[EpdFontFamily::BOLD];
-    if (!sf &&
-        (style == EpdFontFamily::ITALIC || style == EpdFontFamily::BOLD_ITALIC))
-      sf = slots[EpdFontFamily::REGULAR];
+      if (!sf)
+        sf = slots[EpdFontFamily::ITALIC];
+    }
     if (!sf)
       sf = slots[EpdFontFamily::REGULAR];
     if (sf) {

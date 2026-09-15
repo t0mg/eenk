@@ -1441,6 +1441,97 @@ void test_streaming_epd_font_clear_cache(void) {
   TEST_ASSERT_NOT_NULL(b2);
 }
 
+void test_missing_bold_with_italic_present(void) {
+  if (access("stories/psyphon/Quantico.epdfont", F_OK) != 0) {
+    TEST_IGNORE_MESSAGE("Quantico font not found");
+    return;
+  }
+  system("cmd /c if not exist test\\fonts\\test_no_bold mkdir test\\fonts\\test_no_bold");
+  system("cmd /c copy /y stories\\psyphon\\Quantico.epdfont test\\fonts\\test_no_bold\\myfont.epdfont >nul");
+  system("cmd /c copy /y stories\\psyphon\\Quantico-italic.epdfont test\\fonts\\test_no_bold\\myfont-italic.epdfont >nul");
+
+  StreamingEpdFontFamily fam;
+  const char *dirs[] = {"test/fonts/test_no_bold", nullptr};
+  TEST_ASSERT_TRUE(fam.load("myfont", dirs));
+  TEST_ASSERT_TRUE(fam.hasStyle(EpdFontFamily::REGULAR));
+  TEST_ASSERT_FALSE(fam.hasStyle(EpdFontFamily::BOLD));
+  TEST_ASSERT_TRUE(fam.hasStyle(EpdFontFamily::ITALIC));
+  TEST_ASSERT_FALSE(fam.hasStyle(EpdFontFamily::BOLD_ITALIC));
+
+  TestDisplay display(800, 480);
+  display.clear();
+
+  EpdFont r(fam.getData(EpdFontFamily::REGULAR));
+  EpdFont b(fam.getData(EpdFontFamily::BOLD));
+  EpdFont i(fam.getData(EpdFontFamily::ITALIC));
+  EpdFont bi(fam.getData(EpdFontFamily::BOLD_ITALIC));
+  EpdFontFamily sysFam(&r, &b, &i, &bi);
+
+  display.renderer.insertFont(100, sysFam);
+  display.renderer.removeStreamingFont(100);
+  if (fam.hasStyle(EpdFontFamily::REGULAR))
+    display.renderer.setStreamingFont(100, EpdFontFamily::REGULAR, fam.slot(EpdFontFamily::REGULAR));
+  if (fam.hasStyle(EpdFontFamily::BOLD))
+    display.renderer.setStreamingFont(100, EpdFontFamily::BOLD, fam.slot(EpdFontFamily::BOLD));
+  if (fam.hasStyle(EpdFontFamily::ITALIC))
+    display.renderer.setStreamingFont(100, EpdFontFamily::ITALIC, fam.slot(EpdFontFamily::ITALIC));
+  if (fam.hasStyle(EpdFontFamily::BOLD_ITALIC))
+    display.renderer.setStreamingFont(100, EpdFontFamily::BOLD_ITALIC, fam.slot(EpdFontFamily::BOLD_ITALIC));
+
+  auto countBlackPixels = [&]() {
+    int count = 0;
+    const uint8_t *fb = display.eink.getFrameBuffer();
+    int size = display.getWidth() * display.getHeight() / 8;
+    for (int idx = 0; idx < size; ++idx) {
+      count += __builtin_popcount(~fb[idx] & 0xFF);
+    }
+    return count;
+  };
+
+  // Test Regular
+  display.clear();
+  display.renderer.drawText(100, 20, 50, "TestText", true, EpdFontFamily::REGULAR);
+  int regPixels = countBlackPixels();
+  char m1[64]; snprintf(m1, sizeof(m1), "Regular pixels: %d", regPixels); TEST_MESSAGE(m1);
+  TEST_ASSERT_GREATER_THAN(0, regPixels);
+
+  // Test Bold
+  display.clear();
+  display.renderer.drawText(100, 20, 50, "TestText", true, EpdFontFamily::BOLD);
+  int boldPixels = countBlackPixels();
+  char m2[64]; snprintf(m2, sizeof(m2), "Bold pixels: %d", boldPixels); TEST_MESSAGE(m2);
+  TEST_ASSERT_GREATER_THAN(0, boldPixels);
+
+  // Test Italic
+  display.clear();
+  display.renderer.drawText(100, 20, 50, "TestText", true, EpdFontFamily::ITALIC);
+  int italicPixels = countBlackPixels();
+  char m3[64]; snprintf(m3, sizeof(m3), "Italic pixels: %d", italicPixels); TEST_MESSAGE(m3);
+  TEST_ASSERT_GREATER_THAN(0, italicPixels);
+
+  // Test Bold-Italic
+  display.clear();
+  display.renderer.drawText(100, 20, 50, "TestText", true, EpdFontFamily::BOLD_ITALIC);
+  int biPixels = countBlackPixels();
+  char m4[64]; snprintf(m4, sizeof(m4), "Bold-Italic pixels: %d", biPixels); TEST_MESSAGE(m4);
+  TEST_ASSERT_GREATER_THAN(0, biPixels);
+
+  // Test RichText parsing and drawing
+  display.clear();
+  std::vector<TextRun> runs = InkRichTextParser::parse("This is **bold** and *italic* and ***both***.");
+  auto blocks = display.renderer.wrapRichText(100, runs, 700, 10);
+  TEST_ASSERT_GREATER_THAN(0, blocks.size());
+  for (const auto& b : blocks) {
+    display.renderer.drawRichText(100, 20, 100, b);
+  }
+  int richPixels = countBlackPixels();
+  char m5[64]; snprintf(m5, sizeof(m5), "RichText pixels: %d", richPixels); TEST_MESSAGE(m5);
+  TEST_ASSERT_GREATER_THAN(0, richPixels);
+
+  // Clean up
+  system("cmd /c rmdir /s /q test\\fonts\\test_no_bold");
+}
+
 void test_display_manager_trim_history(void) {
   TestDisplay display(800, 480);
   InkDisplayManager dm(display);
@@ -3458,6 +3549,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_streaming_epd_font_family_missing_regular_fails);
   RUN_TEST(test_streaming_epd_font_family_bold_italic_fallback_order);
   RUN_TEST(test_streaming_epd_font_clear_cache);
+  RUN_TEST(test_missing_bold_with_italic_present);
   RUN_TEST(test_display_manager_trim_history);
   RUN_TEST(test_sd_font_catalogue_family_detection);
   // Save manager & Menu modal tests

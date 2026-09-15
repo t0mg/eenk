@@ -173,6 +173,10 @@ class GfxRenderer {
       _fontStyleResolver(_fontStyleResolverCtx, fontId, idx);
       sf = it->second[idx];
     }
+    if (!sf && style == EpdFontFamily::BOLD_ITALIC) {
+      sf = it->second[EpdFontFamily::BOLD];
+      if (!sf) sf = it->second[EpdFontFamily::ITALIC];
+    }
     return sf ? sf : it->second[EpdFontFamily::REGULAR];
   }
 
