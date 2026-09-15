@@ -421,7 +421,7 @@ void InkDisplayManager::updateMaxScrollY() {
     return;
 
   int height = _display.getHeight();
-  int marginY = 24;
+  int marginY = _settings.marginPx;
   int bottomExtraHeight = _choicesRevealed ? getChoicesHeight() : getIndicatorHeight();
 
   int documentHeight = bottomExtraHeight;
@@ -450,7 +450,7 @@ void InkDisplayManager::doAutoScroll(int newLinesCount, bool showChoices) {
     return;
 
   int height = _display.getHeight();
-  int marginY = 24;
+  int marginY = _settings.marginPx;
   int bottomExtraHeight = showChoices ? getChoicesHeight() : getIndicatorHeight();
 
   int documentHeight = bottomExtraHeight;
@@ -695,7 +695,7 @@ void InkDisplayManager::redraw(InkStoryManager &storyManager,
     }
   }
 
-  if (_choicesRevealed && _scrollY < _maxScrollY) {
+  if (_choicesRevealed && !isChoicesVisible()) {
     int triSize = 12;
     int triX = marginX + (narrativeWidth - triSize) / 2;
     int triY = height - 14;
