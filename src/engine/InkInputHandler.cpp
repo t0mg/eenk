@@ -256,14 +256,27 @@ void InkInputHandler::showStoryMenu(
   Action action = optionActions[choice];
   switch (action) {
   case EXIT_TO_MENU: {
-    size_t snapLen = 0;
-    const unsigned char *snap = engine.createSnapshot(&snapLen);
-    if (snap && snapLen > 0) {
-      saveMgr.saveMainProgress(snap, snapLen, engine.getHistory(), /*borrowSnapshot=*/true);
-      saveMgr.writeSaveFile(engine.getStorage());
-      engine.freeSnapshot();
-    } else {
-      engine.freeSnapshot();
+    // Destructively extract history and clear UI caches to maximize available contiguous
+    // heap before computing snapshot size and streaming to disk. This is safe because
+    // the device is going to sleep/menu immediately after saving.
+    std::vector<uint8_t> serializedHistory;
+    StorySaveManager::serializeHistory(display.getHistory(), serializedHistory);
+    display.clearChoices();
+    display.clearHistory();
+    display.unloadStreamingFonts();
+
+    size_t snapLen = engine.getSnapshotSize();
+    bool saved = false;
+    if (snapLen > 0) {
+      saveMgr.saveMainProgressStreaming(
+          snapLen, std::move(serializedHistory),
+          [&engine](IFileWriter &w) -> size_t {
+            return engine.getStoryManager().streamSnapshotTo(w);
+          });
+      saved = saveMgr.writeSaveFile(engine.getStorage());
+    }
+    if (!saved) {
+      ui.showMessage("Save Failed", "Could not save progress.\nMemory is too low.");
     }
     engine.setShouldSleep(false);
     engine.setState(InkEngine::State::DONE);

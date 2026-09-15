@@ -95,12 +95,24 @@ class StreamingEpdFont {
   void logCacheStats() const;
 
   /**
+   * Clear all cached glyph bitmaps and lookup caches to reclaim heap RAM.
+   * Glyphs will be re-streamed from SD card as needed.
+   */
+  void clearCache();
+
+  /**
    * Get the configured cache size.
    */
   static constexpr int getCacheSize() { return CACHE_SIZE; }
 
  private:
+#if defined(BOARD_HAS_PSRAM) || defined(PLATFORM_NATIVE)
   static constexpr int CACHE_SIZE = 192;
+  static constexpr int GLYPH_CACHE_SIZE = 64;
+#else
+  static constexpr int CACHE_SIZE = 48;
+  static constexpr int GLYPH_CACHE_SIZE = 32;
+#endif
   static constexpr uint32_t INVALID_CODEPOINT = 0xFFFFFFFF;
 
   // Maximum allowed glyph bitmap size (defense against corrupted font files)
@@ -147,7 +159,6 @@ class StreamingEpdFont {
   mutable uint32_t _cacheMisses = 0;
 
   // Glyph lookup cache (codepoint -> glyph pointer, for O(1) repeated lookups)
-  static constexpr int GLYPH_CACHE_SIZE = 64;
   struct GlyphCacheEntry {
     uint32_t codepoint = INVALID_CODEPOINT;
     const EpdGlyph* glyph = nullptr;

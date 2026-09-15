@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -11,10 +12,13 @@
 
 class InkStoryManager;
 
+using SnapshotStreamFn = std::function<size_t(class IFileWriter&)>;
+
 struct CheckpointEntry {
   std::string title; // "" for unnamed checkpoint, non-empty for named milestone
   std::vector<uint8_t> snapshotData; // In-memory snapshot payload (cleared once persisted to disk)
   const uint8_t *borrowedSnapshot = nullptr; // Non-owning pointer to snapshot payload while writing
+  SnapshotStreamFn streamFn = nullptr; // Streaming snapshot callback while writing
   std::deque<WrappedLine> history;
 
   // On-disk location in save file when snapshotData is empty
@@ -54,6 +58,15 @@ public:
   void saveMainProgress(const uint8_t *snapData, size_t snapLen,
                         const std::deque<WrappedLine> &history,
                         bool borrowSnapshot = false);
+  void saveMainProgressStreaming(size_t snapLen,
+                                 const std::deque<WrappedLine> &history,
+                                 SnapshotStreamFn streamFn);
+  void saveMainProgressStreaming(size_t snapLen,
+                                 std::deque<WrappedLine> &&history,
+                                 SnapshotStreamFn streamFn);
+  void saveMainProgressStreaming(size_t snapLen,
+                                 std::vector<uint8_t> &&serializedHistory,
+                                 SnapshotStreamFn streamFn);
   void clearMainProgress();
   bool restoreMainProgress(InkStoryManager &story, InkDisplayManager &display,
                            IStorage *storage = nullptr);
@@ -62,6 +75,9 @@ public:
   void saveCheckpoint(const std::string &title, const uint8_t *snapData,
                       size_t snapLen, const std::deque<WrappedLine> &history,
                       bool borrowSnapshot = false);
+  void saveCheckpointStreaming(const std::string &title, size_t snapLen,
+                               const std::deque<WrappedLine> &history,
+                               SnapshotStreamFn streamFn);
 
   bool hasUnnamedCheckpoint() const;
   int getUnnamedCheckpointIndex() const;
@@ -109,7 +125,9 @@ private:
   std::vector<uint8_t> _mainSnapshot;
   const uint8_t *_borrowedMainSnapshot = nullptr;
   size_t _borrowedMainSnapLen = 0;
+  SnapshotStreamFn _mainStreamFn = nullptr;
   std::deque<WrappedLine> _mainHistory;
+  std::vector<uint8_t> _mainHistorySerialized;
 
   std::vector<CheckpointEntry> _checkpoints;
 };

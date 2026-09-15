@@ -516,22 +516,35 @@ void saveProgress() {
   if (!engine || !storage)
     return;
 #ifdef PLATFORM_ESP32
+  // Avoid saving twice if EXIT_TO_MENU already saved (history will be empty)
+  if (engine->getHistory().empty()) {
+    return;
+  }
+  
   systemUI->showLoading("Saving Progress...", 1.0f);
   delay(100);
 
-  size_t snapLen = 0;
-  const unsigned char *snapData = engine->createSnapshot(&snapLen);
-  if (snapData && snapLen > 0) {
-    engine->getSaveManager().saveMainProgress(snapData, snapLen,
-                                             engine->getHistory(), /*borrowSnapshot=*/true);
+  std::vector<uint8_t> serializedHistory;
+  StorySaveManager::serializeHistory(engine->getHistory(), serializedHistory);
+  // Fully destroy streaming fonts to remove heap fragmentation barriers.
+  // The glyph metadata tables (~10KB per variant) sit in the middle of the heap
+  // and prevent freed memory from coalescing into a contiguous block.
+  engine->getDisplayManager().clearChoices();
+  engine->getDisplayManager().clearHistory();
+  engine->getDisplayManager().unloadStreamingFonts();
+  
+  size_t snapLen = engine->getSnapshotSize();
+  if (snapLen > 0) {
+    engine->getSaveManager().saveMainProgressStreaming(
+        snapLen, std::move(serializedHistory),
+        [](IFileWriter &w) -> size_t {
+          return engine->getStoryManager().streamSnapshotTo(w);
+        });
     if (engine->getSaveManager().writeSaveFile(*storage)) {
       Serial.println("Game saved successfully!");
     } else {
       Serial.println("Failed to write save file to SD.");
     }
-    engine->freeSnapshot();
-  } else {
-    engine->freeSnapshot();
   }
 #endif
 }

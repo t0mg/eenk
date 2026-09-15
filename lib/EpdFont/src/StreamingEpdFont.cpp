@@ -56,14 +56,7 @@ bool StreamingEpdFont::load(const char* path) {
   return true;
 }
 
-void StreamingEpdFont::unload() {
-  if (_fontFile) {
-    _fontFile.close();
-  }
-
-  delete[] _glyphs;
-  delete[] _intervals;
-
+void StreamingEpdFont::clearCache() {
   // Free all cached bitmaps
   for (int i = 0; i < CACHE_SIZE; i++) {
     delete[] _cache[i].bitmap;
@@ -80,6 +73,21 @@ void StreamingEpdFont::unload() {
     _glyphCache[i].glyph = nullptr;
   }
 
+  _accessCounter = 0;
+  _totalCacheAllocation = 0;
+  _tombstoneCount = 0;
+}
+
+void StreamingEpdFont::unload() {
+  if (_fontFile) {
+    _fontFile.close();
+  }
+
+  delete[] _glyphs;
+  delete[] _intervals;
+
+  clearCache();
+
   _glyphs = nullptr;
   _intervals = nullptr;
   _glyphCount = 0;
@@ -87,9 +95,6 @@ void StreamingEpdFont::unload() {
   _intervalsSize = 0;
   _bitmapOffset = 0;
   _isLoaded = false;
-  _accessCounter = 0;
-  _totalCacheAllocation = 0;
-  _tombstoneCount = 0;
   _cacheHits = 0;
   _cacheMisses = 0;
 

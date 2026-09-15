@@ -30,11 +30,14 @@ public:
     void resolveAndApplyFont(const StoryMetadata& meta, const char* storyBase, const char* storyDir);
 
     void clearHistory();
+    void trimHistory(size_t targetLines, size_t hardMaxLines = 0);
     void addWrappedLine(const WrappedLine& line);
     void popOldestLine();
     size_t getHistorySize() const { return _wrappedLines.size(); }
     std::deque<WrappedLine>& getHistory() { return _wrappedLines; }
     void markHistoryOld();
+    void clearFontCache();
+    void unloadStreamingFonts();
 
     void collectChoices(ink::runtime::runner& runner);
     void clearChoices();

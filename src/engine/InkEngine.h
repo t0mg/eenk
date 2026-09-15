@@ -26,10 +26,14 @@ public:
     // Save/Load system
     const unsigned char* createSnapshot(std::size_t* outLength);
     void freeSnapshot();
+    size_t getSnapshotSize();
     bool loadSnapshot(const unsigned char* data, std::size_t length);
     
     StorySaveManager& getSaveManager() { return _saveManager; }
     const StorySaveManager& getSaveManager() const { return _saveManager; }
+    InkStoryManager& getStoryManager() { return _storyManager; }
+    const InkStoryManager& getStoryManager() const { return _storyManager; }
+    IDisplay& getDisplay() { return _display; }
     IStorage& getStorage() { return _storage; }
 
     static bool parseCheckpointTag(const char* rawTag, std::string& outTitle);
@@ -44,6 +48,7 @@ public:
     void setShouldSleep(bool sleep) { _shouldSleep = sleep; }
 
     const std::deque<WrappedLine>& getHistory() const { return const_cast<InkDisplayManager&>(_displayManager).getHistory(); }
+    InkDisplayManager& getDisplayManager() { return _displayManager; }
     void setHistory(const std::deque<WrappedLine>& history) { 
         _displayManager.clearHistory();
         for (const auto& l : history) _displayManager.addWrappedLine(l);

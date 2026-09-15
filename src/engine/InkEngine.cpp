@@ -127,7 +127,13 @@ void InkEngine::applySettings(const AppSettings &settings) {
 }
 
 const unsigned char *InkEngine::createSnapshot(std::size_t *outLength) {
+  _displayManager.clearFontCache();
   return _storyManager.createSnapshot(outLength);
+}
+
+size_t InkEngine::getSnapshotSize() {
+  _displayManager.clearFontCache();
+  return _storyManager.computeSnapshotSize();
 }
 
 void InkEngine::freeSnapshot() { _storyManager.freeSnapshot(); }
@@ -203,30 +209,33 @@ bool InkEngine::choose(size_t index) {
 }
 
 void InkEngine::triggerCheckpoint(const std::string &checkpointTitle) {
-#ifdef PLATFORM_ESP32
-  // Ensure sufficient contiguous free heap block to safely create snapshot (14 KB)
-  size_t largestFree = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-  if (largestFree < 14336) {
-    printf("[InkEngine] Low contiguous heap (%u bytes largest block, %u bytes free), skipping checkpoint snapshot\n",
-           (unsigned)largestFree, (unsigned)ESP.getFreeHeap());
+  // Clear font cache to maximize contiguous heap before computing and streaming
+  _displayManager.clearFontCache();
+
+  size_t snapLen = _storyManager.computeSnapshotSize();
+  if (snapLen == 0) {
+    printf("[InkEngine] Cannot compute snapshot size for checkpoint '%s'\n",
+           checkpointTitle.c_str());
+    SystemUI ui(_display);
+    ui.showMessage("Save Failed", "Memory too low to save progress.\nPlease restart the device soon.");
     return;
   }
-#endif
-  size_t snapLen = 0;
-  const unsigned char *snap = _storyManager.createSnapshot(&snapLen);
-  if (snap && snapLen > 0) {
-    _saveManager.clearMainProgress();
-    _saveManager.saveCheckpoint(checkpointTitle, snap, snapLen,
-                                _displayManager.getHistory(), /*borrowSnapshot=*/true);
-    if (_saveManager.writeSaveFile(_storage)) {
-      printf("[InkEngine] Checkpoint saved to SD: '%s' (%u bytes snapshot)\n",
-             checkpointTitle.c_str(), (unsigned)snapLen);
-    } else {
-      printf("[InkEngine] Failed to write checkpoint to SD: '%s'\n", checkpointTitle.c_str());
-    }
-    _storyManager.freeSnapshot();
+
+  _saveManager.clearMainProgress();
+  _saveManager.saveCheckpointStreaming(
+      checkpointTitle, snapLen, _displayManager.getHistory(),
+      [this](IFileWriter &w) -> size_t {
+        return _storyManager.streamSnapshotTo(w);
+      });
+
+  if (_saveManager.writeSaveFile(_storage)) {
+    printf("[InkEngine] Checkpoint saved to SD: '%s' (%u bytes snapshot)\n",
+           checkpointTitle.c_str(), (unsigned)snapLen);
   } else {
-    _storyManager.freeSnapshot();
+    printf("[InkEngine] Checkpoint save failed for '%s' (Low memory or storage error)\n",
+           checkpointTitle.c_str());
+    SystemUI ui(_display);
+    ui.showMessage("Save Failed", "Memory too low to save progress.\nPlease restart the device soon.");
   }
 }
 
@@ -278,6 +287,17 @@ void InkEngine::tickRunningText() {
   int narrativeWidth = _display.getWidth() - (2 * marginX);
   int newLinesCount = 0;
 
+#if defined(BOARD_HAS_PSRAM)
+  static constexpr size_t kTargetHistoryLines = 300;
+  static constexpr size_t kHardMaxHistoryLines = 500;
+#elif defined(PLATFORM_NATIVE)
+  static constexpr size_t kTargetHistoryLines = 800;
+  static constexpr size_t kHardMaxHistoryLines = 1200;
+#else
+  static constexpr size_t kTargetHistoryLines = 50;
+  static constexpr size_t kHardMaxHistoryLines = 75;
+#endif
+
   auto pushLine = [&](const std::string &str) {
     if (str.empty()) {
       _displayManager.addWrappedLine({TextBlock(), false, false, "", 0, true});
@@ -296,6 +316,10 @@ void InkEngine::tickRunningText() {
       tb.addRun(str, EpdFontFamily::REGULAR);
       _displayManager.addWrappedLine({tb, false, false, "", 0, true});
       newLinesCount++;
+    }
+
+    if (_displayManager.getHistorySize() > kHardMaxHistoryLines + 15) {
+      _displayManager.trimHistory(kTargetHistoryLines, kHardMaxHistoryLines);
     }
   };
 
@@ -386,15 +410,7 @@ void InkEngine::tickRunningText() {
     }
   }
 
-#ifdef PLATFORM_ESP32
-  static constexpr size_t kMaxHistoryLines = 100;
-#else
-  static constexpr size_t kMaxHistoryLines = 800;
-#endif
-
-  while (_displayManager.getHistorySize() > kMaxHistoryLines) {
-    _displayManager.popOldestLine();
-  }
+  _displayManager.trimHistory(kTargetHistoryLines, kHardMaxHistoryLines);
 
   if (runner->has_choices()) {
     _displayManager.collectChoices(runner);

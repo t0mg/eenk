@@ -348,33 +348,47 @@ bool StorySaveManager::writeSaveData(IFileWriter &writer,
     return false;
   if (_hasMainProgress) {
     uint32_t snapLen = static_cast<uint32_t>(
-        _borrowedMainSnapshot != nullptr ? _borrowedMainSnapLen : _mainSnapshot.size());
+        _mainStreamFn ? _borrowedMainSnapLen :
+        (_borrowedMainSnapshot != nullptr ? _borrowedMainSnapLen : _mainSnapshot.size()));
     if (!writeU32(snapLen))
       return false;
     if (snapLen > 0) {
-      const uint8_t *dataPtr =
-          _borrowedMainSnapshot != nullptr ? _borrowedMainSnapshot : _mainSnapshot.data();
-      if (!writeData(dataPtr, snapLen))
-        return false;
-    }
-    uint16_t historySize = static_cast<uint16_t>(_mainHistory.size());
-    if (!writeU16(historySize))
-      return false;
-    for (const auto &line : _mainHistory) {
-      std::string text = line.block.getText();
-      if (line.isImage) {
-        text = "\x1B[IMG:" + line.imagePath + "]";
-      }
-      uint16_t len = static_cast<uint16_t>(text.length());
-      if (!writeU16(len))
-        return false;
-      if (len > 0) {
-        if (!writeData(text.data(), len))
+      if (_mainStreamFn) {
+        size_t written = _mainStreamFn(writer);
+        if (written != snapLen)
+          return false;
+        currentOffset += written;
+      } else {
+        const uint8_t *dataPtr =
+            _borrowedMainSnapshot != nullptr ? _borrowedMainSnapshot : _mainSnapshot.data();
+        if (!writeData(dataPtr, snapLen))
           return false;
       }
-      uint8_t flags = (line.isOld ? 1 : 0) | (line.endOfParagraph ? 2 : 0);
-      if (!writeU8(flags))
+    }
+    
+    if (!_mainHistorySerialized.empty()) {
+      if (!writeData(_mainHistorySerialized.data(), _mainHistorySerialized.size()))
         return false;
+    } else {
+      uint16_t historySize = static_cast<uint16_t>(_mainHistory.size());
+      if (!writeU16(historySize))
+        return false;
+      for (const auto &line : _mainHistory) {
+        std::string text = line.block.getText();
+        if (line.isImage) {
+          text = "\x1B[IMG:" + line.imagePath + "]";
+        }
+        uint16_t len = static_cast<uint16_t>(text.length());
+        if (!writeU16(len))
+          return false;
+        if (len > 0) {
+          if (!writeData(text.data(), len))
+            return false;
+        }
+        uint8_t flags = (line.isOld ? 1 : 0) | (line.endOfParagraph ? 2 : 0);
+        if (!writeU8(flags))
+          return false;
+      }
     }
   }
 
@@ -398,14 +412,20 @@ bool StorySaveManager::writeSaveData(IFileWriter &writer,
     }
 
     uint32_t snapLen = static_cast<uint32_t>(
-        cp.borrowedSnapshot != nullptr ? cp.snapshotLen :
-        (!cp.snapshotData.empty() ? cp.snapshotData.size() : cp.snapshotLen));
+        cp.streamFn ? cp.snapshotLen :
+        (cp.borrowedSnapshot != nullptr ? cp.snapshotLen :
+        (!cp.snapshotData.empty() ? cp.snapshotData.size() : cp.snapshotLen)));
     if (!writeU32(snapLen))
       return false;
 
     size_t newOffset = currentOffset;
 
-    if (cp.borrowedSnapshot != nullptr) {
+    if (cp.streamFn) {
+      size_t written = cp.streamFn(writer);
+      if (written != snapLen)
+        return false;
+      currentOffset += written;
+    } else if (cp.borrowedSnapshot != nullptr) {
       if (!writeData(cp.borrowedSnapshot, snapLen))
         return false;
     } else if (!cp.snapshotData.empty()) {
@@ -484,22 +504,34 @@ bool StorySaveManager::writeSaveFile(IStorage &storage) {
 
     if (!ok) {
       storage.deleteFile(tmpPath.c_str());
+      for (auto &cp : _checkpoints) {
+        cp.streamFn = nullptr;
+      }
+      _mainStreamFn = nullptr;
       return false;
     }
 
     storage.deleteFile(_saveFilePath.c_str());
     if (!storage.renameFile(tmpPath.c_str(), _saveFilePath.c_str())) {
+      for (auto &cp : _checkpoints) {
+        cp.streamFn = nullptr;
+      }
+      _mainStreamFn = nullptr;
       return false;
     }
 
-    for (size_t i = 0; i < _checkpoints.size() && i < newOffsets.size(); ++i) {
-      _checkpoints[i].fileOffset = newOffsets[i];
+    for (size_t i = 0; i < _checkpoints.size(); ++i) {
+      if (i < newOffsets.size()) {
+        _checkpoints[i].fileOffset = newOffsets[i];
+      }
       _checkpoints[i].borrowedSnapshot = nullptr;
+      _checkpoints[i].streamFn = nullptr;
       _checkpoints[i].snapshotData.clear();
       _checkpoints[i].snapshotData.shrink_to_fit();
     }
     _borrowedMainSnapshot = nullptr;
     _borrowedMainSnapLen = 0;
+    _mainStreamFn = nullptr;
     return true;
   }
 
@@ -507,16 +539,18 @@ bool StorySaveManager::writeSaveFile(IStorage &storage) {
       _saveFilePath.c_str(),
       [&](IFileWriter &writer) -> bool { return writeSaveData(writer, nullptr, &newOffsets); });
 
-  if (ok) {
-    for (size_t i = 0; i < _checkpoints.size() && i < newOffsets.size(); ++i) {
+  for (size_t i = 0; i < _checkpoints.size(); ++i) {
+    if (ok && i < newOffsets.size()) {
       _checkpoints[i].fileOffset = newOffsets[i];
-      _checkpoints[i].borrowedSnapshot = nullptr;
-      _checkpoints[i].snapshotData.clear();
-      _checkpoints[i].snapshotData.shrink_to_fit();
     }
-    _borrowedMainSnapshot = nullptr;
-    _borrowedMainSnapLen = 0;
+    _checkpoints[i].borrowedSnapshot = nullptr;
+    _checkpoints[i].streamFn = nullptr;
+    _checkpoints[i].snapshotData.clear();
+    _checkpoints[i].snapshotData.shrink_to_fit();
   }
+  _borrowedMainSnapshot = nullptr;
+  _borrowedMainSnapLen = 0;
+  _mainStreamFn = nullptr;
   return ok;
 }
 
@@ -535,15 +569,56 @@ void StorySaveManager::saveMainProgress(
       _borrowedMainSnapLen = 0;
       _mainSnapshot.assign(snapData, snapData + snapLen);
     }
+    _mainStreamFn = nullptr;
     _mainHistory = history;
     _hasMainProgress = true;
   }
+}
+
+void StorySaveManager::saveMainProgressStreaming(
+    size_t snapLen,
+    const std::deque<WrappedLine> &history,
+    SnapshotStreamFn streamFn) {
+  if (snapLen > 0 && streamFn) {
+    _hasMainProgress = true;
+    _mainStreamFn = std::move(streamFn);
+    _borrowedMainSnapshot = nullptr;
+    _borrowedMainSnapLen = snapLen;
+    _mainSnapshot.clear();
+    _mainSnapshot.shrink_to_fit();
+    _mainHistory = history;
+  }
+}
+
+void StorySaveManager::saveMainProgressStreaming(
+    size_t snapLen, std::deque<WrappedLine> &&history,
+    SnapshotStreamFn streamFn) {
+  _hasMainProgress = true;
+  _mainSnapshot.clear();
+  _borrowedMainSnapshot = nullptr;
+  _borrowedMainSnapLen = snapLen;
+  _mainHistorySerialized.clear();
+  _mainHistory = std::move(history);
+  _mainStreamFn = streamFn;
+}
+
+void StorySaveManager::saveMainProgressStreaming(
+    size_t snapLen, std::vector<uint8_t> &&serializedHistory,
+    SnapshotStreamFn streamFn) {
+  _hasMainProgress = true;
+  _mainSnapshot.clear();
+  _borrowedMainSnapshot = nullptr;
+  _borrowedMainSnapLen = snapLen;
+  _mainHistory.clear();
+  _mainHistorySerialized = std::move(serializedHistory);
+  _mainStreamFn = streamFn;
 }
 
 void StorySaveManager::clearMainProgress() {
   _hasMainProgress = false;
   _borrowedMainSnapshot = nullptr;
   _borrowedMainSnapLen = 0;
+  _mainStreamFn = nullptr;
   _mainSnapshot.clear();
   _mainSnapshot.shrink_to_fit();
   _mainHistory.clear();
@@ -566,6 +641,7 @@ bool StorySaveManager::restoreMainProgress(InkStoryManager &story,
 
   display.clearHistory();
   display.setScrollY(0);
+  display.clearFontCache();
 
   if (!story.loadSnapshot(dataPtr, dataLen))
     return false;
@@ -605,6 +681,32 @@ void StorySaveManager::saveCheckpoint(
   } else {
     cp.snapshotData.assign(snapData, snapData + snapLen);
   }
+  if (title.empty()) {
+    cp.history = history;
+  }
+  _checkpoints.push_back(std::move(cp));
+}
+
+void StorySaveManager::saveCheckpointStreaming(
+    const std::string &title, size_t snapLen,
+    const std::deque<WrappedLine> &history,
+    SnapshotStreamFn streamFn) {
+  if (snapLen == 0 || !streamFn)
+    return;
+
+  // 1. Deduplicate: remove any existing entry matching this key
+  for (auto it = _checkpoints.begin(); it != _checkpoints.end(); ++it) {
+    if (it->title == title) {
+      _checkpoints.erase(it);
+      break;
+    }
+  }
+
+  // 2. Append new checkpoint snapshot at the end (latest chronological tail)
+  CheckpointEntry cp;
+  cp.title = title;
+  cp.snapshotLen = snapLen;
+  cp.streamFn = std::move(streamFn);
   if (title.empty()) {
     cp.history = history;
   }
@@ -654,6 +756,7 @@ bool StorySaveManager::restoreCheckpoint(size_t index, InkStoryManager &story,
   //    and the current runner/globals before attempting to allocate snapshot buffers.
   display.clearHistory();
   display.setScrollY(0);
+  display.clearFontCache();
   clearMainProgress();
   story.resetRunner();
 

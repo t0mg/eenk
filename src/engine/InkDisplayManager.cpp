@@ -231,6 +231,22 @@ void InkDisplayManager::resolveAndApplyFont(const StoryMetadata &meta,
 
 void InkDisplayManager::clearHistory() { _wrappedLines.clear(); }
 
+void InkDisplayManager::trimHistory(size_t targetLines, size_t hardMaxLines) {
+  if (hardMaxLines == 0) {
+    hardMaxLines = targetLines;
+  }
+  // Phase 1: Evict old history (from previous turns) down to targetLines
+  while (_wrappedLines.size() > targetLines && !_wrappedLines.empty() && _wrappedLines.front().isOld) {
+    _wrappedLines.pop_front();
+  }
+
+  // Phase 2: Failsafe eviction if history still exceeds hardMaxLines
+  // (e.g. if the current turn alone is excessively long, evict oldest lines to prevent OOM)
+  while (_wrappedLines.size() > hardMaxLines && !_wrappedLines.empty()) {
+    _wrappedLines.pop_front();
+  }
+}
+
 void InkDisplayManager::addWrappedLine(const WrappedLine &line) {
   _wrappedLines.push_back(line);
 }
@@ -244,6 +260,27 @@ void InkDisplayManager::popOldestLine() {
 void InkDisplayManager::markHistoryOld() {
   for (auto &line : _wrappedLines) {
     line.isOld = true;
+  }
+}
+
+void InkDisplayManager::clearFontCache() {
+  if (_streamingFamily) {
+    _streamingFamily->clearCache();
+  }
+}
+
+void InkDisplayManager::unloadStreamingFonts() {
+  if (_streamingFamily) {
+    // Remove streaming font pointers from renderer first
+    GfxRenderer *renderer = _display.getRenderer();
+    if (renderer) {
+      renderer->removeStreamingFont(FONT_NARRATIVE);
+    }
+    // Fully destroy the family — frees _glyphs[], _intervals[], and
+    // all StreamingEpdFont objects. This removes the ~30KB of glyph
+    // table allocations that fragment the heap.
+    delete _streamingFamily;
+    _streamingFamily = nullptr;
   }
 }
 

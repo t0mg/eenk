@@ -2,11 +2,13 @@
 #include <csetjmp>
 #include <cstdio>
 #include <cstring>
+#include <new>
 
 #ifdef PLATFORM_ESP32
 #include <esp_random.h>
 #include <bootloader_random.h>
 #include <esp_timer.h>
+#include <esp_heap_caps.h>
 
 static uint32_t generateRandomSeed() {
     bootloader_random_enable();
@@ -193,7 +195,16 @@ const unsigned char* InkStoryManager::createSnapshot(std::size_t* outLength) {
     if (!_runner)
         return nullptr;
 
-    _currentSnapshot = _runner->create_snapshot();
+    try {
+        _currentSnapshot = _runner->create_snapshot();
+    } catch (const std::bad_alloc&) {
+        printf("[InkStoryManager] std::bad_alloc in create_snapshot! Insufficient contiguous heap.\n");
+        _currentSnapshot = nullptr;
+    } catch (...) {
+        printf("[InkStoryManager] Unexpected exception in create_snapshot!\n");
+        _currentSnapshot = nullptr;
+    }
+
     if (_currentSnapshot) {
         *outLength = _currentSnapshot->get_data_len();
         return _currentSnapshot->get_data();
@@ -206,6 +217,39 @@ void InkStoryManager::freeSnapshot() {
         delete _currentSnapshot;
         _currentSnapshot = nullptr;
     }
+}
+
+size_t InkStoryManager::computeSnapshotSize() const {
+    if (!_runner)
+        return 0;
+    return _runner->compute_snapshot_size();
+}
+
+namespace {
+class FileWriterAdapter : public ink::runtime::snapshot::writer {
+    IFileWriter& _fw;
+public:
+    FileWriterAdapter(IFileWriter& fw) : _fw(fw) {}
+    bool write(const void* data, ink::size_t len) override {
+        return _fw.write(data, len);
+    }
+};
+} // namespace
+
+size_t InkStoryManager::streamSnapshotTo(IFileWriter& writer) {
+    if (!_runner)
+        return 0;
+    FileWriterAdapter adapter(writer);
+    size_t result = _runner->stream_snapshot_to(adapter);
+    if (result == 0) {
+        printf("[InkStoryManager] stream_snapshot_to returned 0!\n");
+#ifdef PLATFORM_ESP32
+        printf("[InkStoryManager] Heap stats: free=%u, largest_block=%u\n",
+               (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT),
+               (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+#endif
+    }
+    return result;
 }
 
 void InkStoryManager::resetRunner() {

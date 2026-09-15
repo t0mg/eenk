@@ -31,6 +31,14 @@ void StreamingEpdFontFamily::unload() {
   }
 }
 
+void StreamingEpdFontFamily::clearCache() {
+  for (int i = 0; i < 4; i++) {
+    if (_slots[i]) {
+      _slots[i]->clearCache();
+    }
+  }
+}
+
 // ── Internal helpers ───────────────────────────────────────────────────────
 
 /*static*/

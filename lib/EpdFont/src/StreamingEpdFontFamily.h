@@ -45,6 +45,9 @@ class StreamingEpdFontFamily {
 
   void unload();
 
+  /// Evict cached glyph bitmaps from all loaded font variants to reclaim RAM.
+  void clearCache();
+
   bool isLoaded() const { return _slots[EpdFontFamily::REGULAR] != nullptr; }
 
   bool hasStyle(EpdFontFamily::Style style) const {

@@ -23,6 +23,8 @@ public:
 
     const unsigned char* createSnapshot(std::size_t* outLength);
     void freeSnapshot();
+    size_t computeSnapshotSize() const;
+    size_t streamSnapshotTo(class IFileWriter& writer);
     void resetRunner();
     bool createFreshRunner();
     bool createFreshRunnerWithSeed(uint32_t seed);

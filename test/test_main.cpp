@@ -1424,6 +1424,103 @@ void test_streaming_epd_font_family_bold_italic_fallback_order(void) {
   remove(bpath);
 }
 
+void test_streaming_epd_font_clear_cache(void) {
+  StreamingEpdFont font;
+  TEST_ASSERT_TRUE(font.load("stories/psyphon/Quantico.epdfont"));
+  TEST_ASSERT_TRUE(font.isLoaded());
+  const EpdGlyph* g1 = font.getGlyph('A');
+  TEST_ASSERT_NOT_NULL(g1);
+  const uint8_t* b1 = font.getGlyphBitmap(g1);
+  TEST_ASSERT_NOT_NULL(b1);
+
+  font.clearCache();
+
+  const EpdGlyph* g2 = font.getGlyph('A');
+  TEST_ASSERT_NOT_NULL(g2);
+  const uint8_t* b2 = font.getGlyphBitmap(g2);
+  TEST_ASSERT_NOT_NULL(b2);
+}
+
+void test_display_manager_trim_history(void) {
+  TestDisplay display(800, 480);
+  InkDisplayManager dm(display);
+
+  // 1. Add 20 old lines
+  for (int i = 0; i < 20; ++i) {
+    WrappedLine wl;
+    wl.isOld = true;
+    wl.block.addRun("Old line", EpdFontFamily::REGULAR);
+    dm.addWrappedLine(wl);
+  }
+  TEST_ASSERT_EQUAL(20, dm.getHistorySize());
+
+  // 2. Add 35 new lines (representing a 2-page turn)
+  for (int i = 0; i < 35; ++i) {
+    WrappedLine wl;
+    wl.isOld = false;
+    char buf[32];
+    snprintf(buf, sizeof(buf), "New line %d", i);
+    wl.block.addRun(buf, EpdFontFamily::REGULAR);
+    dm.addWrappedLine(wl);
+  }
+  TEST_ASSERT_EQUAL(55, dm.getHistorySize());
+
+  // 3. Trim to target 50, hard max 75
+  dm.trimHistory(50, 75);
+  // Total size was 55 > 50. Phase 1 pops 5 old lines.
+  // Result size should be 50.
+  TEST_ASSERT_EQUAL(50, dm.getHistorySize());
+  // The first line should still be an old line (15 old lines remain)
+  TEST_ASSERT_TRUE(dm.getHistory().front().isOld);
+  // All 35 new lines must still be present (new line 0 through 34)
+  TEST_ASSERT_EQUAL_STRING("New line 0", dm.getHistory()[15].block.runs[0].text.c_str());
+  TEST_ASSERT_EQUAL_STRING("New line 34", dm.getHistory()[49].block.runs[0].text.c_str());
+
+  // 4. Now test when new lines alone exceed targetLines:
+  // Add another 30 new lines (total: 15 old + 65 new = 80 lines)
+  for (int i = 35; i < 65; ++i) {
+    WrappedLine wl;
+    wl.isOld = false;
+    char buf[32];
+    snprintf(buf, sizeof(buf), "New line %d", i);
+    wl.block.addRun(buf, EpdFontFamily::REGULAR);
+    dm.addWrappedLine(wl);
+  }
+  TEST_ASSERT_EQUAL(80, dm.getHistorySize());
+
+  // Trim to target 50, hard max 75
+  dm.trimHistory(50, 75);
+  // Phase 1 pops all 15 old lines. Old lines are gone.
+  // Remaining new lines = 65. Target is 50, but front is NOT old!
+  // Phase 2: 65 <= 75 (hard max), so all 65 new lines are preserved!
+  TEST_ASSERT_EQUAL(65, dm.getHistorySize());
+  TEST_ASSERT_FALSE(dm.getHistory().front().isOld);
+  TEST_ASSERT_EQUAL_STRING("New line 0", dm.getHistory().front().block.runs[0].text.c_str());
+
+  // 5. Test hard max failsafe:
+  // Add 30 more new lines (total: 65 + 30 = 95 new lines)
+  for (int i = 65; i < 95; ++i) {
+    WrappedLine wl;
+    wl.isOld = false;
+    char buf[32];
+    snprintf(buf, sizeof(buf), "New line %d", i);
+    wl.block.addRun(buf, EpdFontFamily::REGULAR);
+    dm.addWrappedLine(wl);
+  }
+  TEST_ASSERT_EQUAL(95, dm.getHistorySize());
+
+  // Trim with target 50, hard max 75
+  dm.trimHistory(50, 75);
+  // Total size must be capped at hardMaxLines (75) to prevent OOM
+  TEST_ASSERT_EQUAL(75, dm.getHistorySize());
+  // The first 20 lines (0..19) were popped as failsafe; front is now line 20
+  TEST_ASSERT_EQUAL_STRING("New line 20", dm.getHistory().front().block.runs[0].text.c_str());
+
+  // 6. Test single-argument trim (hardMaxLines == 0 -> defaults to targetLines)
+  dm.trimHistory(25);
+  TEST_ASSERT_EQUAL(25, dm.getHistorySize());
+}
+
 void test_sd_font_catalogue_family_detection(void) {
   // Write a font family into the fonts/ directory so SdFontCatalogue::scan()
   // picks it up. Verify that only the family root appears (no -bold/-italic
@@ -1864,6 +1961,10 @@ void test_save_manager_concurrent_open_files(void) {
 
 void test_psyphon_story_snapshot(void) {
   SDLStorage storage;
+  if (!storage.fileExists("stories/psyphon/core.bin")) {
+    printf("[Psyphon] Skipping test: stories/psyphon/core.bin not present\n");
+    return;
+  }
   InkStoryManager storyMgr(storage);
   StoryMetadata meta;
   std::string base, dir;
@@ -1901,9 +2002,13 @@ void test_psyphon_story_snapshot(void) {
 }
 
 void test_psyphon_full_engine_run(void) {
+  SDLStorage storage;
+  if (!storage.fileExists("stories/psyphon/core.bin")) {
+    printf("[Psyphon] Skipping test: stories/psyphon/core.bin not present\n");
+    return;
+  }
   TestDisplay display(800, 480);
   MockInput input;
-  SDLStorage storage;
   InkEngine engine(display, input, storage);
 
   const char *testSavePath = "test/test_psyphon_engine.sav";
@@ -1997,6 +2102,144 @@ void test_psyphon_full_engine_run(void) {
     TEST_ASSERT_EQUAL(1, newMgr.getCheckpoints().size());
     TEST_ASSERT_EQUAL_STRING("PSYPHON", newMgr.getCheckpoints()[0].title.c_str());
   }
+}
+
+void test_psyphon_multi_chapters(void) {
+  SDLStorage storage;
+  if (!storage.fileExists("stories/psyphon/core.bin")) {
+    printf("[Psyphon] Skipping test: stories/psyphon/core.bin not present\n");
+    return;
+  }
+  TestDisplay display(800, 480);
+  MockInput input;
+  InkEngine engine(display, input, storage);
+
+  const char *testSavePath = "test/test_psyphon_multi.sav";
+  storage.deleteFile(testSavePath);
+
+  TEST_ASSERT_TRUE(engine.loadStory("stories/psyphon/core.bin"));
+  engine.getSaveManager().init(testSavePath, 0x46b28ab5);
+
+  int choicesMade = 0;
+  int checkpointsSeen = 0;
+  while (choicesMade < 120) {
+    engine.update();
+    if (engine.getState() == InkEngine::State::STORY_ENDED || engine.getState() == InkEngine::State::DONE) {
+      printf("[TestMulti] Story reached end after %d choices\n", choicesMade);
+      break;
+    }
+    if (engine.getState() == InkEngine::State::WAITING_INPUT) {
+      if (engine.getSaveManager().getCheckpoints().size() > (size_t)checkpointsSeen) {
+        checkpointsSeen = engine.getSaveManager().getCheckpoints().size();
+        printf("[TestMulti] Checkpoint count: %d, latest title: '%s', historySize: %zu\n",
+               checkpointsSeen,
+               engine.getSaveManager().getCheckpoints().back().title.c_str(),
+               engine.getHistory().size());
+      }
+      if (!engine.choose(0)) {
+        printf("[TestMulti] Choose 0 failed at choice %d\n", choicesMade);
+        break;
+      }
+      choicesMade++;
+    }
+  }
+  printf("[TestMulti] Total choices made: %d, total checkpoints: %zu\n",
+         choicesMade, engine.getSaveManager().getCheckpoints().size());
+  for (size_t i = 0; i < engine.getSaveManager().getCheckpoints().size(); ++i) {
+    printf("  CP[%zu]: '%s' (offset=%zu, len=%zu)\n",
+           i,
+           engine.getSaveManager().getCheckpoints()[i].title.c_str(),
+           engine.getSaveManager().getCheckpoints()[i].fileOffset,
+           engine.getSaveManager().getCheckpoints()[i].snapshotLen);
+  }
+
+  TEST_ASSERT_GREATER_OR_EQUAL(5, engine.getSaveManager().getCheckpoints().size());
+
+  // Test restoring each of the saved checkpoints from disk
+  for (size_t i = 0; i < engine.getSaveManager().getCheckpoints().size(); ++i) {
+    InkStoryManager restoreStory(storage);
+    StoryMetadata meta;
+    std::string base, dir;
+    TEST_ASSERT_TRUE(restoreStory.loadStory("stories/psyphon/core.bin", meta, base, dir));
+    InkDisplayManager restoreDisplay(display);
+    TEST_ASSERT_TRUE(engine.getSaveManager().restoreCheckpoint(i, restoreStory, restoreDisplay, &storage));
+    TEST_ASSERT_TRUE(restoreStory.runner());
+    TEST_ASSERT_TRUE(restoreStory.runner()->has_choices() || restoreStory.runner()->can_continue());
+  }
+
+  storage.deleteFile(testSavePath);
+}
+
+void test_streaming_snapshot(void) {
+  SDLStorage storage;
+  InkStoryManager storyMgr(storage);
+  StoryMetadata meta;
+  std::string base, dir;
+  bool loaded = storyMgr.loadStory("test/story/story.bin", meta, base, dir);
+  TEST_ASSERT_TRUE(loaded);
+
+  // Advance runner
+  while (storyMgr.runner()->can_continue()) {
+    storyMgr.runner()->getline_alloc();
+  }
+
+  // 1. Compare computeSnapshotSize with createSnapshot length
+  size_t computedLen = storyMgr.computeSnapshotSize();
+  TEST_ASSERT_GREATER_THAN(0, computedLen);
+
+  size_t createdLen = 0;
+  const unsigned char *createdSnap = storyMgr.createSnapshot(&createdLen);
+  TEST_ASSERT_NOT_NULL(createdSnap);
+  TEST_ASSERT_EQUAL(createdLen, computedLen);
+
+  // 2. Stream into memory writer
+  class MemoryFileWriter : public IFileWriter {
+  public:
+    std::vector<uint8_t> buffer;
+    bool write(const void *data, size_t size) override {
+      const uint8_t *p = static_cast<const uint8_t *>(data);
+      buffer.insert(buffer.end(), p, p + size);
+      return true;
+    }
+  };
+
+  MemoryFileWriter memWriter;
+  size_t streamedLen = storyMgr.streamSnapshotTo(memWriter);
+  TEST_ASSERT_EQUAL(computedLen, streamedLen);
+  TEST_ASSERT_EQUAL(computedLen, memWriter.buffer.size());
+
+  // 3. Byte-by-byte comparison between streamed snapshot and created snapshot
+  TEST_ASSERT_EQUAL_INT(0, memcmp(createdSnap, memWriter.buffer.data(), computedLen));
+
+  // 4. Test loading streamed snapshot into a fresh runner
+  InkStoryManager restoreMgr(storage);
+  TEST_ASSERT_TRUE(restoreMgr.loadStory("test/story/story.bin", meta, base, dir));
+  TEST_ASSERT_TRUE(restoreMgr.loadSnapshot(memWriter.buffer.data(), memWriter.buffer.size()));
+
+  // 5. Test end-to-end streaming save to disk and restore
+  const char *testSavePath = "test/test_streaming_save.sav";
+  storage.deleteFile(testSavePath);
+
+  StorySaveManager saveMgr;
+  saveMgr.init(testSavePath, 0x12345678);
+  std::deque<WrappedLine> dummyHist;
+  saveMgr.saveCheckpointStreaming("Chapter 1", computedLen, dummyHist,
+    [&storyMgr](IFileWriter &w) -> size_t {
+      return storyMgr.streamSnapshotTo(w);
+    });
+  TEST_ASSERT_TRUE(saveMgr.writeSaveFile(storage));
+
+  // Verify file was written
+  TEST_ASSERT_TRUE(storage.fileExists(testSavePath));
+
+  // Verify restore from file
+  InkStoryManager fileRestoreStory(storage);
+  TEST_ASSERT_TRUE(fileRestoreStory.loadStory("test/story/story.bin", meta, base, dir));
+  TestDisplay testDisp;
+  InkDisplayManager fileRestoreDisp(testDisp);
+  TEST_ASSERT_TRUE(saveMgr.restoreCheckpoint(0, fileRestoreStory, fileRestoreDisp, &storage));
+
+  storage.deleteFile(testSavePath);
 }
 
 void test_save_manager_universal_key_deduplication(void) {
@@ -3214,6 +3457,8 @@ int main(int argc, char **argv) {
   RUN_TEST(test_streaming_epd_font_family_all_styles);
   RUN_TEST(test_streaming_epd_font_family_missing_regular_fails);
   RUN_TEST(test_streaming_epd_font_family_bold_italic_fallback_order);
+  RUN_TEST(test_streaming_epd_font_clear_cache);
+  RUN_TEST(test_display_manager_trim_history);
   RUN_TEST(test_sd_font_catalogue_family_detection);
   // Save manager & Menu modal tests
   RUN_TEST(test_save_manager_enk2_serialization);
@@ -3223,6 +3468,8 @@ int main(int argc, char **argv) {
   RUN_TEST(test_save_manager_concurrent_open_files);
   RUN_TEST(test_psyphon_story_snapshot);
   RUN_TEST(test_psyphon_full_engine_run);
+  RUN_TEST(test_psyphon_multi_chapters);
+  RUN_TEST(test_streaming_snapshot);
   RUN_TEST(test_save_manager_universal_key_deduplication);
   RUN_TEST(test_save_manager_restart_clear);
   RUN_TEST(test_story_random_reseeding);
