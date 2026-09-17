@@ -6,6 +6,7 @@
 #include "ui/LoadingWidget.h"
 #include "ui/QuickMenuWidget.h"
 #include "ui/SettingsView.h"
+#include "ui/MenuModalWidget.h"
 #include "ui/NeuStyle.h"
 #include "os/BootManager.h"
 #include "GfxRenderer.h"
@@ -40,13 +41,16 @@
 #ifdef BOARD_HAS_PSRAM
 static constexpr size_t BOOK_ARENA_SIZE = 512 * 1024;
 static constexpr size_t SCRATCH_ARENA_SIZE = 512 * 1024;
+static constexpr size_t PARSE_ARENA_SIZE = 128 * 1024;
 #else
 static constexpr size_t BOOK_ARENA_SIZE = 12 * 1024;
-static constexpr size_t SCRATCH_ARENA_SIZE = 96 * 1024;
+static constexpr size_t SCRATCH_ARENA_SIZE = 32 * 1024;
+static constexpr size_t PARSE_ARENA_SIZE = 48 * 1024;
 #endif
 #else
 static constexpr size_t BOOK_ARENA_SIZE = 512 * 1024;
 static constexpr size_t SCRATCH_ARENA_SIZE = 512 * 1024;
+static constexpr size_t PARSE_ARENA_SIZE = 128 * 1024;
 #endif
 
 // A PageSink that captures the targeted page into temporary buffers
@@ -165,51 +169,43 @@ BookEngine::~BookEngine() {
         }
     }
     if (_bookArenaBuf) {
-#ifdef PLATFORM_ESP32
-#ifdef BOARD_HAS_PSRAM
+#if defined(PLATFORM_ESP32) && defined(BOARD_HAS_PSRAM)
         heap_caps_free(_bookArenaBuf);
-#else
-        free(_bookArenaBuf);
-#endif
 #else
         free(_bookArenaBuf);
 #endif
         _bookArenaBuf = nullptr;
     }
-#if !defined(PLATFORM_ESP32) || defined(BOARD_HAS_PSRAM)
     if (_scratchArenaBuf) {
-#ifdef PLATFORM_ESP32
-#ifdef BOARD_HAS_PSRAM
+#if defined(PLATFORM_ESP32) && defined(BOARD_HAS_PSRAM)
         heap_caps_free(_scratchArenaBuf);
-#endif
 #else
         free(_scratchArenaBuf);
 #endif
         _scratchArenaBuf = nullptr;
     }
-#else
-    _scratchArenaBuf = nullptr;
-#endif
 }
 
 bool BookEngine::loadBook(const char* epubPath) {
     strncpy(_bookPath, epubPath, sizeof(_bookPath) - 1);
 
-#ifdef PLATFORM_ESP32
-#ifdef BOARD_HAS_PSRAM
+#if defined(PLATFORM_ESP32) && !defined(BOARD_HAS_PSRAM)
+    _bookArenaBuf = (uint8_t*)malloc(BOOK_ARENA_SIZE);
+    _scratchArenaBuf = nullptr;
+    if (!_bookArenaBuf) {
+        Serial.printf("[BookEngine] Arena allocation failed! bookArena: null (%u), free: %u, maxBlock: %u\n",
+                      (unsigned)BOOK_ARENA_SIZE, (unsigned)ESP.getFreeHeap(), 
+                      (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+        return false;
+    }
+    _bookArena.init(_bookArenaBuf, BOOK_ARENA_SIZE);
+#else
+#if defined(PLATFORM_ESP32) && defined(BOARD_HAS_PSRAM)
     _bookArenaBuf = (uint8_t*)heap_caps_malloc(BOOK_ARENA_SIZE, MALLOC_CAP_SPIRAM);
     _scratchArenaBuf = (uint8_t*)heap_caps_malloc(SCRATCH_ARENA_SIZE, MALLOC_CAP_SPIRAM);
 #else
-    _bookArenaBuf = (uint8_t*)malloc(BOOK_ARENA_SIZE + SCRATCH_ARENA_SIZE);
-    if (_bookArenaBuf) {
-        _scratchArenaBuf = _bookArenaBuf + BOOK_ARENA_SIZE;
-    } else {
-        _scratchArenaBuf = nullptr;
-    }
-#endif
-#else
-    _scratchArenaBuf = (uint8_t*)malloc(SCRATCH_ARENA_SIZE);
     _bookArenaBuf = (uint8_t*)malloc(BOOK_ARENA_SIZE);
+    _scratchArenaBuf = (uint8_t*)malloc(SCRATCH_ARENA_SIZE);
 #endif
 
     if (!_bookArenaBuf || !_scratchArenaBuf) {
@@ -218,11 +214,28 @@ bool BookEngine::loadBook(const char* epubPath) {
                       _bookArenaBuf, (unsigned)BOOK_ARENA_SIZE, _scratchArenaBuf, (unsigned)SCRATCH_ARENA_SIZE, 
                       (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 #endif
+        if (_bookArenaBuf) {
+#if defined(PLATFORM_ESP32) && defined(BOARD_HAS_PSRAM)
+            heap_caps_free(_bookArenaBuf);
+#else
+            free(_bookArenaBuf);
+#endif
+            _bookArenaBuf = nullptr;
+        }
+        if (_scratchArenaBuf) {
+#if defined(PLATFORM_ESP32) && defined(BOARD_HAS_PSRAM)
+            heap_caps_free(_scratchArenaBuf);
+#else
+            free(_scratchArenaBuf);
+#endif
+            _scratchArenaBuf = nullptr;
+        }
         return false;
     }
 
     _bookArena.init(_bookArenaBuf, BOOK_ARENA_SIZE);
     _scratchArena.init(_scratchArenaBuf, SCRATCH_ARENA_SIZE);
+#endif
 
     if (!_bookSource.open(epubPath)) {
         return false;
@@ -246,29 +259,88 @@ bool BookEngine::loadBook(const char* epubPath) {
 #endif
     _cacheStorage.setBaseDir(cacheDir);
 
-    freeink::book::BookStatus st = freeink::book::BookCatalog::build(_bookSource, _cacheStorage, _bookArena, &_scratchArena);
+    uint8_t openScratchBuf[4096];
+    freeink::book::Arena openScratch(openScratchBuf, sizeof(openScratchBuf));
+    freeink::book::Arena& startupScratch = 
+#if defined(PLATFORM_ESP32) && !defined(BOARD_HAS_PSRAM)
+        openScratch;
+#else
+        _scratchArena;
+#endif
+
+    // Try opening existing catalog first
+    freeink::book::BookStatus st = _catalog.open(_bookSource, _cacheStorage, _bookArena, startupScratch);
     if (st != freeink::book::BookStatus::Ok) {
 #ifdef PLATFORM_ESP32
-        Serial.printf("[BookEngine] BookCatalog::build failed with status: %d (failedAlloc: %u)\n", 
-                      (int)st, (unsigned)_scratchArena.failedAllocSize());
+        Serial.printf("[BookEngine] Catalog not cached or stale (status: %d), building...\n", (int)st);
 #endif
-        return false;
-    }
+        _bookArena.reset();
+#if !defined(PLATFORM_ESP32) || defined(BOARD_HAS_PSRAM)
+        _scratchArena.reset();
+#endif
 
-    _bookArena.reset();
-    _scratchArena.reset();
+#if defined(PLATFORM_ESP32) && !defined(BOARD_HAS_PSRAM)
+        // On ESP32-C3 without PSRAM, internal DRAM is extremely tight.
+        // Free reading buffer so Expat's XML_Parse has free heap for malloc.
+        if (_bookArenaBuf) free(_bookArenaBuf);
+        _bookArenaBuf = nullptr;
 
-    st = _catalog.open(_bookSource, _cacheStorage, _bookArena, _scratchArena);
-    if (st != freeink::book::BookStatus::Ok) {
+        // Allocate a compact 60 KB scratch buffer for the catalog build.
+        // This leaves ~70 KB+ of contiguous heap free for Expat.
+        constexpr size_t BUILD_SCRATCH_SIZE = 60 * 1024;
+        uint8_t* buildBuf = (uint8_t*)malloc(BUILD_SCRATCH_SIZE);
+        if (!buildBuf) {
+            Serial.printf("[BookEngine] Failed to allocate build scratch (%u bytes)!\n", (unsigned)BUILD_SCRATCH_SIZE);
+            return false;
+        }
+        freeink::book::Arena buildArena(buildBuf, BUILD_SCRATCH_SIZE);
+        st = freeink::book::BookCatalog::build(_bookSource, _cacheStorage, buildArena, nullptr);
+        free(buildBuf);
+
+        if (st != freeink::book::BookStatus::Ok) {
+            Serial.printf("[BookEngine] BookCatalog::build failed with status: %d\n", (int)st);
+            return false;
+        }
+
+        // Re-allocate book arena now that Expat is done
+        _bookArenaBuf = (uint8_t*)malloc(BOOK_ARENA_SIZE);
+        if (!_bookArenaBuf) {
+            Serial.printf("[BookEngine] Failed to reallocate book arena after build!\n");
+            return false;
+        }
+        _bookArena.init(_bookArenaBuf, BOOK_ARENA_SIZE);
+#else
+        // On PSRAM / native targets, we have plenty of memory.
+        // Pass _scratchArena as scratch, and _bookArena as parseArena.
+        st = freeink::book::BookCatalog::build(_bookSource, _cacheStorage, _scratchArena, &_bookArena);
+        if (st != freeink::book::BookStatus::Ok) {
 #ifdef PLATFORM_ESP32
-        Serial.printf("[BookEngine] _catalog.open failed with status: %d (failedAlloc: %u)\n", 
-                      (int)st, (unsigned)_bookArena.failedAllocSize());
+            Serial.printf("[BookEngine] BookCatalog::build failed with status: %d (failedAlloc: %u)\n", 
+                          (int)st, (unsigned)_scratchArena.failedAllocSize());
 #endif
-        return false;
+            return false;
+        }
+        _bookArena.reset();
+        _scratchArena.reset();
+#endif
+
+        st = _catalog.open(_bookSource, _cacheStorage, _bookArena, startupScratch);
+        if (st != freeink::book::BookStatus::Ok) {
+#ifdef PLATFORM_ESP32
+            Serial.printf("[BookEngine] _catalog.open failed with status: %d (failedAlloc: %u)\n", 
+                          (int)st, (unsigned)_bookArena.failedAllocSize());
+#endif
+            return false;
+        }
     }
     _spineCount = _catalog.spineCount();
 
-    BookFontManager::setup(_fontSetup, _scratchArena, _settings);
+    if (!BookFontManager::setup(_fontSetup, startupScratch, _settings)) {
+#ifdef PLATFORM_ESP32
+        Serial.printf("[BookEngine] Failed to setup fonts!\n");
+#endif
+        return false;
+    }
     _layoutParams.font = &_fontSetup.chain;
 
     applySettings(_settings);
@@ -323,10 +395,42 @@ bool BookEngine::paginateChapter(uint16_t spineIndex, PageMatchMode mode, uint32
     _totalPagesInChapter = 0;
     CapturePageSink sink(mode, targetVal);
     
+#if defined(PLATFORM_ESP32) && !defined(BOARD_HAS_PSRAM)
+    // Allocate the large parse buffer (48 KB) FIRST so it claims the largest free contiguous block.
+    uint8_t* parseBuf = (uint8_t*)malloc(PARSE_ARENA_SIZE);
+    // Allocate the layout scratch buffer (32 KB, with 30 KB fallback) SECOND from the remaining heap.
+    size_t actualScratchSize = SCRATCH_ARENA_SIZE;
+    uint8_t* scratchBuf = (uint8_t*)malloc(actualScratchSize);
+    if (!scratchBuf && actualScratchSize > 30 * 1024) {
+        actualScratchSize = 30 * 1024;
+        scratchBuf = (uint8_t*)malloc(actualScratchSize);
+    }
+
+    if (!parseBuf || !scratchBuf) {
+        Serial.printf("[BookEngine] paginateChapter alloc failed! parseBuf: %p (%u), scratchBuf: %p (%u), free: %u, maxBlock: %u\n",
+                      parseBuf, (unsigned)PARSE_ARENA_SIZE, scratchBuf, (unsigned)actualScratchSize,
+                      (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+        if (parseBuf) free(parseBuf);
+        if (scratchBuf) free(scratchBuf);
+        return false;
+    }
+
+    freeink::book::Arena scratchArena(scratchBuf, actualScratchSize);
+    freeink::book::Arena parseArena(parseBuf, PARSE_ARENA_SIZE);
+
+    freeink::book::BookStatus status = freeink::book::ChapterLayout::layout(
+        _bookSource, _catalog.zip(), entry, href, _layoutParams, 
+        scratchArena, sink, &_totalPagesInChapter, nullptr, &parseArena
+    );
+
+    free(scratchBuf);
+    free(parseBuf);
+#else
     freeink::book::BookStatus status = freeink::book::ChapterLayout::layout(
         _bookSource, _catalog.zip(), entry, href, _layoutParams, 
         _scratchArena, sink, &_totalPagesInChapter, nullptr, nullptr
     );
+#endif
     
     if (status == freeink::book::BookStatus::Ok && sink.hasCaptured) {
         _currentPage = sink.matchedIndex;
@@ -340,19 +444,24 @@ bool BookEngine::paginateChapter(uint16_t spineIndex, PageMatchMode mode, uint32
         _currentPageData.runCount = sink.capturedRuns.size();
         if (_currentPageData.runCount > 0) {
             auto* runs = _bookArena.allocArray<freeink::book::PageTextRun>(_currentPageData.runCount);
-            for (size_t i = 0; i < sink.capturedRuns.size(); i++) {
-                runs[i] = sink.capturedRuns[i].run;
-                char* textCopy = (char*)_bookArena.alloc(sink.capturedRuns[i].text.length() + 1);
-                if (textCopy) {
-                    memcpy(textCopy, sink.capturedRuns[i].text.data(), sink.capturedRuns[i].text.length());
-                    textCopy[sink.capturedRuns[i].text.length()] = '\0';
-                    runs[i].text = textCopy;
-                } else {
-                    runs[i].text = nullptr;
-                    runs[i].len = 0;
+            if (runs) {
+                for (size_t i = 0; i < sink.capturedRuns.size(); i++) {
+                    runs[i] = sink.capturedRuns[i].run;
+                    char* textCopy = (char*)_bookArena.alloc(sink.capturedRuns[i].text.length() + 1);
+                    if (textCopy) {
+                        memcpy(textCopy, sink.capturedRuns[i].text.data(), sink.capturedRuns[i].text.length());
+                        textCopy[sink.capturedRuns[i].text.length()] = '\0';
+                        runs[i].text = textCopy;
+                    } else {
+                        runs[i].text = nullptr;
+                        runs[i].len = 0;
+                    }
                 }
+                _currentPageData.runs = runs;
+            } else {
+                _currentPageData.runCount = 0;
+                _currentPageData.runs = nullptr;
             }
-            _currentPageData.runs = runs;
         } else {
             _currentPageData.runs = nullptr;
         }
@@ -360,15 +469,20 @@ bool BookEngine::paginateChapter(uint16_t spineIndex, PageMatchMode mode, uint32
         _currentPageData.imageCount = sink.capturedImages.size();
         if (_currentPageData.imageCount > 0) {
             auto* imgs = _bookArena.allocArray<freeink::book::PageImage>(_currentPageData.imageCount);
-            for (size_t i = 0; i < sink.capturedImages.size(); i++) {
-                imgs[i] = sink.capturedImages[i].img;
-                if (!sink.capturedImages[i].href.empty()) {
-                    imgs[i].href = _bookArena.strdup(sink.capturedImages[i].href.c_str());
-                } else {
-                    imgs[i].href = nullptr;
+            if (imgs) {
+                for (size_t i = 0; i < sink.capturedImages.size(); i++) {
+                    imgs[i] = sink.capturedImages[i].img;
+                    if (!sink.capturedImages[i].href.empty()) {
+                        imgs[i].href = _bookArena.strdup(sink.capturedImages[i].href.c_str());
+                    } else {
+                        imgs[i].href = nullptr;
+                    }
                 }
+                _currentPageData.images = imgs;
+            } else {
+                _currentPageData.imageCount = 0;
+                _currentPageData.images = nullptr;
             }
-            _currentPageData.images = imgs;
         } else {
             _currentPageData.images = nullptr;
         }
@@ -376,12 +490,17 @@ bool BookEngine::paginateChapter(uint16_t spineIndex, PageMatchMode mode, uint32
         _currentPageData.linkCount = sink.capturedLinks.size();
         if (_currentPageData.linkCount > 0) {
             auto* links = _bookArena.allocArray<freeink::book::PageLink>(_currentPageData.linkCount);
-            for (size_t i = 0; i < sink.capturedLinks.size(); i++) {
-                links[i] = sink.capturedLinks[i].link;
-                if (!sink.capturedLinks[i].target.empty()) links[i].target = _bookArena.strdup(sink.capturedLinks[i].target.c_str());
-                if (!sink.capturedLinks[i].fragment.empty()) links[i].fragment = _bookArena.strdup(sink.capturedLinks[i].fragment.c_str());
+            if (links) {
+                for (size_t i = 0; i < sink.capturedLinks.size(); i++) {
+                    links[i] = sink.capturedLinks[i].link;
+                    if (!sink.capturedLinks[i].target.empty()) links[i].target = _bookArena.strdup(sink.capturedLinks[i].target.c_str());
+                    if (!sink.capturedLinks[i].fragment.empty()) links[i].fragment = _bookArena.strdup(sink.capturedLinks[i].fragment.c_str());
+                }
+                _currentPageData.links = links;
+            } else {
+                _currentPageData.linkCount = 0;
+                _currentPageData.links = nullptr;
             }
-            _currentPageData.links = links;
         } else {
             _currentPageData.links = nullptr;
         }
@@ -400,9 +519,9 @@ void BookEngine::buildFbCachePath(char* out, size_t outLen) const {
     char stem[64] = {0};
     buildStem(stem, sizeof(stem));
 #ifdef PLATFORM_ESP32
-    snprintf(out, outLen, "/.eenk_cache/%s/fb_%u_%u_%u.bin", stem, _currentSpine, _currentPageData.charStart, (unsigned int)_generationHash);
+    snprintf(out, outLen, "/.eenk_cache/%s/fb_%u_%u_%u.bin", stem, (unsigned int)_currentSpine, (unsigned int)_currentPageData.charStart, (unsigned int)_generationHash);
 #else
-    snprintf(out, outLen, ".eenk_cache/%s/fb_%u_%u_%u.bin", stem, _currentSpine, _currentPageData.charStart, (unsigned int)_generationHash);
+    snprintf(out, outLen, ".eenk_cache/%s/fb_%u_%u_%u.bin", stem, (unsigned int)_currentSpine, (unsigned int)_currentPageData.charStart, (unsigned int)_generationHash);
 #endif
 }
 
@@ -717,14 +836,34 @@ void BookEngine::renderCurrentPage() {
             break;
     }
     
-    _scratchArena.reset();
     freeink::book::PageRenderer::renderText(_currentPageData, _fontSetup.chain, target, nullptr);
-    freeink::book::BookStatus imgStatus = freeink::book::PageRenderer::renderImages(_currentPageData, _bookSource, _catalog.zip(), _scratchArena, target);
+
+    freeink::book::BookStatus imgStatus = freeink::book::BookStatus::Ok;
+#if defined(PLATFORM_ESP32) && !defined(BOARD_HAS_PSRAM)
+    if (_currentPageData.imageCount > 0) {
+        uint8_t* renderScratchBuf = (uint8_t*)malloc(SCRATCH_ARENA_SIZE);
+        if (renderScratchBuf) {
+            freeink::book::Arena renderScratch(renderScratchBuf, SCRATCH_ARENA_SIZE);
+            imgStatus = freeink::book::PageRenderer::renderImages(_currentPageData, _bookSource, _catalog.zip(), renderScratch, target);
+            if (_currentPageData.imageCount > 0) {
+                Serial.printf("[BookEngine] renderImages status: %d (scratch failedAlloc: %u)\n", 
+                              (int)imgStatus, (unsigned)renderScratch.failedAllocSize());
+            }
+            free(renderScratchBuf);
+        } else {
+            Serial.printf("[BookEngine] Failed to allocate scratch for renderImages (%u bytes)\n", (unsigned)SCRATCH_ARENA_SIZE);
+            imgStatus = freeink::book::BookStatus::OutOfMemory;
+        }
+    }
+#else
+    _scratchArena.reset();
+    imgStatus = freeink::book::PageRenderer::renderImages(_currentPageData, _bookSource, _catalog.zip(), _scratchArena, target);
 #ifdef PLATFORM_ESP32
     if (_currentPageData.imageCount > 0) {
         Serial.printf("[BookEngine] renderImages status: %d (scratch failedAlloc: %u)\n", 
                       (int)imgStatus, (unsigned)_scratchArena.failedAllocSize());
     }
+#endif
 #endif
 
     // 5. Cache the result
@@ -767,10 +906,6 @@ void BookEngine::handleInput() {
             saveProgress();
             setShouldSleep(true);
             return;
-        } else if (act == QuickMenuAction::OPEN_SETTINGS) {
-            SettingsView view(_display, _input, bw, _frontlight, _settings);
-            view.run();
-            applySettings(_settings);
         }
         _needsRedraw = true;
         _lastActionTime = millis();
@@ -809,11 +944,7 @@ void BookEngine::handleInput() {
         nextPage();
     } else if (ev == ButtonEvent::BACK || ev == ButtonEvent::QUIT) {
         _lastActionTime = millis();
-        if (showConfirmExit()) {
-            exitToMenu();
-        } else {
-            _needsRedraw = true;
-        }
+        showReaderMenu();
     } else if (ev == ButtonEvent::SLEEP) {
         saveProgress();
         setShouldSleep(true);
@@ -880,6 +1011,241 @@ int BookEngine::getProgressPercentage() const {
     if (pct > 100) pct = 100;
     if (pct < 0) pct = 0;
     return pct;
+}
+
+void BookEngine::getChapterHeaderString(char* out, size_t outLen) const {
+    if (!out || outLen == 0) return;
+    out[0] = '\0';
+
+    char chapterTitle[96] = {0};
+    char fragBuf[32] = {0};
+
+    // 1. Try to find chapter title from TOC for current spine
+    int tocIdx = _catalog.isOpen() ? _catalog.tocIndexForSpine(_currentSpine) : -1;
+    if (tocIdx >= 0) {
+        freeink::book::BookCatalog::TocItem item;
+        if (_catalog.tocItem(tocIdx, &item, chapterTitle, sizeof(chapterTitle), fragBuf, sizeof(fragBuf)) == freeink::book::BookStatus::Ok) {
+            // Trim leading/trailing whitespace
+            char* p = chapterTitle;
+            while (*p == ' ' || *p == '\t') p++;
+            if (p != chapterTitle) {
+                memmove(chapterTitle, p, strlen(p) + 1);
+            }
+            size_t l = strlen(chapterTitle);
+            while (l > 0 && (chapterTitle[l - 1] == ' ' || chapterTitle[l - 1] == '\t' || chapterTitle[l - 1] == '\r' || chapterTitle[l - 1] == '\n')) {
+                chapterTitle[l - 1] = '\0';
+                l--;
+            }
+        }
+    }
+
+    // Fallback if no chapter title in TOC
+    if (chapterTitle[0] == '\0') {
+        if (_spineCount > 0) {
+            snprintf(chapterTitle, sizeof(chapterTitle), "Chapter %u", _currentSpine + 1);
+        } else {
+            snprintf(chapterTitle, sizeof(chapterTitle), "Book");
+        }
+    }
+
+    char suffix[48] = {0};
+    int pct = getProgressPercentage();
+    if (_totalPagesInChapter > 0) {
+        snprintf(suffix, sizeof(suffix), " - p. %u/%u (%d%%)", 
+                 (unsigned int)(_currentPage + 1), (unsigned int)_totalPagesInChapter, pct);
+    } else {
+        snprintf(suffix, sizeof(suffix), " - %d%%", pct);
+    }
+
+    // Check if combined string fits display header, trimming chapterTitle if needed
+    auto* r = _display.getRenderer();
+    int maxW = _display.getWidth() - 180;
+    if (r && maxW > 100) {
+        int fontHeading = NeuStyle::FONT_HEADING;
+        std::string upperSuffix(suffix);
+        for (auto &c : upperSuffix) c = toupper(c);
+        int suffixW = r->getTextWidth(fontHeading, upperSuffix.c_str());
+        int dotsW = r->getTextWidth(fontHeading, "...");
+        int targetW = maxW - suffixW - dotsW;
+        if (targetW < 0) targetW = 0;
+
+        std::string upperTitle(chapterTitle);
+        for (auto &c : upperTitle) c = toupper(c);
+
+        if (r->getTextWidth(fontHeading, upperTitle.c_str()) > (maxW - suffixW)) {
+            size_t len = strlen(chapterTitle);
+            while (len > 0 && r->getTextWidth(fontHeading, upperTitle.c_str()) > targetW) {
+                len--;
+                chapterTitle[len] = '\0';
+                upperTitle.resize(len);
+            }
+            while (len > 0 && chapterTitle[len - 1] == ' ') {
+                len--;
+                chapterTitle[len] = '\0';
+            }
+            if (len > 0) {
+                strncat(chapterTitle, "...", sizeof(chapterTitle) - strlen(chapterTitle) - 1);
+            }
+        }
+    }
+
+    snprintf(out, outLen, "%s%s", chapterTitle, suffix);
+}
+
+void BookEngine::showReaderMenu() {
+    std::vector<std::string> options;
+    options.push_back("Table of Contents");
+    options.push_back("Exit to Library");
+    options.push_back("Resume");
+
+    char headerBuf[128] = {0};
+    getChapterHeaderString(headerBuf, sizeof(headerBuf));
+
+    int choice = MenuModalWidget::show(_display, _input, _batteryWidget, "Book Menu",
+                                       options, 0, headerBuf, 0, 0, true, nullptr, nullptr, 3);
+    if (choice == 0) {
+        showTableOfContents();
+    } else if (choice == 1) {
+        if (showConfirmExit()) {
+            exitToMenu();
+        } else {
+            _needsRedraw = true;
+        }
+    } else {
+        _needsRedraw = true;
+    }
+}
+
+void BookEngine::showTableOfContents() {
+    size_t count = _catalog.tocCount();
+    std::vector<std::string> tocItems;
+    std::vector<int> spineIndices;
+
+    char titleBuf[128];
+    char fragBuf[64];
+
+    if (count > 0) {
+        bool loadedFromCache = false;
+        if (_cacheStorage.exists("toc.fibc")) {
+            int64_t size = _cacheStorage.fileSize("toc.fibc");
+            if (size > 0 && size < 65536) { // Max 64KB
+                uint8_t* buf = (uint8_t*)malloc(size);
+                if (buf) {
+                    if (_cacheStorage.readAt("toc.fibc", 0, buf, size) == size) {
+                        uint32_t offset = 0;
+                        while (offset < size) {
+                            int spineIdx;
+                            uint16_t len;
+                            if (offset + sizeof(int) + sizeof(uint16_t) > size) break;
+                            memcpy(&spineIdx, buf + offset, sizeof(int));
+                            offset += sizeof(int);
+                            memcpy(&len, buf + offset, sizeof(uint16_t));
+                            offset += sizeof(uint16_t);
+                            if (offset + len > size) break;
+                            std::string label((char*)(buf + offset), len);
+                            offset += len;
+                            
+                            tocItems.push_back(label);
+                            spineIndices.push_back(spineIdx);
+                        }
+                        loadedFromCache = true;
+                    }
+                    free(buf);
+                }
+            }
+        }
+
+        if (!loadedFromCache) {
+            for (size_t i = 0; i < count; i++) {
+                freeink::book::BookCatalog::TocItem item;
+                if (_catalog.tocItem(i, &item, titleBuf, sizeof(titleBuf), fragBuf, sizeof(fragBuf)) == freeink::book::BookStatus::Ok) {
+                    std::string label;
+                    for (uint8_t d = 0; d < item.depth && d < 6; d++) {
+                        label += "  ";
+                    }
+                    label += (titleBuf[0] != '\0') ? titleBuf : "Untitled";
+                    tocItems.push_back(label);
+                    spineIndices.push_back(item.spineIndex);
+                }
+            }
+            
+            if (_cacheStorage.beginWrite("toc.fibc")) {
+                for (size_t i = 0; i < tocItems.size(); i++) {
+                    int spineIdx = spineIndices[i];
+                    uint16_t len = tocItems[i].length();
+                    _cacheStorage.write(&spineIdx, sizeof(int));
+                    _cacheStorage.write(&len, sizeof(uint16_t));
+                    _cacheStorage.write(tocItems[i].data(), len);
+                }
+                _cacheStorage.endWrite();
+            }
+        }
+    }
+
+    // Fallback if no TOC entries found
+    if (tocItems.empty()) {
+        for (uint16_t s = 0; s < _spineCount; s++) {
+            char label[64];
+            snprintf(label, sizeof(label), "Chapter %u", s + 1);
+            tocItems.push_back(label);
+            spineIndices.push_back(s);
+        }
+    }
+
+    if (tocItems.empty()) return;
+
+    // Determine initial selection
+    int initialSelection = 0;
+    if (count > 0) {
+        int tocIdx = _catalog.tocIndexForSpine(_currentSpine);
+        if (tocIdx >= 0 && tocIdx < static_cast<int>(tocItems.size())) {
+            initialSelection = tocIdx;
+        }
+    } else {
+        if (_currentSpine < static_cast<uint16_t>(spineIndices.size())) {
+            initialSelection = _currentSpine;
+        }
+    }
+
+    char headerBuf[128] = {0};
+    getChapterHeaderString(headerBuf, sizeof(headerBuf));
+
+    bool isTouch = _settings.touchChoicesEnabled;
+    int maxItems = 6;
+    int itemMinH = 48;
+
+    if (_display.getHeight() >= 700) {
+        if (isTouch) {
+            maxItems = 5;
+            itemMinH = 64; // Spacious touch targets for X4 Pro
+        } else {
+            maxItems = 7;
+            itemMinH = 48; // Compact items for X4 (physical buttons)
+        }
+    } else {
+        if (isTouch) {
+            maxItems = 3;
+            itemMinH = 56;
+        } else {
+            maxItems = 4;
+            itemMinH = 40;
+        }
+    }
+
+    int chosen = MenuModalWidget::show(
+        _display, _input, _batteryWidget, "Table of Contents",
+        tocItems, initialSelection, headerBuf, 0, 0, true, nullptr, nullptr,
+        maxItems,
+        itemMinH
+    );
+
+    if (chosen >= 0 && chosen < static_cast<int>(spineIndices.size())) {
+        int targetSpine = spineIndices[chosen];
+        if (targetSpine >= 0 && targetSpine < static_cast<int>(_spineCount)) {
+            _pendingSpineJump = targetSpine;
+        }
+    }
+    _needsRedraw = true;
 }
 
 bool BookEngine::showConfirmExit() {
@@ -991,6 +1357,17 @@ void BookEngine::exitToMenu() {
 void BookEngine::update() {
     if (_state == State::READING) {
         handleInput();
+        
+        if (_pendingSpineJump != -1) {
+            uint16_t target = _pendingSpineJump;
+            _pendingSpineJump = -1;
+            
+            _currentSpine = target;
+            _currentPage = 0;
+            paginateChapter(_currentSpine, PageMatchMode::BY_INDEX, 0);
+            _needsRedraw = true;
+        }
+
         if (_needsRedraw) {
             renderCurrentPage();
             drawChrome();

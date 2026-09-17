@@ -58,15 +58,18 @@ int SystemUI::showMenuModal(IInput &input, const char *title,
                             const std::vector<std::string> &items,
                             int initialSelection, const char *headerTitle,
                             int minWidth, int minHeight, bool drawHalftone,
-                            int *outW, int *outH) {
+                            int *outW, int *outH,
+                            int maxItemsPerPage, int itemMinHeight) {
 #ifdef PLATFORM_ESP32
   return MenuModalWidget::show(_display, input, batteryWidget, title, items,
                                initialSelection, headerTitle, minWidth,
-                               minHeight, drawHalftone, outW, outH);
+                               minHeight, drawHalftone, outW, outH,
+                               maxItemsPerPage, itemMinHeight);
 #else
   return MenuModalWidget::show(_display, input, nullptr, title, items,
                                initialSelection, headerTitle, minWidth,
-                               minHeight, drawHalftone, outW, outH);
+                               minHeight, drawHalftone, outW, outH,
+                               maxItemsPerPage, itemMinHeight);
 #endif
 }
 

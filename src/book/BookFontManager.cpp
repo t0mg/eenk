@@ -4,6 +4,7 @@
 #include <text/hyph_en_us.h>
 #include <cstdio>
 #include <cstdlib>
+#include <new>
 
 #ifdef PLATFORM_ESP32
 #include <esp_heap_caps.h>
@@ -37,6 +38,11 @@ FontSetup::~FontSetup() {
 }
 
 bool setup(FontSetup& out, freeink::book::Arena& glyphArena, const AppSettings& settings) {
+#ifdef PLATFORM_ESP32
+    Serial.printf("[BookFont] Setting up fonts, stem: %s, free heap: %u, maxBlock: %u\n",
+                  settings.storyFont[0] ? settings.storyFont : "default",
+                  (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+#endif
     const char* stem = settings.storyFont;
     if (!stem || stem[0] == '\0') {
         stem = "sans-medium";
@@ -107,13 +113,15 @@ bool setup(FontSetup& out, freeink::book::Arena& glyphArena, const AppSettings& 
         snprintf(epdPath, sizeof(epdPath), "/fonts/%s-regular.epdfont", stem);
 #endif
         
-        StreamingEpdFont* streamFont = new StreamingEpdFont();
-        if (streamFont->load(epdPath)) {
+        StreamingEpdFont* streamFont = new (std::nothrow) StreamingEpdFont();
+        if (streamFont && streamFont->load(epdPath)) {
             out.streamingFonts[out.streamingFontCount++] = streamFont;
-            EpdBookFont* bookFont = new EpdBookFont(*streamFont);
-            out.epdFonts[out.epdFontCount++] = bookFont;
-            out.chain.add(bookFont, freeink::book::StyleNone);
-            out.fingerprint += 2000;
+            EpdBookFont* bookFont = new (std::nothrow) EpdBookFont(*streamFont);
+            if (bookFont) {
+                out.epdFonts[out.epdFontCount++] = bookFont;
+                out.chain.add(bookFont, freeink::book::StyleNone);
+                out.fingerprint += 2000;
+            }
         } else {
             delete streamFont;
             
@@ -124,39 +132,61 @@ bool setup(FontSetup& out, freeink::book::Arena& glyphArena, const AppSettings& 
             }
             
             if (builtin && builtin->regular) {
-                EpdFont* ef = new EpdFont(builtin->regular);
-                out.builtinFonts[out.builtinFontCount++] = ef;
-                EpdBookFont* bf = new EpdBookFont(*ef);
-                out.epdFonts[out.epdFontCount++] = bf;
-                out.chain.add(bf, freeink::book::StyleNone);
-                out.fingerprint += 3000;
+                EpdFont* ef = new (std::nothrow) EpdFont(builtin->regular);
+                if (ef) {
+                    out.builtinFonts[out.builtinFontCount++] = ef;
+                    EpdBookFont* bf = new (std::nothrow) EpdBookFont(*ef);
+                    if (bf) {
+                        out.epdFonts[out.epdFontCount++] = bf;
+                        out.chain.add(bf, freeink::book::StyleNone);
+                        out.fingerprint += 3000;
+                    }
+                }
             }
             if (builtin && builtin->bold) {
-                EpdFont* ef = new EpdFont(builtin->bold);
-                out.builtinFonts[out.builtinFontCount++] = ef;
-                EpdBookFont* bf = new EpdBookFont(*ef);
-                out.epdFonts[out.epdFontCount++] = bf;
-                out.chain.add(bf, freeink::book::StyleBold);
+                EpdFont* ef = new (std::nothrow) EpdFont(builtin->bold);
+                if (ef) {
+                    out.builtinFonts[out.builtinFontCount++] = ef;
+                    EpdBookFont* bf = new (std::nothrow) EpdBookFont(*ef);
+                    if (bf) {
+                        out.epdFonts[out.epdFontCount++] = bf;
+                        out.chain.add(bf, freeink::book::StyleBold);
+                    }
+                }
             }
             if (builtin && builtin->italic) {
-                EpdFont* ef = new EpdFont(builtin->italic);
-                out.builtinFonts[out.builtinFontCount++] = ef;
-                EpdBookFont* bf = new EpdBookFont(*ef);
-                out.epdFonts[out.epdFontCount++] = bf;
-                out.chain.add(bf, freeink::book::StyleItalic);
+                EpdFont* ef = new (std::nothrow) EpdFont(builtin->italic);
+                if (ef) {
+                    out.builtinFonts[out.builtinFontCount++] = ef;
+                    EpdBookFont* bf = new (std::nothrow) EpdBookFont(*ef);
+                    if (bf) {
+                        out.epdFonts[out.epdFontCount++] = bf;
+                        out.chain.add(bf, freeink::book::StyleItalic);
+                    }
+                }
             }
             if (builtin && builtin->boldItalic) {
-                EpdFont* ef = new EpdFont(builtin->boldItalic);
-                out.builtinFonts[out.builtinFontCount++] = ef;
-                EpdBookFont* bf = new EpdBookFont(*ef);
-                out.epdFonts[out.epdFontCount++] = bf;
-                out.chain.add(bf, freeink::book::StyleBold | freeink::book::StyleItalic);
+                EpdFont* ef = new (std::nothrow) EpdFont(builtin->boldItalic);
+                if (ef) {
+                    out.builtinFonts[out.builtinFontCount++] = ef;
+                    EpdBookFont* bf = new (std::nothrow) EpdBookFont(*ef);
+                    if (bf) {
+                        out.epdFonts[out.epdFontCount++] = bf;
+                        out.chain.add(bf, freeink::book::StyleBold | freeink::book::StyleItalic);
+                    }
+                }
             }
         }
     }
 
     // 3. Hyphenator
     out.hyphenator.init(freeink::book::k_hyph_en_us, freeink::book::k_hyph_en_us_size);
+
+#ifdef PLATFORM_ESP32
+    Serial.printf("[BookFont] Setup done, coverage: 0x%02x, free heap: %u, maxBlock: %u\n",
+                  out.chain.styleCoverage(), (unsigned)ESP.getFreeHeap(),
+                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+#endif
 
     return out.chain.styleCoverage() != 0;
 }

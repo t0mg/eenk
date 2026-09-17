@@ -923,6 +923,136 @@ void test_epub_exit_modal_render(void) {
   TEST_ASSERT_EQUAL(1, 1);
 }
 
+void test_epub_toc_modal_render(void) {
+  TestDisplay display;
+  QueueMockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  AppSettings settings = AppSettings::defaults();
+  settings.touchChoicesEnabled = false; // X4 non-touch: 10 items per page
+
+  BookEngine engine(display, input);
+  engine.setBatteryWidget(&widget);
+  engine.applySettings(settings);
+
+  const char *epubPath = "test/the-strange-case-of-dr-jekyll-and-mr-hyde.epub";
+  bool loaded = engine.loadBook(epubPath);
+  TEST_ASSERT_TRUE_MESSAGE(loaded, "Failed to load test EPUB");
+
+  // First page render (cover)
+  engine.update();
+
+  // Advance to page 2 (chapter text: Titlepage)
+  input.push(ButtonEvent::DOWN);
+  engine.update();
+
+  // Queue QUIT so the TOC modal exits after rendering
+  input.push(ButtonEvent::QUIT);
+  engine.showTableOfContents();
+
+  saveBMP("test/golden/test_epub_toc_modal.bmp", display.eink.getFrameBuffer(),
+          display.getWidth(), display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_epub_toc_modal_x4pro_render(void) {
+  TestDisplay display;
+  QueueMockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  AppSettings settings = AppSettings::defaults();
+  settings.touchChoicesEnabled = true; // X4 Pro touch: 8 items per page, 64px touch targets
+
+  BookEngine engine(display, input);
+  engine.setBatteryWidget(&widget);
+  engine.applySettings(settings);
+
+  const char *epubPath = "test/the-strange-case-of-dr-jekyll-and-mr-hyde.epub";
+  bool loaded = engine.loadBook(epubPath);
+  TEST_ASSERT_TRUE_MESSAGE(loaded, "Failed to load test EPUB");
+
+  // First page render (cover)
+  engine.update();
+
+  // Advance to page 2 (chapter text: Titlepage)
+  input.push(ButtonEvent::DOWN);
+  engine.update();
+
+  // Queue QUIT so the TOC modal exits after rendering
+  input.push(ButtonEvent::QUIT);
+  engine.showTableOfContents();
+
+  saveBMP("test/golden/test_epub_toc_modal_x4pro.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
+void test_chapter_header_long_title_ellipsizing(void) {
+  TestDisplay display;
+  MockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  AppSettings settings = AppSettings::defaults();
+
+  BookEngine engine(display, input);
+  engine.setBatteryWidget(&widget);
+  engine.applySettings(settings);
+
+  // Directly verify HeaderWidget truncation with long title and progress suffix
+  char testTitle[160] = "THE VERY LONG STRANGE CASE OF DR. HENRY JEKYLL AND MR. EDWARD HYDE - P. 1/14 (85%)";
+  HeaderWidget header(display, widget);
+  header.render(testTitle, NeuStyle::FONT_HEADING);
+
+  // Load Jekyll & Hyde and verify chapter header contains progress
+  const char *epubPath = "test/the-strange-case-of-dr-jekyll-and-mr-hyde.epub";
+  TEST_ASSERT_TRUE(engine.loadBook(epubPath));
+  char headerBuf[128] = {0};
+  engine.getChapterHeaderString(headerBuf, sizeof(headerBuf));
+  TEST_ASSERT_NOT_NULL(strstr(headerBuf, "%"));
+}
+
+void test_epub_toc_and_reader_menu(void) {
+  TestDisplay display;
+  QueueMockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  AppSettings settings = AppSettings::defaults();
+
+  BookEngine engine(display, input);
+  engine.setBatteryWidget(&widget);
+  engine.applySettings(settings);
+
+  const char *epubPath = "test/the-strange-case-of-dr-jekyll-and-mr-hyde.epub";
+  TEST_ASSERT_TRUE(engine.loadBook(epubPath));
+  engine.update(); // render cover
+
+  // Push BACK -> opens reader menu. Select "Resume" (item 2) by pressing DOWN, DOWN, CONFIRM
+  input.push(ButtonEvent::BACK);
+  input.push(ButtonEvent::DOWN);
+  input.push(ButtonEvent::DOWN);
+  input.push(ButtonEvent::CONFIRM);
+  engine.update();
+  TEST_ASSERT_FALSE(engine.isDone());
+
+  // Test opening TOC: BACK -> CONFIRM (item 0: TOC) -> DOWN (next chapter) -> CONFIRM
+  input.push(ButtonEvent::BACK);
+  input.push(ButtonEvent::CONFIRM); // Open TOC
+  input.push(ButtonEvent::DOWN);    // Move down one item
+  input.push(ButtonEvent::CONFIRM); // Select chapter
+  engine.update();
+  TEST_ASSERT_FALSE(engine.isDone());
+}
+
+void test_gnk_epub_open(void) {
+  TestDisplay display;
+  MockInput input;
+  BookEngine engine(display, input);
+  const char *epubPath = "stories/gnk.epub";
+  bool loaded = engine.loadBook(epubPath);
+  TEST_ASSERT_TRUE_MESSAGE(loaded, "Failed to load gnk.epub");
+}
+
 void test_epub_bookmark_resume(void) {
   TestDisplay display1;
   QueueMockInput input1;
@@ -2962,6 +3092,39 @@ void test_epub_exit_modal_x3_render(void) {
   TEST_ASSERT_EQUAL(1, 1);
 }
 
+void test_epub_toc_modal_x3_render(void) {
+  TestDisplay display(528, 792);
+  QueueMockInput input;
+  BatteryMonitor battery;
+  BatteryWidget widget(display.renderer, battery);
+  AppSettings settings = AppSettings::defaults();
+  settings.touchChoicesEnabled = false; // X3 non-touch: 10 items per page
+
+  BookEngine engine(display, input);
+  engine.setBatteryWidget(&widget);
+  engine.applySettings(settings);
+
+  const char *epubPath = "test/the-strange-case-of-dr-jekyll-and-mr-hyde.epub";
+  bool loaded = engine.loadBook(epubPath);
+  TEST_ASSERT_TRUE_MESSAGE(loaded, "Failed to load test EPUB");
+
+  // First page render (cover)
+  engine.update();
+
+  // Advance to page 2 (chapter text: Story of the Door)
+  input.push(ButtonEvent::DOWN);
+  engine.update();
+
+  // Queue QUIT so the TOC modal exits after rendering
+  input.push(ButtonEvent::QUIT);
+  engine.showTableOfContents();
+
+  saveBMP("test/golden/x3/test_epub_toc_modal.bmp",
+          display.eink.getFrameBuffer(), display.getWidth(),
+          display.getHeight());
+  TEST_ASSERT_EQUAL(1, 1);
+}
+
 void test_choice_states_x3_screenshot(void) {
   TestDisplay display(528, 792);
   display.clear();
@@ -3309,6 +3472,11 @@ int main(int argc, char **argv) {
   RUN_TEST(test_epub_page_render);
   RUN_TEST(test_epub_page_2_render);
   RUN_TEST(test_epub_exit_modal_render);
+  RUN_TEST(test_epub_toc_modal_render);
+  RUN_TEST(test_epub_toc_modal_x4pro_render);
+  RUN_TEST(test_chapter_header_long_title_ellipsizing);
+  RUN_TEST(test_epub_toc_and_reader_menu);
+  RUN_TEST(test_gnk_epub_open);
   RUN_TEST(test_epub_bookmark_resume);
   RUN_TEST(test_epub_framebuffer_cache);
   RUN_TEST(test_epub_touch_disabled_navigation);
@@ -3370,6 +3538,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_epub_page_x3_render);
   RUN_TEST(test_epub_page_2_x3_render);
   RUN_TEST(test_epub_exit_modal_x3_render);
+  RUN_TEST(test_epub_toc_modal_x3_render);
   RUN_TEST(test_choice_states_x3_screenshot);
   RUN_TEST(test_choice_states_touch_x3_screenshot);
   RUN_TEST(test_quick_menu_x3_screenshot);

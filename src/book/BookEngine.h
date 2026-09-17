@@ -10,6 +10,8 @@
 #include "BookFontManager.h"
 #include "ui/BatteryWidget.h"
 #include "cache/PageCache.h"
+#include <vector>
+#include <string>
 #include <cstdint>
 
 class IFrontlight;
@@ -37,6 +39,11 @@ public:
 
     // Get the cover thumbnail path for library use
     static bool getCoverThumbPath(const char* epubPath, char* out, size_t outLen);
+
+    // Chapter header and menus
+    void getChapterHeaderString(char* out, size_t outLen) const;
+    void showReaderMenu();
+    void showTableOfContents();
 
 private:
     enum class State { LOADING, PAGINATING, READING, DONE };
@@ -121,6 +128,8 @@ private:
     void buildStem(char* out, size_t outLen) const;
 
     // Internal methods
+    int _pendingSpineJump = -1;
+    bool _pendingRepaginate = false;
     bool openContainer();
     bool setupFonts();
     bool paginateChapter(uint16_t spineIndex, PageMatchMode mode = PageMatchMode::BY_INDEX, uint32_t targetVal = 0);

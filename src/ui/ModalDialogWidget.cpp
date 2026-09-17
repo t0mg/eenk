@@ -91,8 +91,8 @@ bool ModalDialogWidget::show(IDisplay &display, IInput &input,
   renderer->drawShadowBox(dlgX, dlgY, DLG_W, DLG_H, NeuStyle::BORDER_W,
                           NeuStyle::SHADOW_OFFSET);
 
-  if (batteryWidget) {
-    HeaderWidget header(display, *batteryWidget);
+  if (batteryWidget || (headerTitle && headerTitle[0] != '\0')) {
+    HeaderWidget header(display, batteryWidget);
     header.render(headerTitle ? headerTitle : "", fontHeading);
   }
 

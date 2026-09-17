@@ -24,7 +24,8 @@ int MenuModalWidget::show(IDisplay &display, IInput &input,
                           int initialSelection, const char *headerTitle,
                           int minWidth, int minHeight,
                           bool drawHalftone,
-                          int *outW, int *outH) {
+                          int *outW, int *outH,
+                          int maxItemsPerPage, int itemMinHeight) {
   auto renderer = display.getRenderer();
   if (!renderer || items.empty())
     return -1;
@@ -45,16 +46,17 @@ int MenuModalWidget::show(IDisplay &display, IInput &input,
   int selectedIndex = std::max(0, std::min(initialSelection, totalItems - 1));
   int currentMinHeight = minHeight;
 
-  static constexpr int maxItemsPerPage = 4;
+  int effectiveItemMinH = (itemMinHeight > 0) ? itemMinHeight : NeuStyle::CHOICE_MIN_H;
+  int arrowRowH = (effectiveItemMinH < NeuStyle::CHOICE_MIN_H) ? 32 : NeuStyle::CHOICE_MIN_H;
+  int effectiveMaxItems = (maxItemsPerPage > 0) ? maxItemsPerPage : 4;
 
   while (true) {
-    int currentPage = selectedIndex / maxItemsPerPage;
-    int startIndex = currentPage * maxItemsPerPage;
-    int endIndex = std::min(totalItems, startIndex + maxItemsPerPage);
+    int currentPage = selectedIndex / effectiveMaxItems;
+    int startIndex = currentPage * effectiveMaxItems;
+    int endIndex = std::min(totalItems, startIndex + effectiveMaxItems);
 
     bool hasPrevPage = (startIndex > 0);
     bool hasNextPage = (endIndex < totalItems);
-    static constexpr int arrowRowH = NeuStyle::CHOICE_MIN_H;
 
     int innerX = (dispW - DLG_W) / 2 + NeuStyle::BORDER_W;
     int innerW = DLG_W - 2 * NeuStyle::BORDER_W;
@@ -77,7 +79,8 @@ int MenuModalWidget::show(IDisplay &display, IInput &input,
       pageWrappedLines.push_back(wrapped);
 
       int numLines = static_cast<int>(wrapped.size());
-      int itemH = std::max(NeuStyle::CHOICE_MIN_H, numLines * bodyLineH + 20);
+      int itemPad = (effectiveItemMinH < NeuStyle::CHOICE_MIN_H) ? 14 : 20;
+      int itemH = std::max(effectiveItemMinH, numLines * bodyLineH + itemPad);
       pageItemHeights.push_back(itemH);
       itemsTotalH += itemH;
     }
@@ -110,8 +113,8 @@ int MenuModalWidget::show(IDisplay &display, IInput &input,
                             NeuStyle::SHADOW_OFFSET);
 
     // Header widget
-    if (batteryWidget) {
-      HeaderWidget header(display, *batteryWidget);
+    if (batteryWidget || (headerTitle && headerTitle[0] != '\0')) {
+      HeaderWidget header(display, batteryWidget);
       header.render(headerTitle ? headerTitle : "", fontHeading);
     }
 
@@ -141,7 +144,7 @@ int MenuModalWidget::show(IDisplay &display, IInput &input,
     RenderedMenuItem upArrowRect = {0, 0, 0, 0, -1};
     if (hasPrevPage) {
       upArrowRect = {innerX, currY, innerW, arrowRowH, -1};
-      int iconSize = 16;
+      int iconSize = (arrowRowH < 40) ? 14 : 16;
       int iconX = innerX + (innerW - iconSize) / 2;
       int iconY = currY + (arrowRowH - (iconSize + 1) / 2) / 2;
       renderer->drawUpTriangleIcon(iconX, iconY, iconSize, true);
@@ -190,7 +193,7 @@ int MenuModalWidget::show(IDisplay &display, IInput &input,
     RenderedMenuItem downArrowRect = {0, 0, 0, 0, -1};
     if (hasNextPage) {
       downArrowRect = {innerX, currY, innerW, arrowRowH, -1};
-      int iconSize = 16;
+      int iconSize = (arrowRowH < 40) ? 14 : 16;
       int iconX = innerX + (innerW - iconSize) / 2;
       int iconY = currY + (arrowRowH - (iconSize + 1) / 2) / 2;
       renderer->drawDownTriangleIcon(iconX, iconY, iconSize, true);
@@ -243,7 +246,7 @@ int MenuModalWidget::show(IDisplay &display, IInput &input,
             touchX <= upArrowRect.x + upArrowRect.w &&
             touchY >= upArrowRect.y &&
             touchY <= upArrowRect.y + upArrowRect.h) {
-          selectedIndex = std::max(0, startIndex - maxItemsPerPage);
+          selectedIndex = std::max(0, startIndex - effectiveMaxItems);
           stateChanged = true;
           break;
         }

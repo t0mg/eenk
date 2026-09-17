@@ -21,7 +21,9 @@ public:
                     int initialSelection = 0, const char *headerTitle = "",
                     int minWidth = 0, int minHeight = 0,
                     bool drawHalftone = true,
-                    int *outW = nullptr, int *outH = nullptr);
+                    int *outW = nullptr, int *outH = nullptr,
+                    int maxItemsPerPage = 4,
+                    int itemMinHeight = 0);
 
   // Checks battery level and forces sleep if < 5%. Safe to call frequently.
   static void checkBatteryAndShutdown(class BatteryWidget& battery, class IDisplay& display);

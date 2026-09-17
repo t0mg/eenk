@@ -23,7 +23,6 @@ private:
     const EpdFont* _font = nullptr;
     StreamingEpdFont* _streamFont = nullptr;
     freeink::book::GlyphBitmap _glyph{};
-    uint8_t _coverage[64 * 64];
 
     static uint32_t normalized(uint32_t cp);
     const EpdGlyph* getEpdGlyph(uint32_t cp) const;

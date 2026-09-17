@@ -11,11 +11,12 @@ public:
   static constexpr int LEFT_MARGIN = 8;
 
   HeaderWidget(IDisplay &display, BatteryWidget &battery);
+  HeaderWidget(IDisplay &display, BatteryWidget *battery = nullptr);
 
   // Renders the header with the given title string.
   void render(const char *title, int fontIndex) const;
 
 private:
   IDisplay &_display;
-  BatteryWidget &_battery;
+  BatteryWidget *_battery;
 };

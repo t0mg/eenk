@@ -1,5 +1,13 @@
 #include "EpdBookFont.h"
 
+namespace {
+// Shared rasterization buffer across all EpdBookFont instances.
+// PageRenderer renders glyphs sequentially, so a single buffer is safe.
+// Making this static instead of a per-instance member reduces EpdBookFont size
+// from ~4.1 KB to 36 bytes, saving ~16 KB of heap on platforms without PSRAM.
+uint8_t s_coverage[64 * 64];
+}
+
 EpdBookFont::EpdBookFont(const EpdFont& font) : _font(&font), _streamFont(nullptr) {}
 
 EpdBookFont::EpdBookFont(StreamingEpdFont& font) : _font(nullptr), _streamFont(&font) {}
@@ -83,7 +91,7 @@ const freeink::book::GlyphBitmap* EpdBookFont::rasterize(uint32_t codepoint, uin
     if (src == nullptr) return nullptr;
 
     uint32_t pixels = static_cast<uint32_t>(g->width) * g->height;
-    if (pixels > sizeof(_coverage)) return nullptr;
+    if (pixels > sizeof(s_coverage)) return nullptr;
 
     bool is2Bit = false;
     if (_font && _font->data) {
@@ -97,15 +105,15 @@ const freeink::book::GlyphBitmap* EpdBookFont::rasterize(uint32_t codepoint, uin
             const uint8_t byte = src[i / 4];
             const uint8_t bitIdx = static_cast<uint8_t>((3 - (i % 4)) * 2);
             const uint8_t rawVal = (byte >> bitIdx) & 0x3;
-            _coverage[i] = rawVal * 85;
+            s_coverage[i] = rawVal * 85;
         }
     } else {
         for (uint32_t i = 0; i < pixels; ++i) {
-            _coverage[i] = ((src[i / 8] >> (7 - (i % 8))) & 1) ? 255 : 0;
+            s_coverage[i] = ((src[i / 8] >> (7 - (i % 8))) & 1) ? 255 : 0;
         }
     }
 
-    _glyph.pixels = _coverage;
+    _glyph.pixels = s_coverage;
     _glyph.width = g->width;
     _glyph.height = g->height;
     _glyph.xoff = g->left;

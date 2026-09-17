@@ -38,7 +38,7 @@ void earlyBootCheck() {
   if (!updaterMode) {
     // Init SPI first so SD.begin() works (SCLK=8, MISO=7, MOSI=10, CS=21)
     SPI.begin(8, 7, 10, 21);
-    if (SD.begin(12, SPI, 40000000, "/sd", 16)) {
+    if (SD.begin(12, SPI, 40000000, "/sd", 8)) {
       if (SD.exists("/firmware.bin")) {
         Serial.println(
             "[Boot] /firmware.bin found on SD. Forcing updater mode.");
@@ -65,7 +65,7 @@ void initHardware() {
 
 bool mountSdForUpdater() {
   // EspEinkDisplay already called SPI.begin(8, 7, 10, 21)
-  return SD.begin(12, SPI, 40000000, "/sd", 16);
+  return SD.begin(12, SPI, 40000000, "/sd", 8);
 }
 
 void prepareForSleep() {

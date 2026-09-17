@@ -263,8 +263,8 @@ void setup() {
   if (mode == BootMode::BOOK_READER) {
     Serial.println("[Boot] BOOK_READER — loading book...");
 #ifdef HAS_SD_CARD
-    sdStorage = new StorageType();
-    if (!sdStorage->begin()) {
+    StorageType sdMount;
+    if (!sdMount.begin()) {
       Serial.println("[SD] SD mount failed for book reader.");
       systemUI->showMessage("SD ERROR", "Failed to mount SD card.\n\nPress BACK to return to menu.");
       while (true) {

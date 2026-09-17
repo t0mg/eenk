@@ -19,7 +19,7 @@ bool EspSdStorage::begin()
     // SD.begin() will use the existing SPI instance — we only pass the CS pin.
     // Do NOT call SPI.begin() here; it would reconfigure the bus and crash
     // because GPIO12 is also SPIHD on ESP32-C3.
-    if (!SD.begin(SD_CS_PIN, SPI, 40000000, "/sd", 16)) {
+    if (!SD.begin(SD_CS_PIN, SPI, 40000000, "/sd", 8)) {
         Serial.println("[SD] SD card init failed");
         return false;
     }
