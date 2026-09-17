@@ -181,7 +181,6 @@ h2 .heading-anchor:hover {
 .story-card img {
   width: 100%;
   object-fit: contain;
-  flex-grow: 1;
 }
 
 /* Touch devices support (reveal subtly when hover is unavailable) */

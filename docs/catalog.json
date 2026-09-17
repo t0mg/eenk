@@ -1,4 +1,17 @@
 {
+  "psyphon": {
+    "title": "PSYPHON",
+    "author": "Jon Ingold",
+    "description": "Courier job. Turn up at the hotel, port ready. Several terabytes, but you've cleared the space. Will get your mind back once it's done. Nothing's going to go wrong.",
+    "website": "https://www.inklestudios.com",
+    "thumbnail": "../assets/stories/psyphon/thumbnail.jpg",
+    "files": [
+      "../assets/stories/psyphon/core.bin",
+      "../assets/stories/psyphon/core.media",
+      "../assets/stories/psyphon/Quantico.epdfont",
+      "../assets/stories/psyphon/Quantico-italic.epdfont"
+    ]
+  },
   "the-intercept": {
     "title": "The Intercept",
     "author": "Jon Ingold",
