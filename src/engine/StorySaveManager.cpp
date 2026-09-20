@@ -644,8 +644,12 @@ bool StorySaveManager::restoreMainProgress(InkStoryManager &story,
   display.setScrollY(0);
   display.clearFontCache();
 
-  if (!story.loadSnapshot(dataPtr, dataLen))
+  if (!story.loadSnapshot(dataPtr, dataLen)) {
+    if (!story.runner()) {
+      story.createFreshRunner();
+    }
     return false;
+  }
 
   for (const auto &l : _mainHistory) {
     display.addWrappedLine(l);
@@ -763,8 +767,12 @@ bool StorySaveManager::restoreCheckpoint(size_t index, InkStoryManager &story,
   story.resetRunner();
 
   if (!cp.snapshotData.empty()) {
-    if (!story.loadSnapshot(cp.snapshotData.data(), cp.snapshotData.size()))
+    if (!story.loadSnapshot(cp.snapshotData.data(), cp.snapshotData.size())) {
+      if (!story.runner()) {
+        story.createFreshRunner();
+      }
       return false;
+    }
   } else if (cp.fileOffset > 0 && cp.snapshotLen > 0 && storage) {
     bool loaded = false;
     storage->readStream(
@@ -783,14 +791,25 @@ bool StorySaveManager::restoreCheckpoint(size_t index, InkStoryManager &story,
           }
           bool ok = story.loadSnapshot(snapBuf, cp.snapshotLen);
           free(snapBuf);
-          if (!ok)
+          if (!ok) {
+            if (!story.runner()) {
+              story.createFreshRunner();
+            }
             return false;
+          }
           loaded = true;
           return true;
         });
-    if (!loaded)
+    if (!loaded) {
+      if (!story.runner()) {
+        story.createFreshRunner();
+      }
       return false;
+    }
   } else {
+    if (!story.runner()) {
+      story.createFreshRunner();
+    }
     return false;
   }
 

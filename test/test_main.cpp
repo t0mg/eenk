@@ -2242,6 +2242,57 @@ void test_streaming_snapshot(void) {
   storage.deleteFile(testSavePath);
 }
 
+void test_psyphon_snapshot_and_corrupt_save_recovery(void) {
+  SDLStorage storage;
+  StoryMetadata meta;
+  std::string base, dir;
+  InkStoryManager storyMgr(storage);
+
+  const char *psyphonPath = "docs/assets-webonly/stories/psyphon/core.bin";
+  TEST_ASSERT_TRUE(storyMgr.loadStory(psyphonPath, meta, base, dir));
+
+  // Advance to choices
+  while (storyMgr.runner()->can_continue()) {
+    storyMgr.runner()->getline_alloc();
+  }
+  TEST_ASSERT_TRUE(storyMgr.runner()->has_choices());
+  size_t nChoices = storyMgr.runner()->num_choices();
+  TEST_ASSERT_GREATER_THAN(0, nChoices);
+
+  // 1. Create snapshot with active choices and restore it
+  size_t snapLen = 0;
+  const unsigned char *snapData = storyMgr.createSnapshot(&snapLen);
+  TEST_ASSERT_NOT_NULL(snapData);
+  TEST_ASSERT_GREATER_THAN(0, snapLen);
+
+  InkStoryManager restoreMgr(storage);
+  TEST_ASSERT_TRUE(restoreMgr.loadStory(psyphonPath, meta, base, dir));
+  TEST_ASSERT_TRUE(restoreMgr.loadSnapshot(snapData, snapLen));
+  TEST_ASSERT_NOT_NULL(restoreMgr.runner().get());
+  TEST_ASSERT_EQUAL(nChoices, restoreMgr.runner()->num_choices());
+
+  // 2. Test corrupted / incompatible snapshot handling: runner must not be left null
+  uint8_t garbageSnap[64] = {0xFF, 0xEE, 0xDD, 0xCC};
+  TEST_ASSERT_FALSE(restoreMgr.loadSnapshot(garbageSnap, sizeof(garbageSnap)));
+  TEST_ASSERT_NOT_NULL(restoreMgr.runner().get());
+
+  // 3. Test InkEngine loadStory with corrupt / incompatible save file
+  char testSavePath[256] = {};
+  StoryMetadata::getSavePath(psyphonPath, testSavePath, sizeof(testSavePath));
+  storage.deleteFile(testSavePath);
+  storage.writeFileBinary(testSavePath, garbageSnap, sizeof(garbageSnap));
+
+  TestDisplay testDisp;
+  MockInput testInput;
+  InkEngine engine(testDisp, testInput, storage);
+  TEST_ASSERT_TRUE(engine.loadStory(psyphonPath));
+
+  // Runner must be valid and engine should update without hanging
+  TEST_ASSERT_NOT_NULL(engine.getStoryManager().runner().get());
+  engine.update();
+  storage.deleteFile(testSavePath);
+}
+
 void test_save_manager_universal_key_deduplication(void) {
   StorySaveManager mgr;
   mgr.init("test/dummy.sav", 0x11223344);
@@ -3506,6 +3557,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_save_manager_borrowed_snapshot);
   RUN_TEST(test_save_manager_concurrent_open_files);
   RUN_TEST(test_streaming_snapshot);
+  RUN_TEST(test_psyphon_snapshot_and_corrupt_save_recovery);
   RUN_TEST(test_save_manager_universal_key_deduplication);
   RUN_TEST(test_save_manager_restart_clear);
   RUN_TEST(test_story_random_reseeding);

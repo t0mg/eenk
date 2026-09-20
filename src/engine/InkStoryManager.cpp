@@ -283,34 +283,36 @@ bool InkStoryManager::loadSnapshot(const unsigned char* data, std::size_t length
     // Release existing runner and globals before deserializing snapshot to maximize contiguous heap
     resetRunner();
 
+    auto failAndRecover = [this]() {
+        ink::g_ink_has_jmp_buf = false;
+        createFreshRunner();
+        return false;
+    };
+
     ink::g_ink_has_jmp_buf = true;
     if (setjmp(ink::g_ink_jmp_buf) != 0) {
-        ink::g_ink_has_jmp_buf = false;
         printf("[InkStoryManager] RuntimeError loading snapshot: %s\n", ink::g_ink_last_error);
-        return false;
+        return failAndRecover();
     }
 
     ink::runtime::snapshot* snap = ink::runtime::snapshot::from_binary(data, length, false);
     if (!snap) {
-        ink::g_ink_has_jmp_buf = false;
-        return false;
+        return failAndRecover();
     }
 
     _globals = _story->new_globals_from_snapshot(*snap);
     if (!_globals) {
-        ink::g_ink_has_jmp_buf = false;
         printf("[InkStoryManager] Failed to load globals from snapshot\n");
         delete snap;
-        return false;
+        return failAndRecover();
     }
 
     _runner = _story->new_runner_from_snapshot(*snap, _globals);
     if (!_runner) {
-        ink::g_ink_has_jmp_buf = false;
         printf("[InkStoryManager] Failed to load runner from snapshot\n");
         _globals = nullptr;
         delete snap;
-        return false;
+        return failAndRecover();
     }
 
     delete snap;

@@ -79,6 +79,11 @@ bool InkEngine::loadStory(const char *path) {
     _displayManager.clearHistory();
     _displayManager.clearChoices();
     _displayManager.setScrollY(0);
+    if (!_storyManager.runner()) {
+      printf("[InkEngine] Save file could not be restored; starting fresh runner\n");
+      _storyManager.createFreshRunner();
+    }
+    _saveManager.clearAll(_storage);
   }
 
   _state = State::RUNNING_TEXT;
@@ -110,6 +115,11 @@ bool InkEngine::loadStory(const unsigned char *data, std::size_t size,
       _displayManager.clearHistory();
       _displayManager.clearChoices();
       _displayManager.setScrollY(0);
+      if (!_storyManager.runner()) {
+        printf("[InkEngine] Save file could not be restored; starting fresh runner\n");
+        _storyManager.createFreshRunner();
+      }
+      _saveManager.clearAll(_storage);
     }
   } else {
     _displayManager.clearHistory();
@@ -327,8 +337,13 @@ void InkEngine::tickRunningText() {
   };
 
   auto &runner = _storyManager.runner();
-  if (!runner)
-    return;
+  if (!runner) {
+    printf("[InkEngine] Warning: runner is null in tickRunningText; creating fresh runner\n");
+    _storyManager.createFreshRunner();
+    runner = _storyManager.runner();
+    if (!runner)
+      return;
+  }
 
   while (true) {
     ink::g_ink_has_jmp_buf = true;
