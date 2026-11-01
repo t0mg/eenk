@@ -532,6 +532,7 @@ body.iframe-embed .dm-header-title {
 .btn-secondary {
   background: var(--color-bg);
   color: var(--color-fg);
+  text-decoration: none;
 }
 
 .btn-secondary:not(:disabled):hover {
