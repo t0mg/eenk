@@ -17,10 +17,33 @@ FlashCache::FlashCache()
     // Initialize NVS
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+#ifdef EENK_LOCKED_BUILD
+        // Locked X4: NVS is shared with CrossPoint (namespace "devid" holds
+        // its 32-byte device secret; eenk uses "boot"/"settings"/"ink_cache").
+        // Never erase here — a wipe would orphan CrossPoint's wrapped book
+        // keys. All eenk NVS users tolerate init failure (defaults /
+        // hash-miss), so continue without NVS. In practice this branch is
+        // unreachable: Arduino's initArduino() already applies this same
+        // erase policy before setup(), and NEW_VERSION can't occur (both
+        // firmwares are IDF 5.5.x). Defense-in-depth only.
+        Serial.printf("[FlashCache] NVS init failed (%d); continuing without NVS (locked build, no erase).\n",
+                      (int)err);
+#else
         ESP_ERROR_CHECK(nvs_flash_erase());
         err = nvs_flash_init();
+#endif
     }
+#ifdef EENK_LOCKED_BUILD
+    // Locked builds must never hard-fault on NVS failure (a panic loop would
+    // strand a USB-locked unit); every NVS caller handles missing NVS
+    // gracefully, so log and continue.
+    if (err != ESP_OK) {
+        Serial.printf("[FlashCache] NVS unavailable (%d); continuing with defaults.\n", (int)err);
+        return;
+    }
+#else
     ESP_ERROR_CHECK(err);
+#endif
 }
 
 FlashCache::~FlashCache()
@@ -48,8 +71,10 @@ bool FlashCache::findPartition()
 #ifdef EENK_LOCKED_BUILD
     // Locked X4: CrossPoint layout has no ink_cache partition. Reuse the
     // otherwise-unused spiffs partition (0x360000 = 3.375MB) as raw cache.
-    // CrossPoint never mounts flash spiffs (all state lives on SD; it uses
-    // no NVS either), and we never mount it as a filesystem: raw
+    // CrossPoint never mounts flash spiffs (all state lives on SD; its only
+    // NVS use is the 32-byte "devid" secret, disjoint from eenk's
+    // "boot"/"settings"/"ink_cache" namespaces), and we never mount it as a
+    // filesystem: raw
     // erase/write/mmap only, same access pattern as ink_cache.
     _partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "spiffs");
 #else
@@ -80,7 +105,7 @@ bool FlashCache::mapFromFlash(std::size_t size)
 bool FlashCache::loadHashFromNvs(uint32_t* outHash, std::size_t* outSize)
 {
     // NVS namespace is independent of the cache partition label; kept as
-    // "ink_cache" on all builds (CrossPoint uses no NVS: no collisions).
+    // "ink_cache" on all builds (disjoint from CrossPoint's "devid": no collisions).
     nvs_handle_t my_handle;
     esp_err_t err = nvs_open("ink_cache", NVS_READONLY, &my_handle);
     if (err != ESP_OK) return false;

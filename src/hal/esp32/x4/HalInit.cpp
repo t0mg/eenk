@@ -4,6 +4,7 @@
 #include "os/BootManager.h"
 #include <Arduino.h>
 #include <BatteryMonitor.h>
+#include <esp_system.h>
 #include <InputManager.h>
 #include <SD.h>
 #include <SPI.h>
@@ -33,6 +34,20 @@ void earlyBootCheck() {
   // slot, and esp_ota_set_boot_partition() fails its image verify on locked
   // units. Sample UP (same 5-sample debounce as stock); when held, flag SD
   // recovery instead of booting the updater partition.
+  //
+  // Only cold boots / wakes may enter recovery. A warm ESP.restart() (e.g.
+  // the post-flash reboot, a Settings save, or a crash) must boot normally
+  // even if UP is still held — otherwise holding UP through the restart
+  // re-enters recovery with no way out except flashing again. Mirrors
+  // CrossPoint, which gates recovery on a power-button wake (POWERON on
+  // battery, DEEPSLEEP-wake on USB power, EXT for the reset button).
+  const esp_reset_reason_t resetReason = esp_reset_reason();
+  if (resetReason != ESP_RST_POWERON && resetReason != ESP_RST_DEEPSLEEP &&
+      resetReason != ESP_RST_EXT) {
+    Serial.printf("[Boot] Warm boot (reset reason %d): skipping SD recovery check.\n",
+                  (int)resetReason);
+    return;
+  }
   InputManager im;
   im.begin();
   int pressedCount = 0;

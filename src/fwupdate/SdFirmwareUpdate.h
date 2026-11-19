@@ -12,6 +12,9 @@
 // Recovery semantics mirror CrossPoint: with recoveryMode=true the flow never
 // returns to the caller — cancel/failure loop back to the picker — and works
 // with zero .bin files present (shows "No .bin files found" + retry).
+// A power-button long-press deep-sleeps from anywhere (unlike CrossPoint,
+// whose Activity framework keeps SLEEP working globally); the next power-on
+// without UP boots normally, so recovery can never trap the user.
 
 #include <string>
 #include <vector>
@@ -25,7 +28,7 @@ class SdFirmwareUpdate {
   static constexpr size_t kMaxEntries = 64;
 
   // Blocking. recoveryMode=false returns on cancel/failure (caller repaints);
-  // recoveryMode=true only leaves via ESP.restart().
+  // recoveryMode=true only leaves via ESP.restart() or power-button sleep.
   static void run(IDisplay& display, IInput& input, bool recoveryMode);
 
  private:
@@ -40,8 +43,8 @@ class SdFirmwareUpdate {
   static bool validateFirmware(const std::string& path, std::string& outError);
 
   // Block until the user presses CONFIRM/BACK/QUIT (fresh press, not the one
-  // that led here).
-  static void waitForDismiss(IInput& input);
+  // that led here). A power long-press (SLEEP) deep-sleeps via sleepNow().
+  static void waitForDismiss(IInput& input, IDisplay& display);
 
   static void formatSize(uint32_t bytes, char* out, size_t outLen);
   static const char* basenameOf(const char* path);

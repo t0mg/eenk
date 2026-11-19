@@ -4,7 +4,10 @@ Self-update path for USB-locked Xteink X4 units (`[env:esp32c3_locked]`), where
 the factory eFuse disables ROM download mode and `esp_ota_set_boot_partition()`
 fails its image verify. Same safety contract as CrossPoint: validate the image
 end-to-end, stream it into the **inactive** OTA app slot, flip otadata raw.
-Bootloader, partition table, NVS and the running slot are never touched.
+Bootloader, partition table and the running slot are never touched. NVS is
+shared with CrossPoint (its `devid` secret plus eenk's
+`boot`/`settings`/`ink_cache` namespaces, no collisions) and is never
+erased in locked builds.
 
 ## File provenance
 
@@ -62,11 +65,16 @@ with these adaptations:
    refresh (~1s); per-percent would add minutes to a ~3.4MB flash.
 3. **"Do not power off"** lives in the confirmation dialog text: eenk's
    `LoadingWidget` progress screen has no sub-line slot.
-4. **Recovery entry**: `Up` sampled in `HalInit::earlyBootCheck()` sets a flag;
-   `main.cpp` runs the updater after display/input/SD init, before boot-mode
-   dispatch (CrossPoint samples then routes after init the same way). Button
-   only — no `/firmware.bin` auto-trigger. Cancel/failure loop back to the
-   picker; with no `.bin` present it shows the message and retries (re-mounting
-   first, so an SD card inserted after boot is picked up).
+4. **Recovery entry**: `Up` sampled in `HalInit::earlyBootCheck()` on cold boots
+   only (`POWERON`/`DEEPSLEEP`-wake/`EXT`; a warm `ESP.restart()` boots
+   normally even with `Up` held, mirroring CrossPoint's power-button-wake
+   gate) sets a flag; `main.cpp` runs the updater after display/input/SD init,
+   before boot-mode dispatch (CrossPoint samples then routes after init the
+   same way). Button only — no `/firmware.bin` auto-trigger. Cancel/failure
+   loop back to the picker; with no `.bin` present it shows the message and
+   retries (re-mounting first, so an SD card inserted after boot is picked up).
+   A power-button long-press deep-sleeps from anywhere (the e-ink modals ignore
+   `SLEEP`, so input is routed through a decorator); the next power-on without
+   `Up` boots normally, so recovery can never trap the user.
 5. **Settings entry** replaces the `REBOOT_UPDATER` row in the same slot
    (`SD_FIRMWARE_UPDATE`, locked builds only); stock builds keep `bootUpdater()`.

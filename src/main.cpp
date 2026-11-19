@@ -197,7 +197,7 @@ void setup() {
 #ifdef EENK_LOCKED_BUILD
   // Locked X4: Up+Power recovery — run the SD updater before boot-mode
   // dispatch (mirrors CrossPoint: sample early in earlyBootCheck, route here
-  // after init). Recovery never returns except by rebooting.
+  // after init). Recovery never returns except by rebooting or power-button sleep.
   if (HalInit::recoveryRequested()) {
     Serial.println("[Boot] Recovery mode: launching SD firmware updater.");
     sdStorage = new StorageType();

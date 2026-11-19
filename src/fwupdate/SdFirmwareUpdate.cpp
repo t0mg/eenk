@@ -6,11 +6,13 @@
 #include <Arduino.h>
 #include <SD.h>
 #include <esp_ota_ops.h>
+#include <esp_sleep.h>
 
 #include <algorithm>
 #include <cstring>
 
 #include "FirmwareFlasher.h"
+#include "HalInit.h"
 #include "HalTypes.h"
 #include "os/AppSettings.h"
 #include "ui/SystemUI.h"
@@ -77,6 +79,41 @@ void drainStaleInput(IInput& input, unsigned long ms) {
   }
 }
 
+// Power-button sleep from inside the updater. Recovery never returns to the
+// caller, so without this a long-press would be swallowed by the modal
+// pickers (which ignore SLEEP) and trap the user until the battery dies.
+// Sleeping shows the standard cover, arms the power-button wakeup, and
+// deep-sleeps; the next power-on (without UP held) boots normally.
+[[noreturn]] void sleepNow(IDisplay& display) {
+  SystemUI ui(display);
+  ui.showSleepCover();
+  delay(500);
+  HalInit::prepareForSleep();
+  esp_deep_sleep_start();
+  for (;;) delay(1000);  // unreachable
+}
+
+// IInput decorator: deep-sleep on SLEEP instead of returning it, so the
+// blocking Menu/Confirm modals (which ignore SLEEP) can't swallow a
+// power-button long-press. All other events pass through untouched.
+class SleepAwareInput : public IInput {
+ public:
+  SleepAwareInput(IInput& inner, IDisplay& display) : _inner(inner), _display(display) {}
+  ButtonEvent pollInput() override {
+    const ButtonEvent ev = _inner.pollInput();
+    if (ev == ButtonEvent::SLEEP) sleepNow(_display);
+    return ev;
+  }
+  bool getTouchPosition(int& x, int& y) const override { return _inner.getTouchPosition(x, y); }
+  uint32_t getLastActivityTime() const override { return _inner.getLastActivityTime(); }
+  void setAutoSleepTimeout(uint16_t seconds) override { _inner.setAutoSleepTimeout(seconds); }
+  void resetActivityTimer() override { _inner.resetActivityTimer(); }
+
+ private:
+  IInput& _inner;
+  IDisplay& _display;
+};
+
 }  // namespace
 
 const char* SdFirmwareUpdate::basenameOf(const char* path) {
@@ -141,11 +178,12 @@ bool SdFirmwareUpdate::validateFirmware(const std::string& path, std::string& ou
   return true;
 }
 
-void SdFirmwareUpdate::waitForDismiss(IInput& input) {
+void SdFirmwareUpdate::waitForDismiss(IInput& input, IDisplay& display) {
   delay(300);
   drainStaleInput(input, 100);
   for (;;) {
     const ButtonEvent ev = input.pollInput();
+    if (ev == ButtonEvent::SLEEP) sleepNow(display);
     if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::BACK || ev == ButtonEvent::QUIT) return;
     delay(50);
   }
@@ -154,12 +192,17 @@ void SdFirmwareUpdate::waitForDismiss(IInput& input) {
 void SdFirmwareUpdate::run(IDisplay& display, IInput& input, bool recoveryMode) {
   SystemUI ui(display);
   const char* title = recoveryMode ? "Recovery Mode" : "SD Card Firmware Update";
+  // Route all input through the sleep-aware decorator so a power long-press
+  // deep-sleeps even inside the blocking picker/confirm modals (which ignore
+  // SLEEP). Recovery leaves via reboot or power-button sleep; a sleep followed
+  // by a power-on without UP boots normally.
+  SleepAwareInput sleepInput(input, display);
 
   // Never auto-sleep inside the updater (mirrors preventAutoSleep); restored
-  // on every non-recovery exit below. Recovery only leaves via reboot.
-  input.setAutoSleepTimeout(0);
-  input.resetActivityTimer();
-  drainStaleInput(input, 150);
+  // on every non-recovery exit below. Recovery only leaves via reboot/sleep.
+  sleepInput.setAutoSleepTimeout(0);
+  sleepInput.resetActivityTimer();
+  drainStaleInput(sleepInput, 150);
 
   auto restoreSleep = [&input]() {
     input.setAutoSleepTimeout(AppSettings::load().sleepTimeoutSec);
@@ -172,7 +215,7 @@ void SdFirmwareUpdate::run(IDisplay& display, IInput& input, bool recoveryMode) 
     scanForFirmware(paths);
     if (paths.empty()) {
       ui.showMessage(title, "No .bin files found.\n\nPlace a firmware .bin anywhere on the SD card.");
-      waitForDismiss(input);
+      waitForDismiss(sleepInput, display);
       if (!recoveryMode) {
         restoreSleep();
         return;
@@ -215,7 +258,7 @@ void SdFirmwareUpdate::run(IDisplay& display, IInput& input, bool recoveryMode) 
       labels.push_back(label);
     }
 
-    const int sel = ui.showMenuModal(input, "Select firmware", labels, 0, "eenk");
+    const int sel = ui.showMenuModal(sleepInput, "Select firmware", labels, 0, "eenk");
     if (sel < 0 || sel >= static_cast<int>(paths.size())) {
       if (recoveryMode) continue;  // cannot escape recovery (mirrors CrossPoint)
       restoreSleep();
@@ -228,7 +271,7 @@ void SdFirmwareUpdate::run(IDisplay& display, IInput& input, bool recoveryMode) 
     std::string error;
     if (!validateFirmware(fwPath, error)) {
       ui.showMessage("Update failed", error.c_str());
-      waitForDismiss(input);
+      waitForDismiss(sleepInput, display);
       if (recoveryMode) continue;
       restoreSleep();
       return;
@@ -237,7 +280,7 @@ void SdFirmwareUpdate::run(IDisplay& display, IInput& input, bool recoveryMode) 
     // ── CONFIRM ───────────────────────────────────────────────────────────
     std::string prompt(basenameOf(fwPath.c_str()));
     prompt += "\n\nDo not power off during the update.";
-    if (!ui.showConfirmDialog(input, "Update firmware?", prompt.c_str(), "eenk")) {
+    if (!ui.showConfirmDialog(sleepInput, "Update firmware?", prompt.c_str(), "eenk")) {
       if (recoveryMode) continue;
       restoreSleep();
       return;
@@ -257,7 +300,7 @@ void SdFirmwareUpdate::run(IDisplay& display, IInput& input, bool recoveryMode) 
                             ? "Firmware is for a different device"
                             : "Firmware write failed";
       ui.showMessage("Update failed", msg);
-      waitForDismiss(input);
+      waitForDismiss(sleepInput, display);
       if (recoveryMode) continue;
       restoreSleep();
       return;
