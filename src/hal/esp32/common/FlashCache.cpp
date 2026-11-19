@@ -45,7 +45,16 @@ void FlashCache::unload()
 bool FlashCache::findPartition()
 {
     if (_partition) return true;
+#ifdef EENK_LOCKED_BUILD
+    // Locked X4: CrossPoint layout has no ink_cache partition. Reuse the
+    // otherwise-unused spiffs partition (0x360000 = 3.375MB) as raw cache.
+    // CrossPoint never mounts flash spiffs (all state lives on SD; it uses
+    // no NVS either), and we never mount it as a filesystem: raw
+    // erase/write/mmap only, same access pattern as ink_cache.
+    _partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "spiffs");
+#else
     _partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, "ink_cache");
+#endif
     return _partition != nullptr;
 }
 
@@ -70,6 +79,8 @@ bool FlashCache::mapFromFlash(std::size_t size)
 
 bool FlashCache::loadHashFromNvs(uint32_t* outHash, std::size_t* outSize)
 {
+    // NVS namespace is independent of the cache partition label; kept as
+    // "ink_cache" on all builds (CrossPoint uses no NVS: no collisions).
     nvs_handle_t my_handle;
     esp_err_t err = nvs_open("ink_cache", NVS_READONLY, &my_handle);
     if (err != ESP_OK) return false;
@@ -121,6 +132,12 @@ bool FlashCache::loadStoryStreaming(EspSdStorage& sdStorage,
     size_t fileSize = file.size();
     if (fileSize < 128) {
         Serial.printf("[FlashCache] File %s too small (%u bytes)\n", sdPath, (unsigned)fileSize);
+        file.close();
+        return false;
+    }
+    if (fileSize > _partition->size) {
+        Serial.printf("[FlashCache] File %s (%u bytes) exceeds cache partition '%s' (%u bytes)\n",
+                      sdPath, (unsigned)fileSize, _partition->label, (unsigned)_partition->size);
         file.close();
         return false;
     }

@@ -18,6 +18,9 @@
 #include "SystemUI.h"
 #include "eenk_version.h"
 #include "os/BootManager.h"
+#ifdef EENK_LOCKED_BUILD
+#include "fwupdate/SdFirmwareUpdate.h"
+#endif
 #include <cctype>
 #include <cstring>
 
@@ -291,10 +294,17 @@ void SettingsView::renderPage() {
       break;
     }
 #if !FREEINK_DEVICE_X4PRO
+#if defined(EENK_LOCKED_BUILD)
+    case SettingRow::SD_FIRMWARE_UPDATE: {
+      drawSettingsRow(y, "SD Firmware Update", "Flash .bin", selected);
+      break;
+    }
+#else
     case SettingRow::REBOOT_UPDATER: {
       drawSettingsRow(y, "Reboot to Updater", "OTA / App1", selected);
       break;
     }
+#endif
 #endif
     case SettingRow::FIRMWARE_VERSION: {
       drawSettingsRow(y, "Firmware", EENK_VERSION_STR, selected);
@@ -403,9 +413,17 @@ void SettingsView::handleInput(ButtonEvent ev) {
     SettingRow row = static_cast<SettingRow>(_itemIndex);
     switch (row) {
 #if !FREEINK_DEVICE_X4PRO
+#if defined(EENK_LOCKED_BUILD)
+    case SettingRow::SD_FIRMWARE_UPDATE: {
+      SdFirmwareUpdate::run(_display, _input, /*recoveryMode=*/false);
+      renderPage();
+      return;
+    }
+#else
     case SettingRow::REBOOT_UPDATER:
       BootManager::bootUpdater();
       return;
+#endif
 #endif
     case SettingRow::FIRMWARE_VERSION:
       return; // Read-only

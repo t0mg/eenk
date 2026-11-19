@@ -12,9 +12,44 @@
 
 namespace HalInit {
 
+#ifdef EENK_LOCKED_BUILD
+namespace {
+// Set when UP is held at boot; main.cpp runs the in-app SD updater (recovery
+// mode) after display/input/SD init. Button-only: no /firmware.bin
+// auto-trigger (mirrors CrossPoint recovery).
+bool s_recoveryRequested = false;
+} // namespace
+
+bool recoveryRequested() { return s_recoveryRequested; }
+#else
+bool recoveryRequested() { return false; }
+#endif
+
 void earlyBootCheck() {
   initHardware();
 
+#ifdef EENK_LOCKED_BUILD
+  // Locked X4: no app1 updater exists — app1 is the alternate OTA firmware
+  // slot, and esp_ota_set_boot_partition() fails its image verify on locked
+  // units. Sample UP (same 5-sample debounce as stock); when held, flag SD
+  // recovery instead of booting the updater partition.
+  InputManager im;
+  im.begin();
+  int pressedCount = 0;
+  for (int i = 0; i < 5; i++) {
+    im.update();
+    if (im.isPressed(InputManager::BTN_UP)) {
+      pressedCount++;
+    }
+    delay(10);
+  }
+
+  if (pressedCount >= 4) {
+    Serial.println("[Boot] UP button held. Requesting SD recovery updater.");
+    s_recoveryRequested = true;
+  }
+  return;
+#else
   bool updaterMode = false;
 
   // Check UP button (must be held continuously across multiple samples to avoid ADC startup noise)
@@ -52,6 +87,7 @@ void earlyBootCheck() {
     BootManager::bootUpdater();
     // Will reboot
   }
+#endif
 }
 
 void initHardware() {

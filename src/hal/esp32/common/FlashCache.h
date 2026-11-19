@@ -23,7 +23,8 @@ public:
     ~FlashCache();
 
     /**
-     * Load a story binary from SD card into the ink_cache flash partition,
+     * Load a story binary from SD card into the story-cache flash partition
+     * (ink_cache on stock builds, spiffs on EENK_LOCKED_BUILD),
      * then memory-map it for zero-copy access.
      *
      * @param sdStorage  The SD card storage to read from
@@ -50,7 +51,7 @@ public:
     using ProgressCallback = void(*)(float progress, void* ctx);
     void setProgressCallback(ProgressCallback cb, void* ctx = nullptr) { _progressCb = cb; _progressCtx = ctx; }
 
-    /** Check if the ink_cache partition exists. */
+    /** Check if the story-cache partition exists. */
     bool findPartition();
 
     /** Get the CRC32 hash of the loaded story */

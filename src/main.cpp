@@ -126,6 +126,9 @@ int main(int argc, char *argv[]) {
 #include "hal/IFrontlight.h"
 #include "os/AppSettings.h"
 #include "os/BootManager.h"
+#ifdef EENK_LOCKED_BUILD
+#include "fwupdate/SdFirmwareUpdate.h"
+#endif
 #include "serial/SerialFileServer.h"
 #include "ui/BatteryWidget.h"
 #include "ui/Library.h"
@@ -190,6 +193,22 @@ void setup() {
   // ── Battery
   batteryMonitor = HalInit::createBatteryMonitor();
   batteryWidget = new BatteryWidget(*display->getRenderer(), *batteryMonitor);
+
+#ifdef EENK_LOCKED_BUILD
+  // Locked X4: Up+Power recovery — run the SD updater before boot-mode
+  // dispatch (mirrors CrossPoint: sample early in earlyBootCheck, route here
+  // after init). Recovery never returns except by rebooting.
+  if (HalInit::recoveryRequested()) {
+    Serial.println("[Boot] Recovery mode: launching SD firmware updater.");
+    sdStorage = new StorageType();
+    if (!sdStorage->begin()) {
+      Serial.println("[Boot] Recovery: SD mount failed — updater will offer retry.");
+    }
+    SdFirmwareUpdate::run(*display, *input, /*recoveryMode=*/true);
+    delay(500);
+    ESP.restart();
+  }
+#endif
 
   // ── Dual-boot dispatch ─────────────────────────────────────────────────────
   AppSettings settings = AppSettings::load();
@@ -376,8 +395,16 @@ void setup() {
         storyFile.close();
       }
 
-      if (storySize > 8388608) { // 8MB ESP32 MMU hardware limit
-        errorMessage = "Story is too large! Max supported size is 8.0MB.";
+#ifdef EENK_LOCKED_BUILD
+      // Locked X4: stories cache in the 3.375MB spiffs partition.
+      constexpr size_t kMaxStoryBytes = 0x360000;
+      const char *kMaxStoryLabel = "3.375MB (locked-build cache limit)";
+#else
+      constexpr size_t kMaxStoryBytes = 8388608; // 8MB ESP32 MMU hardware limit
+      const char *kMaxStoryLabel = "8.0MB";
+#endif
+      if (storySize > kMaxStoryBytes) {
+        errorMessage = String("Story is too large! Max supported size is ") + kMaxStoryLabel + ".";
       } else if (storySize == 0) {
         errorMessage = "Failed to read story file or file is empty.";
       } else {
@@ -388,8 +415,13 @@ void setup() {
         std::size_t mappedSize = 0;
 
         if (flashCache->findPartition()) {
+#ifdef EENK_LOCKED_BUILD
+          Serial.println(
+              "[FlashCache] cache partition (spiffs) found, streaming to flash...");
+#else
           Serial.println(
               "[FlashCache] ink_cache partition found, streaming to flash...");
+#endif
           flashCache->setProgressCallback(
               [](float p, void *ctx) {
                 static int lastPercent = -1;
@@ -430,8 +462,33 @@ void setup() {
             errorMessage = "Failed to stream story to flash";
           }
         } else {
+#ifdef EENK_LOCKED_BUILD
+          // Locked X4: cache partition absent (unexpected) — fall back to
+          // heap for small stories instead of failing outright.
+          Serial.println("[FlashCache] cache partition not found, trying heap fallback...");
+          std::size_t heapSize = 0;
+          const unsigned char *heapPtr =
+              sdStorage->readFileBinary(sdStoryPath, &heapSize);
+          if (heapPtr != nullptr && heapSize >= 128 &&
+              memcmp(heapPtr, "eenk", 4) == 0) {
+            storage = sdStorage;
+            engine = new InkEngine(*display, *input, *storage);
+            engine->setFrontlight(frontlight);
+            engine->setBatteryWidget(batteryWidget);
+            engine->applySettings(AppSettings::load());
+            storyLoaded = engine->loadStory(heapPtr, heapSize, sdStoryPath);
+            currentStoryHash = crc32_le(0, heapPtr, heapSize);
+            // DO NOT free heapPtr: InkEngine uses it in-place (same as the
+            // HAS_FLASH_CACHE=0 path below).
+          } else {
+            errorMessage =
+                "Cache partition missing and story too large for heap.";
+            storyLoaded = false;
+          }
+#else
           Serial.println("[FlashCache] ink_cache partition not found!");
           errorMessage = "ink_cache partition missing! Update your partitions.";
+#endif
         }
 #else
         std::size_t mappedSize = 0;
