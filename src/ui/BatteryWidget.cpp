@@ -35,16 +35,27 @@ bool BatteryWidget::tick() {
   unsigned long now = millis();
   _stateChanged = false;
   if (_lastPollMs == 0 || (now - _lastPollMs) > POLL_INTERVAL_MS) {
-    uint16_t newPct = _battery.readPercentage();
-    bool newCharging = _battery.isCharging();
-    if (newPct != _cachedPct || newCharging != _cachedCharging) {
-      _stateChanged = true;
-    }
-    _cachedPct = newPct;
-    _cachedCharging = newCharging;
-    _lastPollMs = now;
+    pollOnce();
   }
   return _stateChanged;
+}
+
+void BatteryWidget::refreshNow() {
+  _stateChanged = false;
+  pollOnce();
+}
+
+void BatteryWidget::pollOnce() {
+  uint16_t newPct = _battery.readPercentage();
+  bool newCharging = _battery.isCharging();
+  uint16_t newMv = _battery.readMillivolts();
+  if (newPct != _cachedPct || newCharging != _cachedCharging) {
+    _stateChanged = true;
+  }
+  _cachedPct = newPct;
+  _cachedCharging = newCharging;
+  _cachedMv = newMv;
+  _lastPollMs = millis();
 }
 
 // ─── draw() ──────────────────────────────────────────────────────────────────
