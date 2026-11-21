@@ -26,6 +26,7 @@ enum class SettingRow {
     SLEEP_TIMEOUT,
     SD_FIRMWARE_UPDATE,
     FIRMWARE_VERSION,
+    BATTERY,
     COUNT
 };
 

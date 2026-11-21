@@ -16,6 +16,7 @@ class BatteryMonitor {
 public:
   uint16_t readPercentage() const { return 100; }
   bool isCharging() const { return false; }
+  uint16_t readMillivolts() const { return 4200; }
 };
 #endif
 
@@ -28,18 +29,28 @@ public:
   // Black on white, or white on black if inverted=true.
   void draw(int x, int y, bool inverted = false);
 
-  // Quick poll — reads battery every second to detect cable connect/disconnect promptly.
+  // Throttled poll — reads the battery at most every POLL_INTERVAL_MS (60 s).
   // Returns true if percentage or charging state changed.
   bool tick(); // call from main loop
+
+  // Force an immediate re-read, bypassing the throttle (e.g. the Settings
+  // Battery row). Updates cached percentage/charging/millivolts.
+  void refreshNow();
 
   static constexpr int getWidth() { return kBodyW + kStem; }
   static constexpr int getHeight() { return kBodyH; }
 
   uint16_t getPercentage() const { return _cachedPct; }
+  uint16_t getMillivolts() const { return _cachedMv; }
   bool isCharging() const { return _cachedCharging; }
   bool hasStateChanged() const { return _stateChanged; }
 
 private:
+  // Single poll of percentage + charging + millivolts; updates the cache and
+  // sets _stateChanged when percentage or charging changed (millivolt drift
+  // alone must not trigger redraws).
+  void pollOnce();
+
   static constexpr int kBodyW = 32;
   static constexpr int kBodyH = 16;
   static constexpr int kPadding = 2;
@@ -47,6 +58,7 @@ private:
   GfxRenderer &_renderer;
   BatteryMonitor &_battery;
   uint16_t _cachedPct = 100;
+  uint16_t _cachedMv = 4200;
   bool _cachedCharging = false;
   bool _stateChanged = false;
   unsigned long _lastPollMs = 0;
