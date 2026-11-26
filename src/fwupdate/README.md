@@ -9,10 +9,12 @@ shared with CrossPoint (its `devid` secret plus eenk's
 `boot`/`settings`/`ink_cache` namespaces, no collisions) and is never
 erased in locked builds.
 
-## File provenance
+## File provenance & licensing
 
-Synced from `crosspoint-reader @ 209cb53a`
-(`fix: don't count blocked activity time as idle (#4538)`).
+Synced from [`crosspoint-reader @ 209cb53a`](https://github.com/crosspoint-reader/crosspoint-reader)
+(`fix: don't count blocked activity time as idle (#4538)`), Copyright (c) 2025
+CrossPoint Reader organization, licensed under the MIT License (see `LICENSE`
+in this directory).
 
 | File | Origin | Rule |
 |---|---|---|

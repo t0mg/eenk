@@ -25,6 +25,9 @@ void scanDirRecursive(const char* dirPath, int depth, std::vector<std::string>& 
   File dir = SD_FS.open(dirPath);
   if (!dir || !dir.isDirectory()) return;
 
+  const bool isRoot = (strcmp(dirPath, "/") == 0);
+  std::vector<std::string> subdirs;
+
   File f = dir.openNextFile();
   while (f && out.size() < SdFirmwareUpdate::kMaxEntries) {
     String nameStr = f.name();
@@ -35,25 +38,41 @@ void scanDirRecursive(const char* dirPath, int depth, std::vector<std::string>& 
     char full[256];
     if (rawName[0] == '/') {
       snprintf(full, sizeof(full), "%s", rawName);
+    } else if (isRoot) {
+      snprintf(full, sizeof(full), "/%s", base);
     } else {
       snprintf(full, sizeof(full), "%s/%s", dirPath, base);
     }
 
     if (f.isDirectory()) {
-      if (base[0] != '.' && strcasecmp(base, "System Volume Information") != 0) {
-        scanDirRecursive(full, depth + 1, out);
+      if (base[0] != '.' &&
+          strcasecmp(base, "System Volume Information") != 0 &&
+          !(isRoot && (strcasecmp(base, "stories") == 0 ||
+                       strcasecmp(base, "books") == 0 ||
+                       strcasecmp(base, "fonts") == 0))) {
+        subdirs.emplace_back(full);
       }
-    } else {
-      if (base[0] != '.') {
-        const size_t len = strlen(base);
-        if (len > 4 && strcasecmp(base + len - 4, ".bin") == 0) {
+    } else if (base[0] != '.') {
+      const size_t len = strlen(base);
+      if (len > 4 && strcasecmp(base + len - 4, ".bin") == 0) {
+        // Quick ESP32 image magic check (0xE9) to filter out Ink story .bin
+        // files (which begin with "eenk") and other non-firmware binaries.
+        uint8_t magic = 0;
+        if (f.read(&magic, 1) == 1 && magic == 0xE9) {
           out.emplace_back(full);
         }
       }
     }
+    f.close();
     f = dir.openNextFile();
   }
   dir.close();
+
+  // Recurse after closing dir/f so open handle count stays <= 2 at any depth.
+  for (const auto& sub : subdirs) {
+    if (out.size() >= SdFirmwareUpdate::kMaxEntries) break;
+    scanDirRecursive(sub.c_str(), depth + 1, out);
+  }
 }
 
 struct ProgressCtx {
@@ -220,7 +239,9 @@ void SdFirmwareUpdate::run(IDisplay& display, IInput& input, bool recoveryMode) 
         restoreSleep();
         return;
       }
-      // The card may have been inserted after boot; re-mount before rescanning.
+      // The card may have been inserted or swapped after boot; unmount and
+      // re-mount cleanly before rescanning.
+      SD_FS.end();
       StorageType remount;
       remount.begin();
       continue;
