@@ -5,6 +5,8 @@ Welcome to **eenk**, a custom firmware designed to run **Ink** interactive ficti
 > [!TIP]
 > If you are interested in installing and using eenk rather than looking at firmware development, check out the [eenk website](https://t0mg.github.io/eenk/)!
 
+> **USB-Lock support (since v0.2.0)**: Because `eenk` now uses the same partition table as [Crosspoint](https://crosspointreader.com/), locked X3/X4/X4Pro devices with Crosspoint installed can flash `eenk` directly from the MicroSD card using the app-only `firmware.bin`.
+
 This project supports three build configurations managed via PlatformIO:
 - **`native`**: A desktop simulation of the runtime, using an 800x480 SDL2 graphical window to simulate the e-ink display for testing.
 - **`esp32c3`**: The main firmware build for ESP32-C3 hardware (Xteink X3 and X4, both USB-unlocked and USB-locked).
@@ -62,16 +64,7 @@ pio test -e native
 
 ## ESP32-C3 Target (`esp32c3` configuration)
 
-The `esp32c3` environment builds the firmware for physical ESP32-C3 hardware (Xteink X3 and X4 — both USB-unlocked and USB-locked).
-
-### Unified CrossPoint-Compatible Partition Table (`partitions.csv`)
-
-Both ESP32-C3 (X3/X4) and ESP32-S3 (X4 Pro) devices share a single 16 MB symmetric A/B partition layout (`partitions.csv`, matching CrossPoint Reader):
-- **`app0` (`ota_0`, 6.25 MiB)** & **`app1` (`ota_1`, 6.25 MiB)**: Dual symmetric OTA application slots. Firmware updates and switching between `eenk` and CrossPoint are performed in-app from the MicroSD card (**Settings → SD Firmware Update**, or cold-boot recovery) without repartitioning.
-- **`spiffs` (3.375 MiB)**: Unused by CrossPoint; repurposed on X3/X4 as a raw flash cache for Ink story binaries (with automatic fallback to legacy `ink_cache` partitions).
-
-> [!TIP]
-> **USB-Locked Devices**: Because `eenk` uses the CrossPoint-compatible partition table, USB-locked Xteink devices can install and update `eenk` directly from the MicroSD card using the app-only `firmware.bin` (no USB flashing or repartitioning required).
+The `esp32c3` environment builds the firmware for physical ESP32-C3 hardware (Xteink X3 and X4).
 
 ### Story Caching & Memory Mapping (`spiffs`)
 
@@ -103,11 +96,10 @@ The `esp32s3` environment builds the firmware for Xteink X4 Pro hardware.
 
 ### Key Architectural Differences
 
-The ESP32-S3 target differs from the ESP32-C3 implementation in several key ways:
+The ESP32-S3 target differs from the ESP32-C3 implementation in a couple of key ways:
 
-- **Shared Symmetric A/B Partition Table**: Shares `partitions.csv` (`app0` and `app1`, 6.25 MiB each) with X3/X4 and CrossPoint Reader, supporting in-app SD firmware updates and backwards-compatible OTA updates on existing X4 Pro devices.
 - **Direct PSRAM Execution**: The X4 Pro includes onboard PSRAM, allowing Ink stories to be loaded directly into memory rather than using flash memory mapping.
-- **Hardware Enhancements**: Includes full support for **touchscreen input** and **frontlight controls** present on X4 Pro hardware.
+- **Hardware Enhancements**: Support for hardware enhancements over older models, from full **touchscreen input** to **frontlight controls** and finer battery monitor with charging status detection.
 
 ### Building & Flashing
 
