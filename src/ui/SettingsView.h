@@ -24,9 +24,7 @@ enum class SettingRow {
     FULL_REFRESH,
     SLEEP_TIMEOUT,
     OVERRIDE_FONT,
-#if !FREEINK_DEVICE_X4PRO
     SD_FIRMWARE_UPDATE,
-#endif
     FIRMWARE_VERSION,
     COUNT
 };

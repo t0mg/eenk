@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
 #include "hal/IFrontlight.h"
 #include "os/AppSettings.h"
 #include "os/BootManager.h"
-#if defined(PLATFORM_ESP32) && !FREEINK_DEVICE_X4PRO
+#ifdef PLATFORM_ESP32
 #include "fwupdate/SdFirmwareUpdate.h"
 #endif
 #include "serial/SerialFileServer.h"
@@ -194,10 +194,10 @@ void setup() {
   batteryMonitor = HalInit::createBatteryMonitor();
   batteryWidget = new BatteryWidget(*display->getRenderer(), *batteryMonitor);
 
-#if defined(PLATFORM_ESP32) && !FREEINK_DEVICE_X4PRO
-  // Cold-boot recovery (UP+Power on X3/X4) — launch the in-app SD firmware
-  // updater before boot-mode dispatch. Recovery only leaves via reboot or
-  // power-button sleep.
+#ifdef PLATFORM_ESP32
+  // Cold-boot recovery (UP+Power on X3/X4, LEFT+Power on X4 Pro) — launch
+  // the in-app SD firmware updater before boot-mode dispatch. Recovery only
+  // leaves via reboot or power-button sleep.
   if (HalInit::recoveryRequested()) {
     Serial.println("[Boot] Recovery mode: launching SD firmware updater.");
     sdStorage = new StorageType();

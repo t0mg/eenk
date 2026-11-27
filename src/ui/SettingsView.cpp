@@ -18,7 +18,7 @@
 #include "SystemUI.h"
 #include "eenk_version.h"
 #include "os/BootManager.h"
-#if defined(PLATFORM_ESP32) && !FREEINK_DEVICE_X4PRO
+#ifdef PLATFORM_ESP32
 #include "fwupdate/SdFirmwareUpdate.h"
 #endif
 #include <cctype>
@@ -293,12 +293,10 @@ void SettingsView::renderPage() {
       drawSettingsRow(y, "Override Story Font", val, selected);
       break;
     }
-#if !FREEINK_DEVICE_X4PRO
     case SettingRow::SD_FIRMWARE_UPDATE: {
       drawSettingsRow(y, "SD Firmware Update", "Flash .bin", selected);
       break;
     }
-#endif
     case SettingRow::FIRMWARE_VERSION: {
       drawSettingsRow(y, "Firmware", EENK_VERSION_STR, selected);
       break;
@@ -405,7 +403,6 @@ void SettingsView::handleInput(ButtonEvent ev) {
   if (ev == ButtonEvent::CONFIRM || ev == ButtonEvent::SLEEP) {
     SettingRow row = static_cast<SettingRow>(_itemIndex);
     switch (row) {
-#if !FREEINK_DEVICE_X4PRO
     case SettingRow::SD_FIRMWARE_UPDATE: {
 #ifdef PLATFORM_ESP32
       SdFirmwareUpdate::run(_display, _input, /*recoveryMode=*/false);
@@ -413,7 +410,6 @@ void SettingsView::handleInput(ButtonEvent ev) {
 #endif
       return;
     }
-#endif
     case SettingRow::FIRMWARE_VERSION:
       return; // Read-only
     case SettingRow::STORY_FONT:

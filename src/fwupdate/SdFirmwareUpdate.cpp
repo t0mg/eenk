@@ -4,7 +4,6 @@
 #include "SdFirmwareUpdate.h"
 
 #include <Arduino.h>
-#include <SD.h>
 #include <esp_ota_ops.h>
 #include <esp_sleep.h>
 

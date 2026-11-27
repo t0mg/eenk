@@ -8,9 +8,15 @@
 #include <BatteryMonitor.h>
 #include <PowerManager.h>
 #include <driver/rtc_io.h>
-#include <sys/stat.h>
+#include <esp_system.h>
 
 namespace HalInit {
+
+namespace {
+bool s_recoveryRequested = false;
+} // namespace
+
+bool recoveryRequested() { return s_recoveryRequested; }
 
 void initHardware() {
   // Power rails on X4 Pro:
@@ -35,29 +41,29 @@ bool mountSdForUpdater() {
 void earlyBootCheck() {
   initHardware();
 
-  bool updaterMode = false;
+  // Only cold boots / wakes may enter SD recovery. A warm ESP.restart()
+  // (e.g. post-flash reboot, story launch, or crash) must boot normally.
+  const esp_reset_reason_t resetReason = esp_reset_reason();
+  if (resetReason != ESP_RST_POWERON && resetReason != ESP_RST_DEEPSLEEP &&
+      resetReason != ESP_RST_EXT) {
+    Serial.printf("[Boot] Warm boot (reset reason %d): skipping SD recovery check.\n",
+                  (int)resetReason);
+    return;
+  }
 
-  // Check GPIO0 (Left button) held at startup
+  // Check GPIO0 (Left button) held continuously across 5 samples
   pinMode(0, INPUT_PULLUP);
-  if (digitalRead(0) == LOW) {
-    Serial.println("[Boot] LEFT button (GPIO0) held. Forcing updater mode.");
-    updaterMode = true;
-  }
-
-  if (!updaterMode) {
-    if (mountSdForUpdater()) {
-      struct stat st;
-      if (stat("/sdcard/firmware.bin", &st) == 0) {
-        Serial.println(
-            "[Boot] /firmware.bin found on SDMMC. Forcing updater mode.");
-        updaterMode = true;
-      }
+  int pressedCount = 0;
+  for (int i = 0; i < 5; i++) {
+    if (digitalRead(0) == LOW) {
+      pressedCount++;
     }
+    delay(10);
   }
 
-  if (updaterMode) {
-    Serial.println("[Boot] Restarting into Updater (app1)...");
-    BootManager::bootUpdater();
+  if (pressedCount >= 4) {
+    Serial.println("[Boot] LEFT button (GPIO0) held. Requesting SD recovery updater.");
+    s_recoveryRequested = true;
   }
 }
 

@@ -15,7 +15,7 @@
 
 #include <Arduino.h>
 
-#include <SD.h>
+#include "HalTypes.h"
 
 #include <string>
 
@@ -70,7 +70,7 @@ class HalStorage {
     // recovery dispatch in main.cpp). SD.begin() is idempotent, so a second
     // mount attempt elsewhere is harmless.
     file.close();
-    file._f = SD.open(path, FILE_READ);
+    file._f = SD_FS.open(path, FILE_READ);
     file._open = static_cast<bool>(file._f);
     return file._open;
   }

@@ -6,6 +6,8 @@ class BatteryMonitor;
 
 namespace HalInit {
     void earlyBootCheck();
+    // True when LEFT (GPIO0) was held at cold boot (Left+Power SD recovery).
+    bool recoveryRequested();
     void initHardware();
     bool mountSdForUpdater();
     void prepareForSleep();
