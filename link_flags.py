@@ -27,6 +27,7 @@ if os.name == 'nt':
         "mingw32",
         "SDL2main",
         "SDL2",
+        "iconv",
         "dinput8",
         "dxguid",
         "dxerr8",
