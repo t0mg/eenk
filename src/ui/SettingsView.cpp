@@ -337,6 +337,8 @@ void SettingsView::renderFooter() {
     footer.btnConfirm = {false, "", "", false};
   } else if (selectedRow == SettingRow::SD_FIRMWARE_UPDATE) {
     footer.btnConfirm = {true, "Go", "Confirm", true};
+  } else if (selectedRow == SettingRow::BATTERY) {
+    footer.btnConfirm = {true, "Refresh", "Confirm", true};
   } else {
     footer.btnConfirm = {true, "Change", "Confirm", true};
   }

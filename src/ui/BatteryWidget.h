@@ -14,9 +14,20 @@ class BatteryMonitor;
 #else
 class BatteryMonitor {
 public:
+  struct Status {
+    bool supported = true;
+    bool percentageKnown = true;
+    bool millivoltsKnown = true;
+    bool chargingKnown = true;
+    uint16_t percentage = 100;
+    uint16_t millivolts = 4200;
+    bool charging = false;
+  };
+
   uint16_t readPercentage() const { return 100; }
   bool isCharging() const { return false; }
   uint16_t readMillivolts() const { return 4200; }
+  Status readStatus() const { return {}; }
 };
 #endif
 

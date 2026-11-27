@@ -74,13 +74,8 @@ BatteryMonitor *createBatteryMonitor() { return new BatteryMonitor(); }
 
 IFrontlight *createFrontlight() { return nullptr; }
 
-// NOTE (Nov 2026): an uncalibrated analogReadMilliVolts() override
-// (raw * 3100 / 4095) used to live here to dodge ADC cali-handle collisions,
-// but it bypassed the chip's eFuse calibration and read high enough to pin
-// the battery indicator at 100% on real X4 units. CrossPoint uses Arduino's
-// calibrated default on identical hardware without issue, so eenk does the
-// same now. The 60 s BatteryWidget throttle keeps calibrated reads rare
-// enough to avoid the original collision churn.
+// Use Arduino's calibrated analogReadMilliVolts() default on ESP32-C3 so eFuse
+// calibration applies (uncalibrated raw*3100/4095 reads high and pins X4 at 100%).
 
 } // namespace HalInit
 

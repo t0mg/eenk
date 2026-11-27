@@ -46,9 +46,10 @@ void BatteryWidget::refreshNow() {
 }
 
 void BatteryWidget::pollOnce() {
-  uint16_t newPct = _battery.readPercentage();
-  bool newCharging = _battery.isCharging();
-  uint16_t newMv = _battery.readMillivolts();
+  const BatteryMonitor::Status st = _battery.readStatus();
+  const uint16_t newPct = st.percentageKnown ? st.percentage : _cachedPct;
+  const bool newCharging = st.chargingKnown ? st.charging : _cachedCharging;
+  const uint16_t newMv = st.millivoltsKnown ? st.millivolts : _cachedMv;
   if (newPct != _cachedPct || newCharging != _cachedCharging) {
     _stateChanged = true;
   }
