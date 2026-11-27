@@ -38,17 +38,6 @@ def merge_bin(source, target, env):
     app_path = env.subst("${BUILD_DIR}/${PROGNAME}.bin")
     flash_images.append((app_offset, app_path))
 
-    # Add the updater application binary (app1) if it exists
-    pio_env = env.get('PIOENV')
-    updater_env = f"{pio_env}_updater"
-    app1_path = os.path.join(env.get('PROJECT_DIR'), ".pio", "build", updater_env, "firmware.bin")
-    if os.path.exists(app1_path):
-        app1_offset = "0x800000" if "s3" in pio_env else "0x710000"
-        print(f"Found app1 updater at {app1_path}, including it in factory binary at {app1_offset}")
-        flash_images.append((app1_offset, app1_path))
-    else:
-        print(f"Note: app1 updater not found at {app1_path}. It will not be included in the factory binary.")
-
     esptool_path = os.path.join(
         env.PioPlatform().get_package_dir("tool-esptoolpy"), "esptool.py"
     )

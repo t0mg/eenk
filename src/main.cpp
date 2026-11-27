@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
 #include "hal/IFrontlight.h"
 #include "os/AppSettings.h"
 #include "os/BootManager.h"
-#ifdef EENK_LOCKED_BUILD
+#if defined(PLATFORM_ESP32) && !FREEINK_DEVICE_X4PRO
 #include "fwupdate/SdFirmwareUpdate.h"
 #endif
 #include "serial/SerialFileServer.h"
@@ -194,10 +194,10 @@ void setup() {
   batteryMonitor = HalInit::createBatteryMonitor();
   batteryWidget = new BatteryWidget(*display->getRenderer(), *batteryMonitor);
 
-#ifdef EENK_LOCKED_BUILD
-  // Locked X4: Up+Power recovery — run the SD updater before boot-mode
-  // dispatch (mirrors CrossPoint: sample early in earlyBootCheck, route here
-  // after init). Recovery never returns except by rebooting or power-button sleep.
+#if defined(PLATFORM_ESP32) && !FREEINK_DEVICE_X4PRO
+  // Cold-boot recovery (UP+Power on X3/X4) — launch the in-app SD firmware
+  // updater before boot-mode dispatch. Recovery only leaves via reboot or
+  // power-button sleep.
   if (HalInit::recoveryRequested()) {
     Serial.println("[Boot] Recovery mode: launching SD firmware updater.");
     sdStorage = new StorageType();
@@ -395,17 +395,7 @@ void setup() {
         storyFile.close();
       }
 
-#ifdef EENK_LOCKED_BUILD
-      // Locked X4: stories cache in the 3.375MB spiffs partition.
-      constexpr size_t kMaxStoryBytes = 0x360000;
-      const char *kMaxStoryLabel = "3.375MB (locked-build cache limit)";
-#else
-      constexpr size_t kMaxStoryBytes = 8388608; // 8MB ESP32 MMU hardware limit
-      const char *kMaxStoryLabel = "8.0MB";
-#endif
-      if (storySize > kMaxStoryBytes) {
-        errorMessage = String("Story is too large! Max supported size is ") + kMaxStoryLabel + ".";
-      } else if (storySize == 0) {
+      if (storySize == 0) {
         errorMessage = "Failed to read story file or file is empty.";
       } else {
 #if HAS_FLASH_CACHE
@@ -415,13 +405,17 @@ void setup() {
         std::size_t mappedSize = 0;
 
         if (flashCache->findPartition()) {
-#ifdef EENK_LOCKED_BUILD
-          Serial.println(
-              "[FlashCache] cache partition (spiffs) found, streaming to flash...");
-#else
-          Serial.println(
-              "[FlashCache] ink_cache partition found, streaming to flash...");
-#endif
+          const size_t maxStoryBytes = flashCache->getPartitionSize();
+          if (storySize > maxStoryBytes) {
+            char sizeMsg[128];
+            snprintf(sizeMsg, sizeof(sizeMsg),
+                     "Story is too large! Max supported size is %.2f MB.",
+                     maxStoryBytes / (1024.0f * 1024.0f));
+            errorMessage = sizeMsg;
+          } else {
+          Serial.printf(
+              "[FlashCache] cache partition (%s, %u bytes) found, streaming to flash...\n",
+              flashCache->getPartitionLabel(), (unsigned)maxStoryBytes);
           flashCache->setProgressCallback(
               [](float p, void *ctx) {
                 static int lastPercent = -1;
@@ -461,10 +455,10 @@ void setup() {
           } else {
             errorMessage = "Failed to stream story to flash";
           }
+          }
         } else {
-#ifdef EENK_LOCKED_BUILD
-          // Locked X4: cache partition absent (unexpected) — fall back to
-          // heap for small stories instead of failing outright.
+          // Cache partition absent — fall back to heap for small stories
+          // instead of failing outright.
           Serial.println("[FlashCache] cache partition not found, trying heap fallback...");
           std::size_t heapSize = 0;
           const unsigned char *heapPtr =
@@ -485,12 +479,11 @@ void setup() {
                 "Cache partition missing and story too large for heap.";
             storyLoaded = false;
           }
-#else
-          Serial.println("[FlashCache] ink_cache partition not found!");
-          errorMessage = "ink_cache partition missing! Update your partitions.";
-#endif
         }
 #else
+        if (storySize > 8388608) { // 8MB PSRAM safety limit
+          errorMessage = "Story is too large! Max supported size is 8.0MB.";
+        } else {
         std::size_t mappedSize = 0;
         const unsigned char *mappedPtr =
             sdStorage->readFileBinary(sdStoryPath, &mappedSize);
@@ -508,6 +501,7 @@ void setup() {
         } else {
           errorMessage = "Story could not be read or invalid metadata.";
           storyLoaded = false;
+        }
         }
 #endif
 

@@ -6,8 +6,7 @@ class BatteryMonitor;
 
 namespace HalInit {
     void earlyBootCheck();
-    // Locked builds: true when UP was held at boot (Up+Power SD recovery).
-    // Always false on stock builds.
+    // True when UP was held at cold boot (Up+Power SD recovery).
     bool recoveryRequested();
     void initHardware();
     bool mountSdForUpdater();

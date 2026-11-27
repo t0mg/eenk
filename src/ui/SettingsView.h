@@ -25,11 +25,7 @@ enum class SettingRow {
     SLEEP_TIMEOUT,
     OVERRIDE_FONT,
 #if !FREEINK_DEVICE_X4PRO
-#if defined(EENK_LOCKED_BUILD)
     SD_FIRMWARE_UPDATE,
-#else
-    REBOOT_UPDATER,
-#endif
 #endif
     FIRMWARE_VERSION,
     COUNT

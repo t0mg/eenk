@@ -14,36 +14,15 @@
 
 FlashCache::FlashCache()
 {
-    // Initialize NVS
+    // Initialize NVS without erasing: NVS is shared with CrossPoint (its
+    // "devid" namespace holds a 32-byte device secret, disjoint from eenk's
+    // "boot"/"settings"/"ink_cache" namespaces). Never hard-fault or erase NVS
+    // here — all eenk NVS callers tolerate missing NVS gracefully.
     esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-#ifdef EENK_LOCKED_BUILD
-        // Locked X4: NVS is shared with CrossPoint (namespace "devid" holds
-        // its 32-byte device secret; eenk uses "boot"/"settings"/"ink_cache").
-        // Never erase here — a wipe would orphan CrossPoint's wrapped book
-        // keys. All eenk NVS users tolerate init failure (defaults /
-        // hash-miss), so continue without NVS. In practice this branch is
-        // unreachable: Arduino's initArduino() already applies this same
-        // erase policy before setup(), and NEW_VERSION can't occur (both
-        // firmwares are IDF 5.5.x). Defense-in-depth only.
-        Serial.printf("[FlashCache] NVS init failed (%d); continuing without NVS (locked build, no erase).\n",
-                      (int)err);
-#else
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        err = nvs_flash_init();
-#endif
-    }
-#ifdef EENK_LOCKED_BUILD
-    // Locked builds must never hard-fault on NVS failure (a panic loop would
-    // strand a USB-locked unit); every NVS caller handles missing NVS
-    // gracefully, so log and continue.
     if (err != ESP_OK) {
         Serial.printf("[FlashCache] NVS unavailable (%d); continuing with defaults.\n", (int)err);
         return;
     }
-#else
-    ESP_ERROR_CHECK(err);
-#endif
 }
 
 FlashCache::~FlashCache()
@@ -68,18 +47,13 @@ void FlashCache::unload()
 bool FlashCache::findPartition()
 {
     if (_partition) return true;
-#ifdef EENK_LOCKED_BUILD
-    // Locked X4: CrossPoint layout has no ink_cache partition. Reuse the
-    // otherwise-unused spiffs partition (0x360000 = 3.375MB) as raw cache.
-    // CrossPoint never mounts flash spiffs (all state lives on SD; its only
-    // NVS use is the 32-byte "devid" secret, disjoint from eenk's
-    // "boot"/"settings"/"ink_cache" namespaces), and we never mount it as a
-    // filesystem: raw
-    // erase/write/mmap only, same access pattern as ink_cache.
+    // Prefer CrossPoint's spiffs partition (0x360000 = 3.375 MiB), used as raw
+    // erase/write/mmap cache. Fall back to legacy ink_cache (FAT, 7.875 MiB)
+    // so existing unlocked X4 units that haven't repartitioned yet keep working.
     _partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "spiffs");
-#else
-    _partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, "ink_cache");
-#endif
+    if (!_partition) {
+        _partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, "ink_cache");
+    }
     return _partition != nullptr;
 }
 

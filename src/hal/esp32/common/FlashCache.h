@@ -24,7 +24,7 @@ public:
 
     /**
      * Load a story binary from SD card into the story-cache flash partition
-     * (ink_cache on stock builds, spiffs on EENK_LOCKED_BUILD),
+     * (spiffs on CrossPoint layout, with fallback to legacy ink_cache),
      * then memory-map it for zero-copy access.
      *
      * @param sdStorage  The SD card storage to read from
@@ -53,6 +53,12 @@ public:
 
     /** Check if the story-cache partition exists. */
     bool findPartition();
+
+    /** Size in bytes of the discovered cache partition (0 if not found). */
+    std::size_t getPartitionSize() const { return _partition ? _partition->size : 0; }
+
+    /** Label of the discovered cache partition (empty string if not found). */
+    const char* getPartitionLabel() const { return _partition ? _partition->label : ""; }
 
     /** Get the CRC32 hash of the loaded story */
     uint32_t getHash() const { return _cachedHash; }

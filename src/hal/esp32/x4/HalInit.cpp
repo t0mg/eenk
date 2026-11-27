@@ -13,34 +13,20 @@
 
 namespace HalInit {
 
-#ifdef EENK_LOCKED_BUILD
 namespace {
-// Set when UP is held at boot; main.cpp runs the in-app SD updater (recovery
-// mode) after display/input/SD init. Button-only: no /firmware.bin
-// auto-trigger (mirrors CrossPoint recovery).
+// Set when UP is held on a cold boot; main.cpp launches the in-app SD firmware
+// updater in recovery mode after display/input/SD init.
 bool s_recoveryRequested = false;
 } // namespace
 
 bool recoveryRequested() { return s_recoveryRequested; }
-#else
-bool recoveryRequested() { return false; }
-#endif
 
 void earlyBootCheck() {
   initHardware();
 
-#ifdef EENK_LOCKED_BUILD
-  // Locked X4: no app1 updater exists — app1 is the alternate OTA firmware
-  // slot, and esp_ota_set_boot_partition() fails its image verify on locked
-  // units. Sample UP (same 5-sample debounce as stock); when held, flag SD
-  // recovery instead of booting the updater partition.
-  //
-  // Only cold boots / wakes may enter recovery. A warm ESP.restart() (e.g.
-  // the post-flash reboot, a Settings save, or a crash) must boot normally
-  // even if UP is still held — otherwise holding UP through the restart
-  // re-enters recovery with no way out except flashing again. Mirrors
-  // CrossPoint, which gates recovery on a power-button wake (POWERON on
-  // battery, DEEPSLEEP-wake on USB power, EXT for the reset button).
+  // Only cold boots / wakes may enter SD recovery. A warm ESP.restart() (e.g.
+  // post-flash reboot, story launch, or crash) must boot normally even if UP
+  // is still held, preventing a recovery re-entry loop.
   const esp_reset_reason_t resetReason = esp_reset_reason();
   if (resetReason != ESP_RST_POWERON && resetReason != ESP_RST_DEEPSLEEP &&
       resetReason != ESP_RST_EXT) {
@@ -48,6 +34,7 @@ void earlyBootCheck() {
                   (int)resetReason);
     return;
   }
+
   InputManager im;
   im.begin();
   int pressedCount = 0;
@@ -63,46 +50,6 @@ void earlyBootCheck() {
     Serial.println("[Boot] UP button held. Requesting SD recovery updater.");
     s_recoveryRequested = true;
   }
-  return;
-#else
-  bool updaterMode = false;
-
-  // Check UP button (must be held continuously across multiple samples to avoid ADC startup noise)
-  InputManager im;
-  im.begin();
-  int pressedCount = 0;
-  for (int i = 0; i < 5; i++) {
-    im.update();
-    if (im.isPressed(InputManager::BTN_UP)) {
-      pressedCount++;
-    }
-    delay(10);
-  }
-
-  if (pressedCount >= 4) {
-    Serial.println("[Boot] UP button held. Forcing updater mode.");
-    updaterMode = true;
-  }
-
-  // Check SD card for /firmware.bin
-  if (!updaterMode) {
-    // Init SPI first so SD.begin() works (SCLK=8, MISO=7, MOSI=10, CS=21)
-    SPI.begin(8, 7, 10, 21);
-    if (SD.begin(12, SPI, 40000000, "/sd", 8)) {
-      if (SD.exists("/firmware.bin")) {
-        Serial.println(
-            "[Boot] /firmware.bin found on SD. Forcing updater mode.");
-        updaterMode = true;
-      }
-    }
-  }
-
-  if (updaterMode) {
-    Serial.println("[Boot] Restarting into Updater (app1)...");
-    BootManager::bootUpdater();
-    // Will reboot
-  }
-#endif
 }
 
 void initHardware() {
