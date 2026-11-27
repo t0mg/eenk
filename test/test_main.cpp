@@ -364,6 +364,18 @@ void test_battery_widget_screenshot(void) {
   TEST_ASSERT_EQUAL(1, 1);
 }
 
+void test_battery_percentage_interpolation(void) {
+  TEST_ASSERT_EQUAL_UINT16(0, BatteryWidget::percentageFromMillivolts(0));
+  TEST_ASSERT_EQUAL_UINT16(0, BatteryWidget::percentageFromMillivolts(3450));
+  TEST_ASSERT_EQUAL_UINT16(10, BatteryWidget::percentageFromMillivolts(3680));
+  TEST_ASSERT_EQUAL_UINT16(50, BatteryWidget::percentageFromMillivolts(3820));
+  TEST_ASSERT_EQUAL_UINT16(90, BatteryWidget::percentageFromMillivolts(4060));
+  TEST_ASSERT_EQUAL_UINT16(94, BatteryWidget::percentageFromMillivolts(4114));
+  TEST_ASSERT_EQUAL_UINT16(95, BatteryWidget::percentageFromMillivolts(4130));
+  TEST_ASSERT_EQUAL_UINT16(100, BatteryWidget::percentageFromMillivolts(4200));
+  TEST_ASSERT_EQUAL_UINT16(100, BatteryWidget::percentageFromMillivolts(4300));
+}
+
 static void ensure_test_story_media(bool forceRebuild = false) {
   FILE *f = fopen("test/story/story.media", "rb");
   if (!f || forceRebuild) {
@@ -3577,6 +3589,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_menu_modal_paginated_screenshot);
   RUN_TEST(test_ink_display_manager_choice_overflow);
   RUN_TEST(test_ink_display_manager_ten_choices);
+  RUN_TEST(test_battery_percentage_interpolation);
 
   // X3 (792x528) Golden Screenshot Tests
   RUN_TEST(test_battery_widget_x3_screenshot);

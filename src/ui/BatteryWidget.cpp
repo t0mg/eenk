@@ -13,6 +13,7 @@
 
 #ifdef PLATFORM_ESP32
 #include <BatteryMonitor.h>
+#include <BoardConfig.h>
 #endif
 #include <GfxRenderer.h>
 #include "NeuStyle.h"
@@ -45,11 +46,48 @@ void BatteryWidget::refreshNow() {
   pollOnce();
 }
 
+uint16_t BatteryWidget::percentageFromMillivolts(uint16_t millivolts) {
+  // Same 1S Li-ion discharge anchor points as freeink-sdk's BatteryMonitor,
+  // interpolated linearly to 1% granularity so ADC boards (X4) don't jump in
+  // 10% steps when hovering near a notch boundary.
+  static constexpr uint16_t kNotchMv[11] = {
+      3450, //   0%
+      3680, //  10%
+      3740, //  20%
+      3770, //  30%
+      3790, //  40%
+      3820, //  50%
+      3870, //  60%
+      3920, //  70%
+      3980, //  80%
+      4060, //  90%
+      4200, // 100%
+  };
+  if (millivolts <= kNotchMv[0])
+    return 0;
+  if (millivolts >= kNotchMv[10])
+    return 100;
+  for (uint8_t i = 0; i < 10; ++i) {
+    if (millivolts < kNotchMv[i + 1]) {
+      const uint32_t span = kNotchMv[i + 1] - kNotchMv[i];
+      const uint32_t offset = millivolts - kNotchMv[i];
+      return static_cast<uint16_t>(i * 10 + (offset * 10 + span / 2) / span);
+    }
+  }
+  return 100;
+}
+
 void BatteryWidget::pollOnce() {
   const BatteryMonitor::Status st = _battery.readStatus();
-  const uint16_t newPct = st.percentageKnown ? st.percentage : _cachedPct;
+  uint16_t newPct = st.percentageKnown ? st.percentage : _cachedPct;
   const bool newCharging = st.chargingKnown ? st.charging : _cachedCharging;
   const uint16_t newMv = st.millivoltsKnown ? st.millivolts : _cachedMv;
+#ifdef PLATFORM_ESP32
+  // Gauge boards (X3, X4 Pro) already report 1% SoC; interpolate only on ADC boards (X4).
+  if (st.millivoltsKnown && BoardConfig::ACTIVE.batteryGauge.gaugeAddr == 0) {
+    newPct = percentageFromMillivolts(st.millivolts);
+  }
+#endif
   if (newPct != _cachedPct || newCharging != _cachedCharging) {
     _stateChanged = true;
   }

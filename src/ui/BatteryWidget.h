@@ -56,6 +56,10 @@ public:
   bool isCharging() const { return _cachedCharging; }
   bool hasStateChanged() const { return _stateChanged; }
 
+  // Piecewise-linear 1% Li-ion percentage curve for ADC-based boards (e.g. X4),
+  // smoothing out the 10% notch jumps from BatteryMonitor::percentageFromMillivolts.
+  static uint16_t percentageFromMillivolts(uint16_t millivolts);
+
 private:
   // Single poll of percentage + charging + millivolts; updates the cache and
   // sets _stateChanged when percentage or charging changed (millivolt drift
