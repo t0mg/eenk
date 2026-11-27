@@ -49,7 +49,7 @@ Write interactive stories with the [**eenky** IDE](eenky/) (or any other text ed
   <div class="feature-card">
     <h3><span class="feature-icon material-symbols-outlined">bolt</span>
     Web Flasher</h3>
-    <p>No drivers, no Wifi, no taking out the SD card. Flash the firmware and manage your story library from your browser over USB.</p>
+    <p>No drivers, no Wifi, no taking out the SD card. Flash the firmware and manage your story library from your browser over USB (requires an unlocked device).</p>
   </div>
 </div>
 

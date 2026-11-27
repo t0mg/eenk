@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description"
     content="Flash eenk firmware to your Xteink device directly from your browser using Web Serial." />
-  <title>Web Flasher — eenk</title>
+  <title>Flasher tool — eenk</title>
   <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="../assets/favicon-16x16.png" />
   <link rel="shortcut icon" href="../assets/favicon.ico" />
@@ -73,17 +73,18 @@
             READ THIS BEFORE PROCEEDING
           </div>
           <p>
-            This <strong>Web Flasher</strong> requires a <strong>USB-unlocked Xteink device</strong>.
+            This <strong>Flasher tool</strong> requires a <strong>USB-unlocked Xteink device</strong>.
           </p>
           <p>
-            <strong>Have a USB-locked device?</strong> You can still run eenk! Because eenk uses the
-            CrossPoint-compatible A/B partition layout, you don't need USB flashing at all: download the
-            app-only <code>x3x4-firmware.bin</code> (or <code>x4pro-firmware.bin</code>) from
-            <a href="https://github.com/t0mg/eenk/releases/latest" target="_blank" rel="noopener noreferrer">GitHub Releases</a>
+            <strong>Have a USB-locked device?</strong> You can still run eenk! Install <a
+              href="https://crosspointreader.com/" target="_blank" rel="noopener noreferrer">Crosspoint</a> then
+            download the app-only <code>x3x4-firmware.bin</code> (or <code>x4pro-firmware.bin</code>) from
+            <a href="https://github.com/t0mg/eenk/releases/latest" target="_blank" rel="noopener noreferrer">GitHub
+              Releases</a>
             and flash it directly from your MicroSD card via CrossPoint's SD updater.
           </p>
           <p>
-            <em>Existing unlocked X3/X4 users migrating from an older eenk version (pre-unified layout)
+            <em>Existing unlocked X3/X4 users migrating from an older eenk version (0.1.x)
               should run a one-time <strong>Factory Flash</strong> to update their partition table to the
               shared A/B layout.</em>
           </p>
@@ -92,7 +93,7 @@
         <div class="confirm-checkbox-row">
           <input type="checkbox" id="unlock-confirm" aria-required="true" />
           <label for="unlock-confirm">
-            I understand that this Web Flasher is for USB-unlocked devices (USB-locked devices should flash via SD card instead).
+            I understand that this Flasher tool is for USB-unlocked devices only.
           </label>
         </div>
 
@@ -164,7 +165,8 @@
             <div>
               <span class="card-title">CrossPoint / Stock Restore</span>
               <span class="card-desc" style="display:block;margin-top:0.35rem;">
-                Switch back to CrossPoint via SD card (Settings → SD Firmware Update), or restore stock firmware via USB.
+                Switch back to CrossPoint via SD card (Settings → SD Firmware Update), or restore stock firmware via
+                USB.
               </span>
             </div>
           </button>
