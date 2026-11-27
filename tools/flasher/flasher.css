@@ -36,6 +36,16 @@ button[disabled] {
   cursor: not-allowed;
 }
 
+a:not(.btn) {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+a:not(.btn):hover {
+  color: var(--color-accent-dark);
+}
+
 /* ── Flasher Shell ───────────────────────────────────────────── */
 .flasher-shell {
   display: grid;
