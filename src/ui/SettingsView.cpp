@@ -255,12 +255,6 @@ void SettingsView::renderPage() {
   int y = HeaderWidget::HEIGHT + CARD_INSET_Y;
   static constexpr int kItems = static_cast<int>(SettingRow::COUNT);
 
-  // Battery row value (cached poll; CONFIRM on the row forces a live re-read).
-  char batteryVal[32];
-  snprintf(batteryVal, sizeof(batteryVal), "%u%% (%u mV)",
-           (unsigned)_battery.getPercentage(),
-           (unsigned)_battery.getMillivolts());
-
   for (int r = 0; r < kItems; ++r) {
     SettingRow row = static_cast<SettingRow>(r);
     bool selected = (_itemIndex == r);
@@ -307,10 +301,6 @@ void SettingsView::renderPage() {
       drawSettingsRow(y, "Firmware", EENK_VERSION_STR, selected);
       break;
     }
-    case SettingRow::BATTERY: {
-      drawSettingsRow(y, "Battery", batteryVal, selected);
-      break;
-    }
     default:
       break;
     }
@@ -337,8 +327,6 @@ void SettingsView::renderFooter() {
     footer.btnConfirm = {false, "", "", false};
   } else if (selectedRow == SettingRow::SD_FIRMWARE_UPDATE) {
     footer.btnConfirm = {true, "Go", "Confirm", true};
-  } else if (selectedRow == SettingRow::BATTERY) {
-    footer.btnConfirm = {true, "Refresh", "Confirm", true};
   } else {
     footer.btnConfirm = {true, "Change", "Confirm", true};
   }
@@ -431,11 +419,6 @@ void SettingsView::handleInput(ButtonEvent ev) {
     }
     case SettingRow::FIRMWARE_VERSION:
       return; // Read-only
-    case SettingRow::BATTERY:
-      // Live re-read on demand, then show the fresh values.
-      _battery.refreshNow();
-      renderPage();
-      return;
     case SettingRow::STORY_FONT:
       _dirty = true;
       if (_fontCatalogue.getCount() > 0) {
