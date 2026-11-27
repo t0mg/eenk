@@ -324,11 +324,11 @@ void SettingsView::renderFooter() {
   footer.btnBack = {true, "Exit", "Back"};
   SettingRow selectedRow = static_cast<SettingRow>(_itemIndex);
   if (selectedRow == SettingRow::FIRMWARE_VERSION) {
-    footer.btnConfirm = {false, "", ""};
+    footer.btnConfirm = {false, "", "", false};
   } else if (selectedRow == SettingRow::SD_FIRMWARE_UPDATE) {
-    footer.btnConfirm = {true, "Go", "Confirm"};
+    footer.btnConfirm = {true, "Go", "Confirm", true};
   } else {
-    footer.btnConfirm = {true, "Change", "Confirm"};
+    footer.btnConfirm = {true, "Change", "Confirm", true};
   }
   footer.btnPrev = {true, "Up", "Prev"};
   footer.btnNext = {true, "Down", "Next"};
