@@ -9,6 +9,7 @@
 #include <direct.h>
 #else
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 #ifdef PLATFORM_NATIVE
@@ -1045,10 +1046,14 @@ void test_epub_toc_and_reader_menu(void) {
 }
 
 void test_gnk_epub_open(void) {
+  const char *epubPath = "stories/gnk.epub";
+  if (access(epubPath, F_OK) != 0) {
+    TEST_IGNORE_MESSAGE("stories/gnk.epub not present locally");
+    return;
+  }
   TestDisplay display;
   MockInput input;
   BookEngine engine(display, input);
-  const char *epubPath = "stories/gnk.epub";
   bool loaded = engine.loadBook(epubPath);
   TEST_ASSERT_TRUE_MESSAGE(loaded, "Failed to load gnk.epub");
 }
