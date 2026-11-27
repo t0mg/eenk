@@ -38,6 +38,20 @@ bool BatteryWidget::tick() {
   if (_lastPollMs == 0 || (now - _lastPollMs) > POLL_INTERVAL_MS) {
     pollOnce();
   }
+#ifdef PLATFORM_ESP32
+  else if (BoardConfig::ACTIVE.batteryChargeStatus >= 0 &&
+           (now - _lastChargePollMs) >= CHARGE_POLL_INTERVAL_MS) {
+    const int activeLevel =
+        BoardConfig::ACTIVE.batteryChargeStatusActiveHigh ? HIGH : LOW;
+    const bool newCharging =
+        digitalRead(BoardConfig::ACTIVE.batteryChargeStatus) == activeLevel;
+    if (newCharging != _cachedCharging) {
+      _cachedCharging = newCharging;
+      _stateChanged = true;
+    }
+    _lastChargePollMs = now;
+  }
+#endif
   return _stateChanged;
 }
 
@@ -95,6 +109,7 @@ void BatteryWidget::pollOnce() {
   _cachedCharging = newCharging;
   _cachedMv = newMv;
   _lastPollMs = millis();
+  _lastChargePollMs = _lastPollMs;
 }
 
 // ─── draw() ──────────────────────────────────────────────────────────────────

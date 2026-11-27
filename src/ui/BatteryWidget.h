@@ -77,5 +77,7 @@ private:
   bool _cachedCharging = false;
   bool _stateChanged = false;
   unsigned long _lastPollMs = 0;
+  unsigned long _lastChargePollMs = 0;
   static constexpr unsigned long POLL_INTERVAL_MS = 60000;
+  static constexpr unsigned long CHARGE_POLL_INTERVAL_MS = 500;
 };
