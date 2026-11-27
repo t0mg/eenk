@@ -20,10 +20,10 @@ class BatteryWidget;
 enum class SettingRow {
     STORY_FONT,
     CHOICE_FONT,
+    OVERRIDE_FONT,
     MARGIN,
     FULL_REFRESH,
     SLEEP_TIMEOUT,
-    OVERRIDE_FONT,
     SD_FIRMWARE_UPDATE,
     FIRMWARE_VERSION,
     COUNT

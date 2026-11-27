@@ -294,7 +294,7 @@ void SettingsView::renderPage() {
       break;
     }
     case SettingRow::SD_FIRMWARE_UPDATE: {
-      drawSettingsRow(y, "SD Firmware Update", "Flash .bin", selected);
+      drawSettingsRow(y, "SD Firmware Update", "", selected);
       break;
     }
     case SettingRow::FIRMWARE_VERSION: {
@@ -322,7 +322,14 @@ void SettingsView::renderFooter() {
 
   FooterWidget footer;
   footer.btnBack = {true, "Exit", "Back"};
-  footer.btnConfirm = {true, "Change", "Confirm"};
+  SettingRow selectedRow = static_cast<SettingRow>(_itemIndex);
+  if (selectedRow == SettingRow::FIRMWARE_VERSION) {
+    footer.btnConfirm = {false, "", ""};
+  } else if (selectedRow == SettingRow::SD_FIRMWARE_UPDATE) {
+    footer.btnConfirm = {true, "Go", "Confirm"};
+  } else {
+    footer.btnConfirm = {true, "Change", "Confirm"};
+  }
   footer.btnPrev = {true, "Up", "Prev"};
   footer.btnNext = {true, "Down", "Next"};
   footer.render(r, _display.getWidth(), _display.getHeight());
