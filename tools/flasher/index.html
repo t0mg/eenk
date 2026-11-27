@@ -73,26 +73,26 @@
             READ THIS BEFORE PROCEEDING
           </div>
           <p>
-            The eenk firmware is only compatible with <strong>USB unlocked Xteink devices</strong>.
-            Flashing a locked device <strong>CAN BRICK IT</strong>.
+            This <strong>Web Flasher</strong> requires a <strong>USB-unlocked Xteink device</strong>.
           </p>
           <p>
-            If you purchased your device from Xteink, it is unlocked. From other resellers, your mileage may vary. The
-            flashing wizard provided here will not work on locked devices. Please do not try alternate flashing
-            methods, or you will turn your ereader into a very thin and light paperweight (i.e. a pretty bad one).
+            <strong>Have a USB-locked device?</strong> You can still run eenk! Because eenk uses the
+            CrossPoint-compatible A/B partition layout, you don't need USB flashing at all: download the
+            app-only <code>x3x4-firmware.bin</code> (or <code>x4pro-firmware.bin</code>) from
+            <a href="https://github.com/t0mg/eenk/releases/latest" target="_blank" rel="noopener noreferrer">GitHub Releases</a>
+            and flash it directly from your MicroSD card via CrossPoint's SD updater.
           </p>
           <p>
-            <em>Technical reason: The eenk firmware replaces the stock partition table,
-              allocating roughly half of the X3/X4's 16 MB flash as read-only storage for
-              loading and running Ink stories. It is not possible to safely modify the
-              partition table (and flash back to stock) without USB.</em>
+            <em>Existing unlocked X3/X4 users migrating from an older eenk version (pre-unified layout)
+              should run a one-time <strong>Factory Flash</strong> to update their partition table to the
+              shared A/B layout.</em>
           </p>
         </div>
 
         <div class="confirm-checkbox-row">
           <input type="checkbox" id="unlock-confirm" aria-required="true" />
           <label for="unlock-confirm">
-            I understand that flashing eenk on a locked device will brick it.
+            I understand that this Web Flasher is for USB-unlocked devices (USB-locked devices should flash via SD card instead).
           </label>
         </div>
 
@@ -144,8 +144,8 @@
             <div>
               <span class="card-title">Factory Flash</span>
               <span class="card-desc" style="display:block;margin-top:0.35rem;">
-                Full erase and install. Writes the bootloader, custom partition table, and
-                application from scratch.<br><strong>Required for first-time installation.</strong>
+                Full erase and install. Writes the bootloader, CrossPoint-compatible A/B partition table, and
+                application from scratch.<br><strong>Required for first-time USB installation.</strong>
               </span>
             </div>
           </button>
@@ -164,7 +164,7 @@
             <div>
               <span class="card-title">CrossPoint / Stock Restore</span>
               <span class="card-desc" style="display:block;margin-top:0.35rem;">
-                A guide to help you restore your device to the original vendor partition table and stock firmware.
+                Switch back to CrossPoint via SD card (Settings → SD Firmware Update), or restore stock firmware via USB.
               </span>
             </div>
           </button>
@@ -223,8 +223,9 @@
               Restoring CrossPoint / Stock Firmware
             </h3>
             <p>
-              To restore the original vendor partition layout and stock firmware on your device, you can use the
-              CrossPoint Reader debug tools page:
+              Because eenk uses the same A/B partition layout as CrossPoint, you can switch back to CrossPoint
+              at any time directly from your MicroSD card via <strong>Settings → SD Firmware Update</strong>.
+              To restore stock vendor firmware over USB, you can also use the CrossPoint Reader debug tools page:
             </p>
             <ol>
               <li>

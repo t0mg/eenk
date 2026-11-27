@@ -27,19 +27,19 @@ import sys
 from datetime import datetime, timezone
 
 
-# ── Partition offsets (must match partitions.csv / partitions_x4pro.csv) ──────
+# ── Partition offsets (must match unified partitions.csv) ────────────────────
 
 X4_OFFSETS = {
     # Offset 0x0 used for merged factory binary (bootloader at 0x0)
     'factory_merged': '0x0',
     'app0':           '0x10000',
-    'app1_updater':   '0x710000',
+    # Symmetric A/B OTA handled in-app via SdFirmwareUpdate
 }
 
 X4PRO_OFFSETS = {
     'factory_merged': '0x0',
     'app0':           '0x10000',
-    # No separate updater: A/B OTA handled from app0
+    # Symmetric A/B OTA handled in-app via SdFirmwareUpdate
 }
 
 

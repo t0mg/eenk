@@ -69,10 +69,6 @@ jobs:
       fail-fast: true
       matrix:
         include:
-          - env: esp32c3_updater
-            artifact: x4-updater
-            rename: {}
-
           - env: esp32c3
             artifact: x3x4-firmware
             rename:

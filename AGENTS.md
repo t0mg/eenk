@@ -64,65 +64,46 @@ eenky
 
 ### Build System
 
-eenk uses **PlatformIO** with four build environments defined in `platformio.ini`:
+eenk uses **PlatformIO** with three build environments defined in `platformio.ini`:
 
 | Environment | Target | Purpose |
 |------------|--------|---------|
 | `native` | Host (MinGW/SDL2) | Desktop simulator, renders to SDL2 window |
-| `esp32c3` | ESP32-C3 | Main firmware for Xteink X3 and X4 hardware (app0) |
-| `esp32c3_updater` | ESP32-C3 | Minimal OTA updater firmware for X4 (app1) |
-| `esp32s3` | ESP32-S3 | Main firmware for Xteink X4 Pro hardware (app0) |
+| `esp32c3` | ESP32-C3 | Main firmware for Xteink X3 and X4 hardware (unlocked & USB-locked) |
+| `esp32s3` | ESP32-S3 | Main firmware for Xteink X4 Pro hardware |
 
 **Build commands:**
 ```sh
 pio run -e native          # Desktop simulator
-pio run -e esp32c3         # Main firmware (X4)
+pio run -e esp32c3         # Main firmware (X3 / X4)
 pio run -e esp32s3         # Main firmware (X4 Pro)
-pio run -e esp32c3_updater # OTA updater (X4)
 pio test -e native         # Unit tests (native only)
 ```
 
 > [!NOTE]
-> The X4 Pro has **no separate updater environment** — it uses symmetric A/B OTA partitions (both `app0` and `app1` are full ~7.9 MB firmware slots). OTA on the X4 Pro is handled by swapping the active slot via `esp_ota_set_boot_partition` directly from the main firmware.
+> Both X3/X4 (`esp32c3`) and X4 Pro (`esp32s3`) use symmetric A/B OTA partitions (CrossPoint-compatible layout in `partitions.csv`) and perform in-app SD firmware updates via `src/fwupdate/`. There is no separate `esp32c3_updater` environment.
 
 > [!IMPORTANT]
 > **After making changes, always build `native`, `esp32c3`, and `esp32s3` targets** to verify cross-platform compatibility. The native build uses host g++ with SDL2; the ESP32 builds use the ESP-IDF Arduino framework.
 
 ### Partition Layout
 
-The ESP32-C3 (X4) and ESP32-S3 (X4 Pro) both use 16 MB flash chips, but their partition schemes differ.
+Both ESP32-C3 (X3/X4) and ESP32-S3 (X4 Pro) share the same 16 MB CrossPoint-compatible partition table (`partitions.csv`):
 
-**X4 (16 MB) Layout (`partitions.csv`):**
 | Partition | Type | Offset | Size | Purpose |
 |-----------|------|--------|------|---------|
-| `nvs` | data | 0x9000 | 20 KB | Non-volatile storage (settings, boot state) |
+| `nvs` | data | 0x9000 | 20 KB | Non-volatile storage (settings, boot state; shared with CrossPoint's `devid`) |
 | `otadata` | data | 0xE000 | 8 KB | OTA boot selection metadata |
-| **`app0`** | app (ota_0) | 0x10000 | **7 MB** | Main firmware — full interactive fiction runtime |
-| **`app1`** | app (ota_1) | 0x710000 | **1 MB** | OTA Updater — minimal recovery/update firmware |
-| `ink_cache` | data (FAT) | 0x810000 | ~7.9 MB | Story file cache (FAT filesystem) |
-| `coredump` | data | 0xFF0000 | 64 KB | Crash dump storage |
-
-**X4 Pro (16 MB) Layout (`partitions_x4pro.csv`):**
-| Partition | Type | Offset | Size | Purpose |
-|-----------|------|--------|------|---------|
-| `nvs` | data | 0x9000 | 20 KB | Non-volatile storage (settings, boot state) |
-| `otadata` | data | 0xE000 | 8 KB | OTA boot selection metadata |
-| **`app0`** | app (ota_0) | 0x10000 | **~7.9 MB** | Main firmware — full interactive fiction runtime |
-| **`app1`** | app (ota_1) | 0x800000 | **~7.9 MB** | Alternate OTA partition — full runtime (A/B updates) |
+| **`app0`** | app (ota_0) | 0x10000 | **6.25 MiB** | Primary OTA slot — full interactive fiction runtime |
+| **`app1`** | app (ota_1) | 0x650000 | **6.25 MiB** | Alternate OTA slot — full runtime (symmetric A/B updates) |
+| `spiffs` | data (spiffs) | 0xC90000 | **3.375 MiB** | Raw Ink story cache on X3/X4 (unused on X4 Pro, which loads stories into PSRAM) |
 | `coredump` | data | 0xFF0000 | 64 KB | Crash dump storage |
 
 **Key constraints:**
-- `app0` holds the full runtime with the Ink engine, UI, fonts, and rendering. Most firmware development happens here.
-- On the X4 Pro, `app0` and `app1` are identical in size (~7.9 MB) for full A/B OTA updates. There is no `ink_cache` partition because stories are loaded directly into PSRAM.
-- On the X4 (no PSRAM), `app1` (1 MB) is the **updater partition** — an intentionally minimal firmware that handles OTA updates and SD card firmware flashing.
-
-> [!CAUTION]
-> **The updater partition (`app1`, `src/updater/`) must remain extremely lean and robust.** It is the device's recovery mechanism. Before making any change to the updater code, always ask:
-> 1. Is this change absolutely necessary?
-> 2. Could a bug here brick the device?
-> 3. Will the resulting binary still fit in 1 MB?
->
-> The updater only links a small subset of source files — see the `build_src_filter` in the `[env:esp32c3_updater]` section of `platformio.ini`.
+- `app0` and `app1` are symmetric 6.25 MiB OTA slots so devices (including USB-locked units) can update `eenk` or switch back to CrossPoint directly from the MicroSD card without repartitioning.
+- On X3/X4 (no PSRAM), `FlashCache` uses `spiffs` as a raw erase/write/mmap story cache (max 3.375 MiB) and falls back to legacy `ink_cache` partitions if present.
+- On X4 Pro, stories load directly into PSRAM (`HAS_FLASH_CACHE = 0`).
+- `src/fwupdate/` contains verbatim CrossPoint Reader flasher files (MIT licensed, see `src/fwupdate/LICENSE`). Never edit the verbatim files directly; extend `src/fwupdate/compat/HalStorage.h` instead.
 
 ### Source Code Layout
 
@@ -138,6 +119,14 @@ src/
 ├── engine/
 │   ├── InkEngine.cpp/.h      # Core Ink story execution engine
 │   └── StorySaveManager.cpp/.h # ENK2 save game serialization & checkpoint manager
+├── fwupdate/
+│   ├── FirmwareFlasher.cpp/.h  # Verbatim CrossPoint SD firmware flasher (MIT)
+│   ├── OtaBootSwitch.cpp/.h    # Verbatim CrossPoint raw otadata switcher (MIT)
+│   ├── FirmwareBoardTag.cpp/.h # Verbatim CrossPoint board-tag guard (MIT)
+│   ├── skip_efuse_blk_check.c  # C3/X3 eFuse block revision check override (MIT)
+│   ├── SdFirmwareUpdate.cpp/.h # Blocking eenk UI flow for SD firmware updates
+│   ├── compat/HalStorage.h     # Minimal HalStorage shim over SD_FS (SD / SD_MMC)
+│   └── LICENSE                 # CrossPoint Reader MIT license notice
 ├── hal/
 │   ├── IDisplay.h            # Display hardware abstraction interface
 │   ├── IInput.h              # Input hardware abstraction interface
@@ -160,9 +149,6 @@ src/
 │   ├── HeaderWidget.cpp/.h   # Header bar
 │   ├── FooterWidget.cpp/.h   # Footer bar
 │   └── StoryMetadata.cpp/.h  # Story metadata parsing
-└── updater/
-    ├── UpdaterMain.cpp       # OTA updater entry point (app1 only)
-    └── WifiProvisioner.cpp/.h # WiFi credential reader
 ```
 
 > [!NOTE]
@@ -358,7 +344,6 @@ After making firmware changes in eenk:
 - [ ] `pio run -e esp32c3` builds successfully
 - [ ] `pio run -e esp32s3` builds successfully
 - [ ] `pio test -e native` passes (golden screenshots match or are intentionally updated)
-- [ ] If updater was touched: `pio run -e esp32c3_updater` builds and binary fits in 1 MB
 
 ### Commit & Release Workflow
 

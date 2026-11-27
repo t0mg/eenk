@@ -10,7 +10,7 @@ Welcome to the **eenk** User Guide! This guide covers everything you need to kno
 
 ### Supported Devices
 
-> Important: Only USB-unlocked Xteink devices are compatible with the eenk firmware.
+Both **USB-unlocked** and **USB-locked** Xteink devices are supported. USB-unlocked devices can use the Web Flasher or SD card; USB-locked devices flash the app-only `.bin` directly from the MicroSD card (no repartitioning required).
 
 | Device | Processor | Notes |
 |---|---|---|
@@ -31,13 +31,14 @@ The easiest way to install or update eenk firmware is using your web browser:
 3. Select your device model and click **Connect**.
 4. Follow the on-screen wizard to flash the firmware. Select **Factory flash** if it's the first time you're flashing eenk, **Update** otherwise.
 
-### Method 2: Offline SD Card Update
+### Method 2: Offline SD Card Update (All Devices & USB-Locked Units)
 
-TODO: document this alternative method for X4.
+Because eenk shares the CrossPoint Reader symmetric A/B partition layout, you can install or update eenk (and switch back to CrossPoint) directly from your MicroSD card without USB:
 
-<!-- 1. Download the [latest `firmware.bin` release](https://github.com/t0mg/eenk/releases/latest) for your device (`x3x4-` or `x4pro-` depending on your model).
-2. Copy `firmware.bin` to the **root directory** of your MicroSD card.
-3. Insert the SD card and turn on the device. The bootloader will detect the update file, flash the new firmware, and rename the file to `firmware.bin.bak`. -->
+1. Download the [latest app-only `.bin` release](https://github.com/t0mg/eenk/releases/latest) for your device (`x3x4-firmware.bin` for X3/X4, or `x4pro-firmware.bin` for X4 Pro).
+2. Copy the `.bin` file anywhere on your MicroSD card (outside `/stories`, `/books`, and `/fonts`).
+3. On a device already running eenk, open **Settings → SD Firmware Update**, pick the `.bin` file, and confirm. (If installing from CrossPoint, use CrossPoint's SD firmware updater.)
+4. The device validates the image, flashes the inactive OTA slot, and reboots automatically.
 
 ## Basic Device Interactions
 
@@ -158,11 +159,11 @@ When you power on the device, the **Library** displays all available stories fou
 The loading process differs depending on your hardware model:
 
 - **Xteink X4 / X3 (ESP32-C3)**:
-  Because the ESP32-C3 has less internal RAM than an original [Commodore Amiga 500](https://en.wikipedia.org/wiki/Amiga_500), eenk uses an **internal flash cache partition** (`ink_cache`). When you select a new story, eenk streams the story from the SD card into this flash cache. You will see a `Loading story...` progress screen for a few seconds. Once cached, story execution runs via high-speed, zero-copy memory-mapped flash. This means that resuming a story you've been playing is relatively fast because it was already loaded in cache, but switching between stories takes time as this cache needs to be rewritten every time.
+  Because the ESP32-C3 has less internal RAM than an original [Commodore Amiga 500](https://en.wikipedia.org/wiki/Amiga_500), eenk uses the unused **3.375 MB `spiffs` partition** in the CrossPoint-compatible layout as a raw flash cache for Ink stories (with automatic fallback to legacy `ink_cache` partitions). When you select a new story, eenk streams it from the SD card into flash and runs it via zero-copy memory-mapped flash. Resuming the same story is fast because it is already cached; switching stories rewrites the cache.
 - **Xteink X4 Pro (ESP32-S3)**:
-  With 8MB of additional RAM, the X4 Pro loads stories directly into memory every time it loads, eliminating the need for a cache partition.
-  
-  > Note: A technical side effect is that the partition table on the X4Pro isn't too different from the e.g. Crosspoint firmware, unlike on X3/X4 where it's OTA partitions are assymetrical.
+  With 8MB of additional PSRAM, the X4 Pro loads stories directly into memory every time, without needing a flash cache.
+
+  > Note: Both X3/X4 and X4 Pro use the same CrossPoint-compatible symmetric A/B partition table (`6.25 MB app0 / 6.25 MB app1 / 3.375 MB spiffs`), so you can switch between eenk and CrossPoint via SD card without repartitioning.
 
 ### Reading, Scrolling & Making Choices
 
@@ -203,7 +204,7 @@ This UI screen is still a work in progress and likely to be adjusted in the near
 | **Full Refresh** | Every 5, 10, 15, 20 updates, or Off | Periodically trigger a full e-ink waveform refresh to eliminate ghosting. |
 | **Sleep & Save** | 1 min, 2 min, 5 min, Never | Set inactivity timeout before auto-saving and deep sleeping. |
 | **Override Story Font** | On / Off | If enabled, your device font setting will override any `@font` hint defined by the story. |
-| **Reboot to Updater** | OTA / App1 | Reboot into the recovery/updater partition (X4). |
+| **SD Firmware Update** | Flash `.bin` | Flash an eenk or CrossPoint firmware `.bin` from the MicroSD card. |
 | **Format SD** | Erase SD Card | Formats the MicroSD card to FAT32 filesystem. |
 | **Firmware** | Version String | Displays the currently installed eenk firmware version. | -->
 
@@ -268,10 +269,10 @@ If you ever encounter an issue or a corrupted firmware flash, eenk provides buil
 
 ### Hardware Recovery Modes
 
-- **Xteink X4 Recovery**:
-  Turn on the device while holding the **UP** button. This forces the device to boot into the minimal recovery Updater partition (`app1`).
-- **Xteink X4 Pro Recovery**: TODO: verify this
-  <!-- Turn on the device while holding the **LEFT** button (GPIO0). -->
+- **Xteink X3 / X4 Recovery**:
+  Power on the device while holding the **UP** button. This launches the in-app SD Firmware Updater in recovery mode before loading any story. (Long-press **Power** to sleep and exit recovery without flashing.)
+- **Xteink X4 Pro Recovery**:
+  Power on the device while holding the **LEFT** button (GPIO0) to launch the in-app SD Firmware Updater in recovery mode.
 - **USB Bootloader Reflash**:
   If the device does not turn on normally, hold the **UP/BOOT** button while plugging in the USB cable to enter ESP32 ROM bootloader mode, then reflash using the [Web Flasher](../flasher/).
 

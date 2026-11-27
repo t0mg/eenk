@@ -78,17 +78,8 @@ pio run -e esp32c3
 ```
 
 Outputs:
-- `.pio/build/esp32c3/firmware.bin` — app partition only
+- `.pio/build/esp32c3/firmware.bin` — app partition only (SD-flashable on both USB-locked and unlocked devices)
 - `.pio/build/esp32c3/firmware-factory.bin` — merged (bootloader + partitions + app), ready for Web Flasher
-
-### Xteink X3 / X4 OTA Updater (`esp32c3_updater`)
-
-The partition table contains a separate 1 MB updater partition (`app1`) to fit a minimal recovery firmware that can flash an OTA update from SD. Build the updater *before* the main firmware if you want it included in the factory image:
-
-```powershell
-pio run -e esp32c3_updater
-pio run -e esp32c3
-```
 
 ### Xteink X4 Pro (`esp32s3`)
 
@@ -97,6 +88,7 @@ pio run -e esp32s3
 ```
 
 Outputs:
+- `.pio/build/esp32s3/firmware.bin` — app partition only (SD-flashable)
 - `.pio/build/esp32s3/firmware-factory.bin` — merged factory image for X4 Pro
 
 ---

@@ -5,10 +5,9 @@ Welcome to **eenk**, a custom firmware designed to run **Ink** interactive ficti
 > [!TIP]
 > If you are interested in installing and using eenk rather than looking at firmware development, check out the [eenk website](https://t0mg.github.io/eenk/)!
 
-This project supports four build configurations managed via PlatformIO:
+This project supports three build configurations managed via PlatformIO:
 - **`native`**: A desktop simulation of the runtime, using an 800x480 SDL2 graphical window to simulate the e-ink display for testing.
-- **`esp32c3`**: The main firmware build for ESP32-C3 hardware (Xteink X3, X4).
-- **`esp32c3_updater`**: A minimal recovery and OTA updater firmware for ESP32-C3 devices.
+- **`esp32c3`**: The main firmware build for ESP32-C3 hardware (Xteink X3 and X4, both USB-unlocked and USB-locked).
 - **`esp32s3`**: The firmware build for ESP32-S3 hardware (Xteink X4 Pro).
 
 ---
@@ -61,46 +60,40 @@ pio test -e native
 
 ---
 
-## ESP32-C3 Target (`esp32c3` & `esp32c3_updater` configurations)
+## ESP32-C3 Target (`esp32c3` configuration)
 
-The `esp32c3` environment builds the firmware partition for physical ESP32-C3 hardware (Xteink X3, X4).
+The `esp32c3` environment builds the firmware for physical ESP32-C3 hardware (Xteink X3 and X4 — both USB-unlocked and USB-locked).
 
-### Custom Partition Table & Updater Firmware
+### Unified CrossPoint-Compatible Partition Table (`partitions.csv`)
 
-ESP32-C3 devices (16 MB flash) use a custom partition layout (`partitions.csv`):
-- **`app0` (7 MB)**: Main interactive fiction runtime firmware (`esp32c3`).
-- **`app1` (1 MB)**: Minimal OTA updater firmware (`esp32c3_updater`), which handles recovery and OTA updates.
-- **`ink_cache` (~7.9 MB)**: Dedicated FAT data partition used for caching Ink story binaries.
+Both ESP32-C3 (X3/X4) and ESP32-S3 (X4 Pro) devices share a single 16 MB symmetric A/B partition layout (`partitions.csv`, matching CrossPoint Reader):
+- **`app0` (`ota_0`, 6.25 MiB)** & **`app1` (`ota_1`, 6.25 MiB)**: Dual symmetric OTA application slots. Firmware updates and switching between `eenk` and CrossPoint are performed in-app from the MicroSD card (**Settings → SD Firmware Update**, or cold-boot recovery) without repartitioning.
+- **`spiffs` (3.375 MiB)**: Unused by CrossPoint; repurposed on X3/X4 as a raw flash cache for Ink story binaries (with automatic fallback to legacy `ink_cache` partitions).
 
-> [!CAUTION]
-> **USB-Locked Devices**: Installing `eenk` requires flashing custom bootloader and partition tables over USB. Because of this custom partition scheme, it is **strictly impossible to use `eenk` on USB-locked Xteink devices**, such as those sometimes sold on Aliexpress.
+> [!TIP]
+> **USB-Locked Devices**: Because `eenk` uses the CrossPoint-compatible partition table, USB-locked Xteink devices can install and update `eenk` directly from the MicroSD card using the app-only `firmware.bin` (no USB flashing or repartitioning required).
 
-### Story Caching & Memory Mapping (`ink_cache`)
+### Story Caching & Memory Mapping (`spiffs`)
 
 Because the ESP32-C3 lacks onboard PSRAM, its 400KB of internal SRAM is insufficient to keep full Ink story binaries in memory (in addition to the firmware itself). To address this:
-1. The currently selected story binary is copied from the SD card to the `ink_cache` flash partition.
+1. The currently selected story binary is copied from the SD card to the `spiffs` flash partition (raw erase/write, no filesystem).
 2. The `inkcpp` runtime utilizes ESP-IDF memory mapping (`esp_partition_mmap`) to map the partition memory directly into the MCU's address space.
-3. This enables zero-copy execution of large Ink stories directly from flash without consuming scarce RAM. Up to ~5MB is possible, but the limit also largely depends on the number of Ink containers and variables, which require actual RAM.
+3. This enables zero-copy execution of Ink stories up to **3.375 MiB** directly from flash without consuming scarce RAM.
 
 ### Building & Flashing
 
-To compile the main firmware for the Xteink X4:
+To compile the firmware for the Xteink X3 / X4:
 ```powershell
 pio run -e esp32c3
 ```
-This produces `.pio/build/esp32c3/firmware.bin` (app partition) and **`.pio/build/esp32c3/firmware-factory.bin`** (merged bootloader + partition table + app, used by ESP Web Tools in the eenky IDE).
-
-To compile the minimal updater firmware:
-```powershell
-pio run -e esp32c3_updater
-```
+This produces `.pio/build/esp32c3/firmware.bin` (app-only, SD-flashable on locked & unlocked devices) and **`.pio/build/esp32c3/firmware-factory.bin`** (merged bootloader + partition table + app, used by the Web Flasher and eenky IDE).
 
 Flashing via CLI:
 ```powershell
 pio run -e esp32c3 -t upload
 ```
 
-Alternatively, you can flash using the **Flash** tab within the eenky IDE, which uses ESP Web Tools to push `firmware-factory.bin` over USB.
+Alternatively, you can flash using the **Flash** tab within the eenky IDE, or copy `firmware.bin` to your MicroSD card and flash via **Settings → SD Firmware Update**.
 
 ---
 
@@ -112,9 +105,9 @@ The `esp32s3` environment builds the firmware for Xteink X4 Pro hardware.
 
 The ESP32-S3 target differs from the ESP32-C3 implementation in several key ways:
 
-- **Symmetric A/B Partition Table**: Uses `partitions_x4pro.csv` with dual symmetric ~7.9 MB partitions (`app0` and `app1`). Full firmware updates are performed in-place by swapping active slots via standard ESP-IDF OTA APIs. A separate minimal updater firmware (`app1`) is not used.
-- **Direct PSRAM Execution**: The X4 Pro includes onboard PSRAM, allowing Ink stories to be loaded directly into memory rather than using flash memory mapping via an `ink_cache` partition.
-- **Hardware Enhancements**: Includes full support for **touchscreen input** and **LED indicator / backlight controls** present on X4 Pro hardware.
+- **Shared Symmetric A/B Partition Table**: Shares `partitions.csv` (`app0` and `app1`, 6.25 MiB each) with X3/X4 and CrossPoint Reader, supporting in-app SD firmware updates and backwards-compatible OTA updates on existing X4 Pro devices.
+- **Direct PSRAM Execution**: The X4 Pro includes onboard PSRAM, allowing Ink stories to be loaded directly into memory rather than using flash memory mapping.
+- **Hardware Enhancements**: Includes full support for **touchscreen input** and **frontlight controls** present on X4 Pro hardware.
 
 ### Building & Flashing
 
@@ -169,7 +162,7 @@ Every build compiles `EENK_VERSION_STR` into flash via `scripts/build_version.py
 
 ## Credits & Acknowledgments
 
-eenk builds upon the work of open-source firmware projects, drivers, and runtime libraries. See [credits.md](credits.md) for the complete list of credits and software acknowledgments.
+eenk builds upon the work of open-source firmware projects, drivers, and runtime libraries, including the [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader) SD firmware flasher (`src/fwupdate/`, MIT License). See [docs/pages/credits.md](docs/pages/credits.md) for the complete list of credits and software acknowledgments.
 
 ## License
 
